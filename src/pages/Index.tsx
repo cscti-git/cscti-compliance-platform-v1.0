@@ -1,499 +1,416 @@
-import React, { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { useSearch } from '@/contexts/SearchContext'
-import { useRealtime } from '@/hooks/use-realtime'
 import {
-  listContexts,
-  deleteContext,
-  exportContextAsJson,
-  createContext,
-  type ContextItem,
-  type ContextSource,
-} from '@/services/contextService'
-import {
-  Briefcase,
-  MessageSquare,
+  ShieldCheck,
+  CheckCircle2,
+  FolderGit2,
+  Server,
+  HardDriveDownload,
+  AlertTriangle,
   Clock,
-  Plus,
-  MoreVertical,
-  Download,
-  Pencil,
-  Trash2,
-  Copy,
-  Eye,
-  FileText,
-  SearchX,
-  ExternalLink,
+  ArrowRight,
+  Building2,
+  FileCheck2,
+  Users,
+  Settings,
+  Activity,
+  Layers,
+  Sparkles,
 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  listAssignments,
+  listPeople,
+  getIntegrations,
+  listAuditLogs,
+} from '@/services/csctiService'
+import type { AuditLogItem } from '@/types/cscti'
 
-// Source styling helper
-export function getSourceBadgeInfo(source: ContextSource) {
-  switch (source) {
-    case 'chatgpt':
-      return {
-        label: 'ChatGPT',
-        bgColor: 'bg-[#ECFDF5]',
-        textColor: 'text-[#10A37F]',
-        borderColor: 'border-[#10A37F]/30',
-      }
-    case 'claude':
-      return {
-        label: 'Claude',
-        bgColor: 'bg-[#FFF7ED]',
-        textColor: 'text-[#D97757]',
-        borderColor: 'border-[#D97757]/30',
-      }
-    case 'gemini':
-      return {
-        label: 'Gemini',
-        bgColor: 'bg-[#EFF6FF]',
-        textColor: 'text-[#4285F4]',
-        borderColor: 'border-[#4285F4]/30',
-      }
-    case 'vm':
-      return {
-        label: 'VM',
-        bgColor: 'bg-[#F5F3FF]',
-        textColor: 'text-[#8B5CF6]',
-        borderColor: 'border-[#8B5CF6]/30',
-      }
-    case 'manual':
-    default:
-      return {
-        label: 'Manual',
-        bgColor: 'bg-[#F3F4F6]',
-        textColor: 'text-[#6B7280]',
-        borderColor: 'border-[#6B7280]/30',
-      }
-  }
-}
-
-// Relative time helper
-export function formatRelativeTime(dateString: string) {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-  if (diffInSeconds < 60) return 'agora'
-  if (diffInSeconds < 3600) return `há ${Math.floor(diffInSeconds / 60)} min`
-  if (diffInSeconds < 86400) return `há ${Math.floor(diffInSeconds / 3600)} h`
-  if (diffInSeconds < 86400 * 30) return `há ${Math.floor(diffInSeconds / 86400)} d`
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-}
-
-export default function Index() {
-  const { user } = useAuth()
-  const { searchTerm } = useSearch()
-  const navigate = useNavigate()
-  const { toast } = useToast()
-
-  const [contexts, setContexts] = useState<ContextItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [sourceFilter, setSourceFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<string>('-created')
-
-  // Deletion modal state
-  const [contextToDelete, setContextToDelete] = useState<ContextItem | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
-
-  const fetchContexts = async () => {
-    try {
-      const data = await listContexts({
-        source: sourceFilter,
-        sort: sortBy,
-      })
-      setContexts(data)
-    } catch (err) {
-      console.error('Erro ao carregar contextos:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+export const Index: React.FC = () => {
+  const { organization, user } = useAuth()
+  const [peopleCount, setPeopleCount] = useState<number>(0)
+  const [assignmentsCount, setAssignmentsCount] = useState<number>(0)
+  const [glpiActive, setGlpiActive] = useState<boolean>(false)
+  const [emailActive, setEmailActive] = useState<boolean>(false)
+  const [recentAudits, setRecentAudits] = useState<AuditLogItem[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchContexts()
-  }, [sourceFilter, sortBy])
-
-  // Realtime subscription for live sync
-  useRealtime('contexts', () => {
-    fetchContexts()
-  })
-
-  // Client-side search filtering
-  const filteredContexts = useMemo(() => {
-    if (!searchTerm.trim()) return contexts
-    const q = searchTerm.toLowerCase()
-    return contexts.filter((c) => {
-      const inTitle = c.title.toLowerCase().includes(q)
-      const inSummary = c.summary.toLowerCase().includes(q)
-      const inContent = c.content.toLowerCase().includes(q)
-      const inTags = c.tags.some((t) => t.toLowerCase().includes(q))
-      return inTitle || inSummary || inContent || inTags
-    })
-  }, [contexts, searchTerm])
-
-  // Stats calculation
-  const totalCount = contexts.length
-  const conversationCount = contexts.filter(
-    (c) => c.source === 'chatgpt' || c.source === 'claude' || c.source === 'gemini',
-  ).length
-  const latestUpdate = contexts.length > 0 ? contexts[0].created : null
-
-  const handleDeleteConfirm = async () => {
-    if (!contextToDelete) return
-    setIsDeleting(true)
-    try {
-      await deleteContext(contextToDelete.id, contextToDelete.title)
-      setContexts((prev) => prev.filter((c) => c.id !== contextToDelete.id))
-      toast({
-        title: 'Contexto excluído',
-        description: `O contexto "${contextToDelete.title}" foi removido com sucesso.`,
-      })
-      setContextToDelete(null)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Falha ao excluir'
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao excluir',
-        description: msg,
-      })
-    } finally {
-      setIsDeleting(false)
+    async function loadStats() {
+      if (!organization?.id) return
+      try {
+        const [people, assignments, ints, audits] = await Promise.all([
+          listPeople(organization.id),
+          listAssignments(organization.id),
+          getIntegrations(organization.id),
+          listAuditLogs(organization.id, 5),
+        ])
+        setPeopleCount(people.length)
+        setAssignmentsCount(assignments.filter((a) => a.status === 'ativo').length)
+        setGlpiActive(Boolean(ints.glpi?.enabled && ints.glpi.glpi_url))
+        setEmailActive(Boolean(ints.email?.enabled && ints.email.email_host))
+        setRecentAudits(audits)
+      } catch (err) {
+        console.error('Erro ao carregar dados do dashboard:', err)
+      } finally {
+        setLoading(false)
+      }
     }
-  }
+    loadStats()
+  }, [organization?.id])
 
-  const handleDuplicate = async (context: ContextItem) => {
-    try {
-      await createContext({
-        title: `${context.title} (Cópia)`,
-        summary: context.summary,
-        content: context.content,
-        source: context.source,
-        tags: [...context.tags],
-      })
-      toast({
-        title: 'Contexto duplicado',
-        description: `Uma cópia de "${context.title}" foi criada.`,
-      })
-    } catch (err) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao duplicar',
-        description: 'Não foi possível duplicar o contexto.',
-      })
-    }
-  }
+  // Calculation of Configuration completeness for the banner
+  const hasBasicData = Boolean(organization?.corporate_name && organization?.cnpj)
+  const hasType = Boolean(organization?.type)
+  const hasServices = Boolean(organization?.services && organization.services.length > 0)
+  const hasPeople = peopleCount > 0
+  const hasAssignments = assignmentsCount > 0
+  const hasAddress = Boolean(organization?.zip_code && organization?.street && organization?.city)
+
+  const completedSteps = [
+    hasBasicData,
+    hasType,
+    hasServices,
+    hasPeople,
+    hasAssignments,
+    hasAddress,
+  ].filter(Boolean).length
+
+  const configProgress = Math.round((completedSteps / 6) * 100)
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Header section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1F2937]">
-            Olá, {user?.name || 'Desenvolvedor'} 👋
+    <div className="space-y-6">
+      {/* Banner de Boas-Vindas e Status Geral */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="space-y-2 max-w-2xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-blue-600/90 hover:bg-blue-600 text-white border-0 text-xs px-2.5 py-0.5">
+              Provimento CNJ 243/2026
+            </Badge>
+            <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Ambiente Institucional Ativo
+            </span>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            {organization?.name || 'Serventia Extrajudicial'}
           </h1>
-          <p className="text-sm text-[#6B7280] mt-1">
-            Gerencie seus contextos de trabalho entre ferramentas e sua máquina virtual.
+          <p className="text-sm text-slate-300 leading-relaxed">
+            Painel consolidado de governança, evidências comprobatórias e controles de tecnologia
+            para atendimento às exigências normativas da Corregedoria Nacional de Justiça.
           </p>
         </div>
-        <button
-          onClick={() => navigate('/novo-contexto')}
-          className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-medium rounded-lg shadow-sm transition-all active:scale-[0.98] shrink-0 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Novo Contexto</span>
-        </button>
-      </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-[#E4E7EC] shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-lg bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center shrink-0">
-            <Briefcase className="w-6 h-6" />
+        {/* Card Resumo do Provimento */}
+        <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/15 w-full sm:w-auto shrink-0 min-w-[240px]">
+          <div className="flex items-center justify-between gap-4 text-xs text-slate-300 mb-2">
+            <span>Enquadramento:</span>
+            <span className="font-bold text-white uppercase">
+              Classe {organization?.provimento_class || 'C2'} • Subclasse{' '}
+              {organization?.provimento_subclass || 'D'}
+            </span>
           </div>
-          <div>
-            <p className="text-xs text-[#6B7280] font-medium">Total de Contextos</p>
-            <p className="text-2xl font-bold text-[#1F2937]">{totalCount}</p>
+          <div className="flex items-center justify-between gap-4 text-xs text-slate-300 mb-2">
+            <span>Prazo Etapa 1:</span>
+            <span className="font-bold text-blue-300">
+              {organization?.deadline_stage_1_days || 240} dias
+            </span>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-[#E4E7EC] shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-lg bg-emerald-50 text-[#10B981] flex items-center justify-center shrink-0">
-            <MessageSquare className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs text-[#6B7280] font-medium">Conversas Importadas</p>
-            <p className="text-2xl font-bold text-[#1F2937]">{conversationCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-[#E4E7EC] shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-lg bg-purple-50 text-[#8B5CF6] flex items-center justify-center shrink-0">
-            <Clock className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs text-[#6B7280] font-medium">Última Atualização</p>
-            <p className="text-sm font-semibold text-[#1F2937] mt-1">
-              {latestUpdate ? formatRelativeTime(latestUpdate) : 'Nenhuma'}
-            </p>
+          <div className="flex items-center justify-between gap-4 text-xs text-slate-300">
+            <span>Prazo Etapa 2:</span>
+            <span className="font-bold text-blue-300">
+              {organization?.deadline_stage_2_days || 240} dias
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Filter and sorting bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mr-1">
-            Origem:
-          </span>
-          {[
-            { id: 'all', label: 'Todos' },
-            { id: 'chatgpt', label: 'ChatGPT' },
-            { id: 'claude', label: 'Claude' },
-            { id: 'gemini', label: 'Gemini' },
-            { id: 'manual', label: 'Manual' },
-            { id: 'vm', label: 'VM' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setSourceFilter(item.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 cursor-pointer ${
-                sourceFilter === item.id
-                  ? 'bg-[#4F46E5] text-white shadow-xs'
-                  : 'bg-white border border-[#D1D5DB] text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#1F2937]'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <span className="text-xs text-[#6B7280]">Ordenar:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="h-8 px-2.5 text-xs rounded-lg border border-[#D1D5DB] bg-white text-[#1F2937] focus:outline-none focus:border-[#4F46E5] cursor-pointer"
-          >
-            <option value="-created">Mais recentes</option>
-            <option value="created">Mais antigos</option>
-            <option value="title">A-Z</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Grid of Context cards */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="bg-white rounded-xl border border-[#E4E7EC] p-5 space-y-3 animate-pulse"
-            >
-              <div className="h-5 w-20 bg-slate-200 rounded-md" />
-              <div className="h-5 w-3/4 bg-slate-200 rounded-md" />
-              <div className="h-12 w-full bg-slate-100 rounded-md" />
-              <div className="flex gap-2 pt-2">
-                <div className="h-4 w-12 bg-slate-200 rounded-full" />
-                <div className="h-4 w-16 bg-slate-200 rounded-full" />
+      {/* Assistente de Configuração — Progresso */}
+      {completedSteps < 6 && (
+        <Card className="border-blue-200 bg-blue-50/50 shadow-xs">
+          <CardContent className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1.5 flex-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-blue-600" />
+                <h3 className="text-sm font-bold text-blue-950">
+                  Assistente de Implantação da Serventia ({completedSteps} de 6 etapas concluídas)
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600">
+                Complete os dados cadastrais, atribuições de papéis e conectores para garantir a
+                conformidade institucional.
+              </p>
+              <div className="w-full max-w-md pt-1">
+                <Progress value={configProgress} className="h-2 bg-blue-200" />
               </div>
             </div>
-          ))}
-        </div>
-      ) : filteredContexts.length === 0 ? (
-        <div className="bg-white border border-[#E4E7EC] rounded-2xl p-12 text-center max-w-lg mx-auto space-y-4 my-8">
-          {searchTerm ? (
-            <>
-              <div className="w-16 h-16 mx-auto rounded-full bg-slate-100 text-[#9CA3AF] flex items-center justify-center">
-                <SearchX className="w-8 h-8" />
-              </div>
-              <h3 className="text-lg font-semibold text-[#1F2937]">
-                Nenhum resultado para "{searchTerm}"
-              </h3>
-              <p className="text-xs text-[#6B7280]">
-                Tente ajustar os termos de busca ou limpar os filtros para ver seus contextos.
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="w-20 h-20 mx-auto rounded-2xl bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center shadow-inner">
-                <FileText className="w-10 h-10" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-semibold text-[#1F2937]">
-                  Nenhum contexto criado ainda
-                </h3>
-                <p className="text-xs text-[#6B7280] max-w-sm mx-auto">
-                  Importe uma conversa do ChatGPT/Claude ou descreva seu trabalho para começar a
-                  organizar seus contextos portáteis.
-                </p>
-              </div>
-              <div className="pt-2">
-                <button
-                  onClick={() => navigate('/novo-contexto')}
-                  className="inline-flex items-center justify-center gap-2 h-10 px-5 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-medium rounded-lg shadow-sm transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Criar seu primeiro contexto</span>
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredContexts.map((context) => {
-            const badge = getSourceBadgeInfo(context.source)
-            return (
-              <div
-                key={context.id}
-                onClick={() => navigate(`/contextos/${context.id}`)}
-                className="group relative bg-white rounded-xl border border-[#E4E7EC] hover:border-[#C7CBD1] hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200 p-5 flex flex-col justify-between cursor-pointer"
-              >
-                <div>
-                  {/* Top row: Badge and dropdown */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bgColor} ${badge.textColor} ${badge.borderColor}`}
-                    >
-                      {badge.label}
-                    </span>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1 rounded-md text-[#9CA3AF] hover:text-[#1F2937] hover:bg-[#F3F4F6] transition-colors focus:outline-none"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-44 bg-white border border-[#E4E7EC] shadow-lg rounded-lg p-1 text-xs"
-                      >
-                        <DropdownMenuItem
-                          onClick={() => navigate(`/contextos/${context.id}`)}
-                          className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-[#1F2937]"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-[#6B7280]" />
-                          <span>Ver Detalhes</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => navigate(`/editar-contexto/${context.id}`)}
-                          className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-[#1F2937]"
-                        >
-                          <Pencil className="w-3.5 h-3.5 text-[#6B7280]" />
-                          <span>Editar</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDuplicate(context)}
-                          className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-[#1F2937]"
-                        >
-                          <Copy className="w-3.5 h-3.5 text-[#6B7280]" />
-                          <span>Duplicar</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => exportContextAsJson(context)}
-                          className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-[#1F2937]"
-                        >
-                          <Download className="w-3.5 h-3.5 text-[#6B7280]" />
-                          <span>Exportar JSON</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="my-1 bg-[#E4E7EC]" />
-                        <DropdownMenuItem
-                          onClick={() => setContextToDelete(context)}
-                          className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-[#EF4444] hover:bg-red-50 focus:bg-red-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Excluir</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="font-semibold text-sm text-[#1F2937] line-clamp-1 group-hover:text-[#4F46E5] transition-colors">
-                    {context.title}
-                  </h3>
-
-                  {/* Snippet / Summary */}
-                  <p className="text-xs text-[#6B7280] line-clamp-2 mt-2 leading-relaxed">
-                    {context.summary || context.content}
-                  </p>
-                </div>
-
-                {/* Footer: Tags and Time */}
-                <div className="pt-4 mt-3 border-t border-[#F3F4F6] flex items-center justify-between text-[11px] text-[#9CA3AF]">
-                  <div className="flex flex-wrap gap-1 max-w-[70%]">
-                    {context.tags.slice(0, 3).map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-0.5 rounded-md bg-[#F3F4F6] text-[#6B7280] text-[10px] font-medium"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                    {context.tags.length > 3 && (
-                      <span className="text-[10px] text-[#9CA3AF]">+{context.tags.length - 3}</span>
-                    )}
-                  </div>
-                  <span className="shrink-0">{formatRelativeTime(context.created)}</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+            <Button
+              asChild
+              size="sm"
+              className="bg-blue-700 hover:bg-blue-800 text-xs font-semibold shrink-0"
+            >
+              <Link to="/configuracoes">
+                Continuar Configuração <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!contextToDelete} onOpenChange={(open) => !open && setContextToDelete(null)}>
-        <DialogContent className="sm:max-w-md bg-white p-6 rounded-2xl border border-[#E4E7EC]">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-[#1F2937]">
-              Excluir Contexto
-            </DialogTitle>
-            <DialogDescription className="text-sm text-[#6B7280] mt-2">
-              Tem certeza que deseja excluir o contexto <strong>"{contextToDelete?.title}"</strong>?
-              Esta ação não pode ser desfeita.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0 mt-4">
-            <button
-              type="button"
-              onClick={() => setContextToDelete(null)}
-              disabled={isDeleting}
-              className="px-4 py-2 border border-[#D1D5DB] rounded-lg text-sm text-[#1F2937] hover:bg-[#F9FAFB] transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteConfirm}
-              disabled={isDeleting}
-              className="px-4 py-2 bg-[#EF4444] hover:bg-[#DC2626] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              {isDeleting ? 'Excluindo...' : 'Excluir'}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* 4 Cards de Status Principal */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {/* Card 1: Conformidade Normativa */}
+        <Card className="border-slate-200/90 shadow-xs hover:border-slate-300 transition-colors">
+          <CardHeader className="p-5 pb-3 flex flex-row items-center justify-between space-y-0">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Conformidade CNJ
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="p-5 pt-0 space-y-2">
+            <div className="text-2xl font-bold text-slate-900">Em preparação</div>
+            <p className="text-xs text-slate-500">
+              Mapeamento de 48 requisitos técnicos do Anexo IV em fase de parametrização.
+            </p>
+            <div className="pt-2">
+              <Link
+                to="/conformidade"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 inline-flex items-center"
+              >
+                Abrir módulo <ArrowRight className="w-3 h-3 ml-1" />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Central de Evidências */}
+        <Card className="border-slate-200/90 shadow-xs hover:border-slate-300 transition-colors">
+          <CardHeader className="p-5 pb-3 flex flex-row items-center justify-between space-y-0">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Evidências & Auditoria
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center">
+              <FolderGit2 className="w-4 h-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="p-5 pt-0 space-y-2">
+            <div className="text-2xl font-bold text-slate-900">
+              {recentAudits.length > 0 ? `${recentAudits.length} Registros` : 'Ativa'}
+            </div>
+            <p className="text-xs text-slate-500">
+              Trilha de auditoria das operações e registros comprobatórios das configurações.
+            </p>
+            <div className="pt-2">
+              <Link
+                to="/auditoria"
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 inline-flex items-center"
+              >
+                Ver auditoria <ArrowRight className="w-3 h-3 ml-1" />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Inventário de Ativos (GLPI) */}
+        <Card className="border-slate-200/90 shadow-xs hover:border-slate-300 transition-colors">
+          <CardHeader className="p-5 pb-3 flex flex-row items-center justify-between space-y-0">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Inventário de Ativos
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <Server className="w-4 h-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="p-5 pt-0 space-y-2">
+            <div className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <span>{glpiActive ? 'Conectado' : 'Pendente'}</span>
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  glpiActive ? 'bg-emerald-500' : 'bg-amber-400'
+                }`}
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              {glpiActive
+                ? 'Conector GLPI ativo e preparado para sincronização.'
+                : 'Conector GLPI requer validação das credenciais no painel.'}
+            </p>
+            <div className="pt-2">
+              <Link
+                to="/configuracoes?tab=integracoes"
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 inline-flex items-center"
+              >
+                Configurar conector <ArrowRight className="w-3 h-3 ml-1" />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Continuidade & Backup (IMAP) */}
+        <Card className="border-slate-200/90 shadow-xs hover:border-slate-300 transition-colors">
+          <CardHeader className="p-5 pb-3 flex flex-row items-center justify-between space-y-0">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Backup & Continuidade
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+              <HardDriveDownload className="w-4 h-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="p-5 pt-0 space-y-2">
+            <div className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <span>{emailActive ? 'Configurado' : 'Pendente'}</span>
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  emailActive ? 'bg-emerald-500' : 'bg-amber-400'
+                }`}
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              {emailActive
+                ? 'Recepção de e-mails de comprovação de backup configurada.'
+                : 'Requer cadastro da caixa postal IMAP de backup.'}
+            </p>
+            <div className="pt-2">
+              <Link
+                to="/backup"
+                className="text-xs font-semibold text-amber-600 hover:text-amber-800 inline-flex items-center"
+              >
+                Abrir módulo <ArrowRight className="w-3 h-3 ml-1" />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Grid Duplo: Resumo Institucional e Trilha Recente */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna 1 & 2: Estrutura Institucional da Serventia */}
+        <Card className="lg:col-span-2 border-slate-200 shadow-xs">
+          <CardHeader className="border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-bold text-slate-900">
+                  Estrutura Institucional e Atribuições
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500">
+                  Pessoas responsáveis e papéis regimentais designados para a serventia.
+                </CardDescription>
+              </div>
+              <Button asChild variant="outline" size="sm" className="text-xs">
+                <Link to="/configuracoes?tab=papeis">
+                  Gerenciar Pessoas <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <span>Pessoas Cadastradas</span>
+                </div>
+                <div className="text-2xl font-bold text-slate-900">{peopleCount}</div>
+                <p className="text-[11px] text-slate-500 mt-1">Colaboradores da serventia</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                  <FileCheck2 className="w-4 h-4 text-emerald-600" />
+                  <span>Atribuições Ativas</span>
+                </div>
+                <div className="text-2xl font-bold text-slate-900">{assignmentsCount}</div>
+                <p className="text-[11px] text-slate-500 mt-1">Papéis com vigência válida</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                  <Building2 className="w-4 h-4 text-indigo-600" />
+                  <span>Serviços Institucionais</span>
+                </div>
+                <div className="text-2xl font-bold text-slate-900">
+                  {organization?.services?.length || 0}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Atos notariais/registrais</p>
+              </div>
+            </div>
+
+            {/* Informações de Localização */}
+            <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 text-xs text-slate-600 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <Building2 className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-semibold text-slate-900">Endereço da Serventia: </span>
+                  <span>
+                    {organization?.street
+                      ? `${organization.street}, ${organization.number || 'S/N'} — ${organization.neighborhood || ''}, ${organization.city || ''}/${organization.state || ''}`
+                      : 'Endereço ainda não preenchido nas configurações.'}
+                  </span>
+                </div>
+              </div>
+              <Button asChild variant="link" size="sm" className="text-xs text-blue-600 p-0 h-auto">
+                <Link to="/configuracoes?tab=organizacao">Editar dados</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Coluna 3: Trilha de Auditoria Recente */}
+        <Card className="border-slate-200 shadow-xs">
+          <CardHeader className="border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-bold text-slate-900">
+                  Auditoria Recente
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500">
+                  Últimas ações registradas
+                </CardDescription>
+              </div>
+              <Button asChild variant="ghost" size="sm" className="text-xs text-blue-600">
+                <Link to="/auditoria">Ver tudo</Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            {recentAudits.length === 0 ? (
+              <p className="text-xs text-slate-400 py-6 text-center">
+                Nenhum evento registrado ainda.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentAudits.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-2.5 rounded-lg border border-slate-100 bg-slate-50/70 text-xs space-y-1"
+                  >
+                    <div className="flex items-center justify-between font-medium">
+                      <span className="text-slate-800 font-semibold truncate max-w-[170px]">
+                        {item.action}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {item.created ? new Date(item.created).toLocaleDateString('pt-BR') : ''}
+                      </span>
+                    </div>
+                    <p className="text-slate-600 line-clamp-2 text-[11px]">{item.detail}</p>
+                    <p className="text-[10px] text-slate-400">
+                      Por: {item.user_name || item.user_email || 'Sistema'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
+export default Index

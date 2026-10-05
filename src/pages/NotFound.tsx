@@ -1,25 +1,30 @@
-/* 404 Page - Displays when a user attempts to access a non-existent route - translate to the language of the user */
-import { useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import React from 'react'
+import { Link } from 'react-router-dom'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { ShieldAlert, ArrowLeft } from 'lucide-react'
 
-const NotFound = () => {
-  const location = useLocation()
-
-  useEffect(() => {
-    console.error('404 Error: User attempted to access non-existent route:', location.pathname)
-  }, [location.pathname])
-
+export const NotFound: React.FC = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
-      </div>
+    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-[#F8FAFC]">
+      <Card className="max-w-md w-full border-slate-200 shadow-md bg-white text-center p-6">
+        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center mx-auto mb-4">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <CardTitle className="text-xl font-bold text-slate-900">Página Não Encontrada</CardTitle>
+        <CardDescription className="text-xs text-slate-500 mt-2">
+          O caminho solicitado não existe ou você não possui autorização para este recurso
+          institucional.
+        </CardDescription>
+        <div className="mt-6">
+          <Button asChild className="bg-blue-700 hover:bg-blue-800 text-xs w-full">
+            <Link to="/">
+              <ArrowLeft className="w-3.5 h-3.5 mr-2" /> Retornar ao Dashboard
+            </Link>
+          </Button>
+        </div>
+      </Card>
     </div>
   )
 }
-
 export default NotFound

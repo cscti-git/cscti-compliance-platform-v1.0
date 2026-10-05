@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-10-02T18:41:41.933Z",
+  "generatedAt": "2026-10-05T13:24:56.093Z",
   "collections": [
     {
       "name": "users",
       "type": "auth",
       "apiRules": {
-        "list": "id = @request.auth.id",
-        "view": "id = @request.auth.id",
-        "create": "",
-        "update": "id = @request.auth.id",
-        "delete": "id = @request.auth.id"
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "update": "@request.auth.id != '' && (id = @request.auth.id || (@request.auth.system_role = 'admin' && organization = @request.auth.organization))",
+        "delete": "@request.auth.id != '' && @request.auth.system_role = 'admin' && organization = @request.auth.organization && id != @request.auth.id"
       },
       "fields": [
         {
@@ -37,6 +37,32 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "system_role",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["admin", "suporte", "usuario"]
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_access",
+          "type": "date",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -173,6 +199,771 @@
         }
       ],
       "indexes": ["CREATE INDEX idx_activities_user_created ON activities (user_id, created DESC)"]
+    },
+    {
+      "name": "organization_types",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_org_types_code ON organization_types (code)"]
+    },
+    {
+      "name": "institutional_services",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_inst_services_code ON institutional_services (code)"]
+    },
+    {
+      "name": "organizations",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.organization = id || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (@request.auth.organization = id || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "update": "@request.auth.id != '' && ((@request.auth.organization = id && @request.auth.system_role = 'admin') || @request.auth.system_role = 'admin')",
+        "delete": "@request.auth.id != '' && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "corporate_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "trade_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cnpj",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contact_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "website",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativa", "inativa"]
+        },
+        {
+          "name": "type",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organization_types"
+        },
+        {
+          "name": "services",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "institutional_services"
+        },
+        {
+          "name": "provimento_class",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["C1", "C2", "C3"]
+        },
+        {
+          "name": "provimento_subclass",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+        },
+        {
+          "name": "revenue_range",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "deadline_stage_1_days",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "deadline_stage_2_days",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "zip_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "street",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "complement",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "neighborhood",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "country",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "app_product_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "app_header_title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "app_institutional_text",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_organizations_name ON organizations (name)"]
+    },
+    {
+      "name": "people",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "role_title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_people_org ON people (organization)"]
+    },
+    {
+      "name": "roles",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "suggested_mode",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_roles_code ON roles (code)"]
+    },
+    {
+      "name": "assignments",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "person",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "role",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "roles"
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo", "encerrado"]
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_assignments_org ON assignments (organization)"]
+    },
+    {
+      "name": "integrations",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "delete": "@request.auth.id != '' && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["glpi", "email_backup"]
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ativo", "inativo", "pendente", "erro"]
+        },
+        {
+          "name": "glpi_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "glpi_sync_limit",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "glpi_ssl_verify",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "glpi_app_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "glpi_user_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "glpi_has_app_token",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "glpi_has_user_token",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_host",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_port",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_protocol",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_security",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_user",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_folder",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_password",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_has_password",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_sync",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_sync_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_sync_message",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_integrations_org_type ON integrations (organization, type)"]
+    },
+    {
+      "name": "audit_log",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "user_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "user_email",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "entity",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detail",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "metadata",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ip_address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_audit_org_created ON audit_log (organization, created DESC)"]
     }
   ]
 }
