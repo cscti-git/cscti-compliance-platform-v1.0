@@ -1,10 +1,14 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
-import { Briefcase, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { Loader2, ArrowLeft, CheckCircle2, Mail, AlertCircle, ArrowRight } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { AuthShell } from '@/components/AuthShell'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
-export default function ForgotPassword() {
+export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSent, setIsSent] = useState(false)
@@ -15,11 +19,11 @@ export default function ForgotPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email.trim()) {
-      setError('Email é obrigatório')
+      setError('O e-mail cadastrado é obrigatório.')
       return
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
-      setError('Insira um email válido')
+      setError('Informe um endereço de e-mail institucional válido.')
       return
     }
 
@@ -29,11 +33,14 @@ export default function ForgotPassword() {
       await pb.collection('users').requestPasswordReset(email.trim())
       setIsSent(true)
       toast({
-        title: 'Email de recuperação enviado',
-        description: 'Verifique sua caixa de entrada para redefinir a senha.',
+        title: 'Instruções enviadas',
+        description: 'Verifique sua caixa de entrada institucional para redefinir a credencial.',
       })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Falha ao solicitar recuperação'
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Falha ao solicitar link de redefinição. Contate o Administrador.'
       setError(msg)
     } finally {
       setIsLoading(false)
@@ -41,85 +48,91 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#EEF2FF] via-[#F7F8FA] to-[#F3F4F6] p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-[#E4E7EC] p-8 space-y-6">
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#4F46E5] text-white shadow-md shadow-[#4F46E5]/20 mb-2">
-            <Briefcase className="w-6 h-6" />
+    <AuthShell
+      title="Recuperação de Senha"
+      subtitle="Enviaremos um link assinado digitalmente para você cadastrar uma nova credencial segura."
+      badgeText="Segurança Institucional"
+      footerLink={{
+        text: 'Lembrou de sua senha?',
+        linkText: 'Retornar ao login',
+        href: '/login',
+      }}
+    >
+      {isSent ? (
+        <div className="py-2 text-center space-y-4">
+          <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1F2937]">Recuperar Senha</h1>
-          <p className="text-sm text-[#6B7280]">
-            Enviaremos um link seguro para você definir uma nova senha.
-          </p>
-        </div>
 
-        {isSent ? (
-          <div className="text-center space-y-4 py-4">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-50 text-[#10B981]">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-            <p className="text-sm text-[#1F2937] font-medium">
-              Link de recuperação enviado com sucesso!
+          <div className="space-y-1.5">
+            <h3 className="text-base font-bold text-slate-900">Link Despachado com Sucesso</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Caso haja uma conta ativa para <strong>{email}</strong>, o link com prazo de expiração
+              de segurança foi enviado para a sua caixa postal.
             </p>
-            <p className="text-xs text-[#6B7280]">
-              Se houver uma conta associada ao e-mail <strong>{email}</strong>, você receberá
-              instruções para redefinir a sua senha.
-            </p>
-            <div className="pt-4">
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center gap-2 text-sm text-[#4F46E5] hover:text-[#4338CA] font-medium"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Voltar para o login
-              </Link>
-            </div>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-[#1F2937] uppercase tracking-wider mb-1.5">
-                E-mail cadastrado
-              </label>
-              <input
+
+          <div className="pt-3">
+            <Button
+              asChild
+              className="w-full h-11 text-sm font-semibold bg-[#0B2545] hover:bg-[#07192F] text-white shadow-md rounded-lg"
+            >
+              <Link to="/login">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                <span>Voltar para a tela de Login</span>
+              </Link>
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="p-3.5 rounded-xl bg-red-50/90 border border-red-200 text-red-700 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-600" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              E-mail Institucional Cadastrado
+            </Label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Mail className="w-4 h-4" />
+              </div>
+              <Input
                 type="email"
+                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
-                className={`w-full h-10 px-3 text-sm rounded-lg border bg-white text-[#1F2937] placeholder-[#9CA3AF] transition-all focus:outline-none focus:border-[#4F46E5] focus:ring-3 focus:ring-[#4F46E5]/15 ${
-                  error ? 'border-[#EF4444]' : 'border-[#D1D5DB]'
-                }`}
+                placeholder="seu.nome@cartorio.com.br"
+                className="pl-10 h-11 text-sm bg-slate-50/70 border-slate-200 focus:bg-white focus:border-[#0B2545] focus:ring-2 focus:ring-[#0B2545]/15"
               />
-              {error && <p className="text-xs text-[#EF4444] mt-1">{error}</p>}
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full h-10 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Enviando...</span>
-                </>
-              ) : (
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="w-full h-11 text-sm font-semibold bg-[#0B2545] hover:bg-[#07192F] text-white shadow-md shadow-[#0B2545]/20 hover:shadow-lg transition-all rounded-lg mt-2 flex items-center justify-center gap-2 group cursor-pointer"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
+                <span>Despachando link...</span>
+              </>
+            ) : (
+              <>
                 <span>Enviar link de recuperação</span>
-              )}
-            </button>
-
-            <div className="pt-2 text-center">
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center gap-2 text-xs text-[#6B7280] hover:text-[#1F2937] transition-colors"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Lembrei minha senha
-              </Link>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+                <ArrowRight className="w-4 h-4 text-[#D4AF37] group-hover:translate-x-0.5 transition-transform" />
+              </>
+            )}
+          </Button>
+        </form>
+      )}
+    </AuthShell>
   )
 }
+
+export default ForgotPassword

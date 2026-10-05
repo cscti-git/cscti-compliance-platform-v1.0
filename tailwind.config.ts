@@ -81,6 +81,16 @@ export default {
           4: 'hsl(var(--chart-4))',
           5: 'hsl(var(--chart-5))',
         },
+        cscti: {
+          navy: '#0B2545',
+          navyDeep: '#061628',
+          navyLight: '#133E68',
+          gold: '#D4AF37',
+          goldLight: '#F3C969',
+          goldMuted: '#997A15',
+          cyan: '#0EA5E9',
+          slate: '#0F172A',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

@@ -8,6 +8,7 @@ import { ProtectedRoute, PublicRoute } from '@/components/AuthGuards'
 import Layout from './components/Layout'
 import Index from './pages/Index'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
@@ -29,6 +30,14 @@ export const App = () => (
             element={
               <PublicRoute>
                 <Login />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <PublicRoute>
+                <Signup />
               </PublicRoute>
             }
           />

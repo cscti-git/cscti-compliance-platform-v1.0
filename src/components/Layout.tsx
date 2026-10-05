@@ -16,12 +16,11 @@ import {
   Building2,
   Menu,
   X,
-  ChevronRight,
-  UserCheck,
-  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { CsctiLogo, CsctiLogoMark } from '@/components/CsctiLogo'
+import { CSCTI_BRAND } from '@/lib/brand'
 
 import { Outlet } from 'react-router-dom'
 
@@ -98,9 +97,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const orgName = organization?.name || 'Serventia Conectada'
-  const productName = organization?.app_product_name || 'CSCTI — Compliance Platform V2'
-  const headerTitle =
-    organization?.app_header_title || 'Governança, conformidade e gestão institucional'
+  const productName = organization?.app_product_name || CSCTI_BRAND.name
+  const headerTitle = organization?.app_header_title || CSCTI_BRAND.tagline
 
   const getRoleLabel = () => {
     switch (role) {
@@ -141,21 +139,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
 
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-700 flex items-center justify-center text-white shadow-xs">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
+          <Link to="/" className="flex items-center gap-3 group">
+            <CsctiLogoMark size={36} />
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 text-sm sm:text-base leading-tight tracking-tight">
+                <span className="font-bold text-slate-900 text-sm sm:text-base leading-tight tracking-tight group-hover:text-[#0B2545] transition-colors">
                   {productName}
                 </span>
-                <span className="hidden sm:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300">
                   Prov. 243/2026
                 </span>
               </div>
               <p className="text-xs text-slate-500 hidden sm:block truncate max-w-md">
-                {headerTitle}
+                {headerTitle || CSCTI_BRAND.tagline}
               </p>
             </div>
           </Link>
@@ -192,7 +188,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <p className="text-[11px] text-slate-500 capitalize">{getRoleLabel()}</p>
             </div>
 
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white text-xs font-bold uppercase ring-2 ring-slate-100">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0B2545] to-[#124E78] border border-[#D4AF37]/50 flex items-center justify-center text-white text-xs font-bold uppercase shadow-xs">
               {(user?.name || user?.email || 'U').substring(0, 2)}
             </div>
 
@@ -241,20 +237,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       <li key={item.title}>
                         <Link
                           to={item.href}
-                          className={`group flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                          className={`group flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                             active
-                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              ? 'bg-gradient-to-r from-[#124E78] to-[#0B2545] text-white shadow-xs font-semibold border-l-2 border-[#D4AF37]'
                               : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <item.icon
-                              className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}
+                              className={`w-4 h-4 shrink-0 ${active ? 'text-[#D4AF37]' : 'text-slate-400 group-hover:text-slate-200'}`}
                             />
                             <span className="truncate">{item.title}</span>
                           </div>
                           {item.badge && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#F3C969] font-semibold border border-[#D4AF37]/30">
                               {item.badge}
                             </span>
                           )}
@@ -269,8 +265,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Rodapé da Sidebar */}
           <div className="p-3.5 border-t border-slate-800/80 bg-slate-950/60 text-xs text-slate-400 flex items-center justify-between">
-            <span className="truncate">CSCTI Compliance V2</span>
-            <span className="text-[11px] font-mono text-slate-500">243/2026</span>
+            <div className="flex items-center gap-2 truncate">
+              <CsctiLogoMark size={16} />
+              <span className="truncate">{CSCTI_BRAND.name} Compliance</span>
+            </div>
+            <span className="text-[10px] font-mono text-[#D4AF37] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+              243/213
+            </span>
           </div>
         </aside>
 
@@ -316,12 +317,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                               onClick={() => setMobileMenuOpen(false)}
                               className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium ${
                                 active
-                                  ? 'bg-blue-600 text-white font-semibold'
+                                  ? 'bg-gradient-to-r from-[#124E78] to-[#0B2545] text-white font-semibold border-l-2 border-[#D4AF37]'
                                   : 'text-slate-300 hover:bg-slate-800'
                               }`}
                             >
                               <div className="flex items-center gap-2.5">
-                                <item.icon className="w-4 h-4 shrink-0" />
+                                <item.icon
+                                  className={`w-4 h-4 shrink-0 ${active ? 'text-[#D4AF37]' : ''}`}
+                                />
                                 <span>{item.title}</span>
                               </div>
                             </Link>

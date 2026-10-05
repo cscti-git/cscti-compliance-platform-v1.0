@@ -6,13 +6,19 @@ import { Label } from '@/components/ui/label'
 import { updateOrganization } from '@/services/csctiService'
 import type { OrganizationItem } from '@/types/cscti'
 import { useToast } from '@/hooks/use-toast'
-import { Palette, Eye, Save, Loader2, Sparkles } from 'lucide-react'
+import { Palette, Eye, Save, Loader2, Sparkles, RotateCcw } from 'lucide-react'
+import { CsctiLogoMark } from '@/components/CsctiLogo'
+import { CSCTI_BRAND } from '@/lib/brand'
 
 interface VisualIdentityTabProps {
   organization: OrganizationItem
   onUpdated: () => Promise<void>
   readOnly?: boolean
 }
+
+const DEFAULT_PRODUCT_NAME = CSCTI_BRAND.name
+const DEFAULT_HEADER_TITLE = CSCTI_BRAND.tagline
+const DEFAULT_INSTITUTIONAL_TEXT = `${CSCTI_BRAND.normativeReference} — ${CSCTI_BRAND.shortTagline}`
 
 export const VisualIdentityTab: React.FC<VisualIdentityTabProps> = ({
   organization,
@@ -23,15 +29,20 @@ export const VisualIdentityTab: React.FC<VisualIdentityTabProps> = ({
   const [isSaving, setIsSaving] = useState(false)
 
   const [productName, setProductName] = useState(
-    organization.app_product_name || 'CSCTI — Compliance Platform V2',
+    organization.app_product_name || DEFAULT_PRODUCT_NAME,
   )
   const [headerTitle, setHeaderTitle] = useState(
-    organization.app_header_title || 'Governança, conformidade e gestão institucional',
+    organization.app_header_title || DEFAULT_HEADER_TITLE,
   )
   const [institutionalText, setInstitutionalText] = useState(
-    organization.app_institutional_text ||
-      'Serventia Extrajudicial em Conformidade com o Provimento 243/2026 CNJ',
+    organization.app_institutional_text || DEFAULT_INSTITUTIONAL_TEXT,
   )
+
+  const handleResetToDefault = () => {
+    setProductName(DEFAULT_PRODUCT_NAME)
+    setHeaderTitle(DEFAULT_HEADER_TITLE)
+    setInstitutionalText(DEFAULT_INSTITUTIONAL_TEXT)
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,34 +145,50 @@ export const VisualIdentityTab: React.FC<VisualIdentityTabProps> = ({
                 <span>Pré-visualização do Topo do Sistema:</span>
               </div>
               <div className="p-3 bg-white rounded-lg border border-slate-200/80 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-700 flex items-center justify-center text-white font-bold text-xs">
-                  C
-                </div>
+                <CsctiLogoMark size={32} />
                 <div>
-                  <p className="text-xs font-bold text-slate-900 leading-tight">
-                    {productName || 'CSCTI'}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-slate-900 leading-tight">
+                      {productName || DEFAULT_PRODUCT_NAME}
+                    </p>
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-300">
+                      Prov. 243/2026
+                    </span>
+                  </div>
                   <p className="text-[11px] text-slate-500 truncate">
-                    {headerTitle || 'Governança, conformidade e gestão institucional'}
+                    {headerTitle || DEFAULT_HEADER_TITLE}
                   </p>
                 </div>
               </div>
             </div>
 
             {!readOnly && (
-              <div className="flex justify-end pt-2">
+              <div className="flex items-center justify-between pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetToDefault}
+                  className="text-xs text-slate-600 hover:text-slate-900"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1.5 text-[#D4AF37]" />
+                  Restaurar Padrão CSCTI
+                </Button>
+
                 <Button
                   type="submit"
                   disabled={isSaving}
-                  className="bg-[#1D4ED8] hover:bg-[#1E40AF] text-white text-xs h-10 px-6 font-semibold"
+                  className="bg-[#0B2545] hover:bg-[#07192F] text-white text-xs h-10 px-6 font-semibold shadow-xs"
                 >
                   {isSaving ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Atualizando...
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-[#D4AF37]" />{' '}
+                      Atualizando...
                     </>
                   ) : (
                     <>
-                      <Save className="w-3.5 h-3.5 mr-1.5" /> Salvar Identidade Visual
+                      <Save className="w-3.5 h-3.5 mr-1.5 text-[#D4AF37]" /> Salvar Identidade
+                      Visual
                     </>
                   )}
                 </Button>
