@@ -16,6 +16,7 @@ import {
   Building2,
   Menu,
   X,
+  RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -62,9 +63,10 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: 'Ambiente',
+    title: 'Inventário e Ativos',
     items: [
-      { title: 'Inventário de Ativos', href: '/ativos', icon: Server },
+      { title: 'Ativos do Cartório', href: '/ativos', icon: Server },
+      { title: 'Sincronização GLPI', href: '/ativos?tab=glpi', icon: RefreshCw },
       { title: 'Infraestrutura', href: '/infraestrutura', icon: Building2 },
     ],
   },

@@ -166,3 +166,66 @@ export interface AuditLogItem {
   created?: string
   updated?: string
 }
+
+export type AssetType =
+  | 'servidor_aplicacao'
+  | 'banco_dados'
+  | 'storage_backup'
+  | 'servico_nuvem'
+  | 'estacao'
+  | 'impressora_multifuncional'
+  | 'equipamento_rede'
+  | 'outro'
+
+export type AssetStatus = 'ativo' | 'inativo' | 'desativado'
+export type AssetCriticality = 'baixa' | 'media' | 'alta'
+export type AssetOrigin = 'manual' | 'glpi'
+
+export interface InventoryAssetItem {
+  id: string
+  organization: string
+  name: string
+  tipo: AssetType
+  status: AssetStatus
+  criticidade: AssetCriticality
+  origem: AssetOrigin
+  localizacao?: string
+  descricao?: string
+  ip_address?: string
+  serial_number?: string
+  external_id?: string
+  responsavel?: string
+  dados_normalizados?: Record<string, unknown>
+  created?: string
+  updated?: string
+  expand?: {
+    responsavel?: PersonItem
+    organization?: OrganizationItem
+  }
+}
+
+export type SyncRunStatus = 'em_andamento' | 'sucesso' | 'erro' | 'parcial'
+
+export interface SyncRunSummary {
+  criados: number
+  atualizados: number
+  inalterados: number
+  erros: number
+  total_glpi: number
+}
+
+export interface InventorySyncRunItem {
+  id: string
+  organization: string
+  connector?: string
+  status: SyncRunStatus
+  resumo?: SyncRunSummary
+  error_message?: string
+  started_at?: string
+  finished_at?: string
+  created?: string
+  updated?: string
+  expand?: {
+    connector?: IntegrationItem
+  }
+}

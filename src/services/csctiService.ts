@@ -10,6 +10,9 @@ import type {
   AuditLogItem,
   UserItem,
   SystemRole,
+  InventoryAssetItem,
+  InventorySyncRunItem,
+  SyncRunSummary,
 } from '@/types/cscti'
 
 // 1. Audit Log Helper
@@ -609,4 +612,172 @@ export async function deleteOrganizationUser(userId: string, orgId: string): Pro
     detail: `Usuário excluído (id: ${userId})`,
     organizationId: orgId,
   })
+}
+
+// 9. Inventory Assets
+export async function listInventoryAssets(
+  orgId: string,
+  params?: {
+    tipo?: string
+    status?: string
+    criticidade?: string
+    origem?: string
+    search?: string
+  },
+): Promise<InventoryAssetItem[]> {
+  try {
+    const filters: string[] = [`organization = '${orgId}'`]
+
+    if (params?.tipo && params.tipo !== 'todos') {
+      filters.push(`tipo = '${params.tipo}'`)
+    }
+    if (params?.status && params.status !== 'todos') {
+      filters.push(`status = '${params.status}'`)
+    }
+    if (params?.criticidade && params.criticidade !== 'todos') {
+      filters.push(`criticidade = '${params.criticidade}'`)
+    }
+    if (params?.origem && params.origem !== 'todos') {
+      filters.push(`origem = '${params.origem}'`)
+    }
+    if (params?.search && params.search.trim()) {
+      const q = params.search.trim().replace(/['"\\]/g, '')
+      filters.push(
+        `(name ~ '${q}' || localizacao ~ '${q}' || ip_address ~ '${q}' || serial_number ~ '${q}')`,
+      )
+    }
+
+    const records = await pb.collection('inventory_assets').getFullList<InventoryAssetItem>({
+      filter: filters.join(' && '),
+      sort: 'name',
+      expand: 'responsavel',
+    })
+    return records
+  } catch (err) {
+    console.error('Erro ao listar inventory_assets:', err)
+    return []
+  }
+}
+
+export async function getInventoryAssetById(id: string): Promise<InventoryAssetItem | null> {
+  try {
+    return await pb.collection('inventory_assets').getOne<InventoryAssetItem>(id, {
+      expand: 'responsavel,organization',
+    })
+  } catch (err) {
+    console.error('Erro ao buscar ativo:', err)
+    return null
+  }
+}
+
+export async function saveInventoryAsset(
+  orgId: string,
+  data: Partial<InventoryAssetItem> & {
+    name: string
+    tipo: string
+    status: string
+    criticidade: string
+  },
+): Promise<InventoryAssetItem> {
+  const payload: Record<string, unknown> = {
+    organization: orgId,
+    name: data.name.trim(),
+    tipo: data.tipo,
+    status: data.status,
+    criticidade: data.criticidade,
+    origem: data.origem || 'manual',
+    localizacao: data.localizacao?.trim() || '',
+    descricao: data.descricao?.trim() || '',
+    ip_address: data.ip_address?.trim() || '',
+    serial_number: data.serial_number?.trim() || '',
+    external_id: data.external_id?.trim() || '',
+    responsavel: data.responsavel || null,
+    dados_normalizados: data.dados_normalizados || {},
+  }
+
+  let res: InventoryAssetItem
+  if (data.id) {
+    res = await pb.collection('inventory_assets').update<InventoryAssetItem>(data.id, payload)
+    await logAudit({
+      action: 'INVENTORY_ASSET_UPDATE',
+      entity: 'Inventário de Ativos',
+      detail: `Ativo atualizado: ${res.name} (Tipo: ${res.tipo}, Status: ${res.status})`,
+      organizationId: orgId,
+      metadata: { asset_id: res.id, name: res.name },
+    })
+  } else {
+    res = await pb.collection('inventory_assets').create<InventoryAssetItem>(payload)
+    await logAudit({
+      action: 'INVENTORY_ASSET_CREATE',
+      entity: 'Inventário de Ativos',
+      detail: `Novo ativo cadastrado: ${res.name} (Tipo: ${res.tipo}, Criticidade: ${res.criticidade})`,
+      organizationId: orgId,
+      metadata: { asset_id: res.id, name: res.name },
+    })
+  }
+  return res
+}
+
+export async function deleteInventoryAsset(
+  id: string,
+  orgId: string,
+  assetName?: string,
+): Promise<void> {
+  await pb.collection('inventory_assets').delete(id)
+  await logAudit({
+    action: 'INVENTORY_ASSET_DELETE',
+    entity: 'Inventário de Ativos',
+    detail: `Ativo excluído: ${assetName || id}`,
+    organizationId: orgId,
+    metadata: { asset_id: id },
+  })
+}
+
+// 10. Inventory Sync Runs
+export async function listInventorySyncRuns(
+  orgId: string,
+  limit = 30,
+): Promise<InventorySyncRunItem[]> {
+  try {
+    const records = await pb
+      .collection('inventory_sync_runs')
+      .getList<InventorySyncRunItem>(1, limit, {
+        filter: `organization = '${orgId}'`,
+        sort: '-created',
+        expand: 'connector',
+      })
+    return records.items
+  } catch (err) {
+    console.error('Erro ao listar inventory_sync_runs:', err)
+    return []
+  }
+}
+
+export async function triggerGlpiSync(orgId: string): Promise<{
+  success: boolean
+  status: string
+  message: string
+  run_id?: string
+  resumo?: SyncRunSummary
+}> {
+  try {
+    const response = await fetch(`${pb.baseUrl}/backend/v1/inventory/glpi-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: pb.authStore.token,
+      },
+      body: JSON.stringify({ organizationId: orgId }),
+    })
+
+    const data = await response.json()
+    return data
+  } catch (err: unknown) {
+    console.error('Erro ao disparar sincronização GLPI:', err)
+    return {
+      success: false,
+      status: 'erro',
+      message: 'Não foi possível comunicar com o serviço de sincronização da plataforma.',
+    }
+  }
 }

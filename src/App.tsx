@@ -14,6 +14,8 @@ import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
 import SettingsPage from './pages/SettingsPage'
 import AuditPage from './pages/AuditPage'
+import AssetsPage from './pages/inventory/AssetsPage'
+import InventoryReportPage from './pages/inventory/InventoryReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
@@ -110,22 +112,7 @@ export const App = () => (
             <Route path="/auditoria" element={<AuditPage />} />
 
             {/* 4. Ambiente */}
-            <Route
-              path="/ativos"
-              element={
-                <PlaceholderPage
-                  moduleTitle="Inventário de Ativos"
-                  moduleSection="Ambiente"
-                  description="Mapeamento e catalogação de servidores, computadores e equipamentos da serventia via GLPI."
-                  featuresPlanned={[
-                    'Sincronização bidirecional com a API do servidor GLPI',
-                    'Classificação de computadores com acesso a centrais notariais',
-                    'Status de antivírus, criptografia e firewall nos endpoints',
-                    'Ficha técnica por estação de trabalho',
-                  ]}
-                />
-              }
-            />
+            <Route path="/ativos" element={<AssetsPage />} />
             <Route
               path="/infraestrutura"
               element={
@@ -180,6 +167,16 @@ export const App = () => (
             {/* 7. Administração */}
             <Route path="/configuracoes" element={<SettingsPage />} />
           </Route>
+
+          {/* Relatório Comprobatório Formatado (Visualização limpa e Impressão A4) */}
+          <Route
+            path="/relatorios/inventario"
+            element={
+              <ProtectedRoute>
+                <InventoryReportPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* 404 Fallback */}
           <Route path="*" element={<NotFound />} />
