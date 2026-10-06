@@ -108,13 +108,13 @@ export const InventoryReportPage: React.FC = () => {
                   Relatório Comprobatório de Inventário de Ativos
                 </h1>
                 <p className="text-xs font-semibold text-slate-600">
-                  Provimento CNJ nº 243/2026 e nº 213/2026 • Gestão de Continuidade e Segurança
+                  CSCTI - Compliance • Gestão de Continuidade e Segurança da Informação
                 </p>
               </div>
             </div>
 
             <div className="text-right text-xs">
-              <span className="inline-block px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-300 font-bold mb-1">
+              <span className="inline-block px-2.5 py-1 rounded bg-slate-100 text-slate-800 border border-slate-300 font-bold mb-1">
                 Classe {provimentoClass} • Fase 2
               </span>
               <p className="text-slate-500 font-mono text-[11px]">
@@ -289,9 +289,8 @@ export const InventoryReportPage: React.FC = () => {
           <div className="mb-8">
             <p className="leading-relaxed">
               <strong>Declaração de Conformidade Técnica:</strong> Certifica-se, para os devidos
-              fins de fiscalização correcional e cumprimento das diretrizes de segurança da
-              informação estipuladas pelo <strong>Provimento CNJ nº 243/2026</strong> (que alterou o
-              Provimento CNJ nº 213/2026), que a relação de ativos acima descrita reflete
+              fins de fiscalização, governança e cumprimento das diretrizes de segurança da
+              informação perante o juízo competente, que a relação de ativos acima descrita reflete
               integralmente o ambiente tecnológico em operação nesta serventia, servindo de base de
               escopo para as rotinas automáticas de backup, recuperação e auditoria contínua.
             </p>
@@ -319,7 +318,7 @@ export const InventoryReportPage: React.FC = () => {
         <footer className="mt-12 pt-3 border-t border-slate-200 text-[10px] text-slate-400 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CsctiLogoMark size={14} />
-            <span>CSCTI — Compliance Platform • Sistema de Governança Cartorial CNJ</span>
+            <span>CSCTI - Compliance • Gestão de Continuidade e Ativos</span>
           </div>
           <div>
             <span>Documento emitido eletronicamente • Hash de Integridade Auditável</span>

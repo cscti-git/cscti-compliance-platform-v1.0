@@ -151,8 +151,7 @@ export const AssetModal: React.FC<AssetModalProps> = ({ open, onClose, onSaved, 
                 {asset ? 'Editar Ativo do Inventário' : 'Novo Ativo Tecnológico'}
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-500">
-                Mapeamento obrigatório para controle de continuidade e backup conforme Provimento
-                243/2026 CNJ.
+                Mapeamento para controle de continuidade, inventário e rotinas de backup.
               </DialogDescription>
             </div>
           </div>

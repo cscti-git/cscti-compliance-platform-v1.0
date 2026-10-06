@@ -6,13 +6,12 @@
 export const CSCTI_BRAND = {
   name: 'CSCTI',
   legalName: 'CSCTI Tecnologia & Governança',
-  productName: 'CSCTI — Compliance Platform V2',
+  productName: 'CSCTI - Compliance',
   tagline: 'Governança, conformidade e confiança para serventias',
   shortTagline: 'Conformidade que comprova.',
-  normativeReference: 'Provimento CNJ 243/2026 & 213/2026',
-  normativeSubtext:
-    'Padrão nacional de conformidade tecnológica e segurança para cartórios extrajudiciais',
-  version: '2.4.0-cnj',
+  normativeReference: 'CSCTI - Compliance',
+  normativeSubtext: 'Padrão de conformidade tecnológica e segurança da informação',
+  version: '2.4.0',
   supportEmail: 'suporte@cscti.com.br',
   defaultCredentialsHint: 'Acesso institucional autenticado',
 } as const
@@ -22,18 +21,18 @@ export const CSCTI_FEATURES = [
     id: 'access',
     title: 'Acesso blindado e rastreável',
     description:
-      'Isolamento multi-tenant por serventia com trilha de auditoria contínua e imutável para correições.',
+      'Isolamento multi-tenant por organização com trilha de auditoria contínua e imutável.',
   },
   {
     id: 'roles',
     title: 'Controle de acesso por perfis',
     description:
-      'Perfis segregados (Administrador, Suporte e Usuário de Consulta) estritamente alinhados ao Provimento CNJ.',
+      'Perfis segregados (Administrador, Suporte e Usuário de Consulta) para conformidade institucional.',
   },
   {
     id: 'compliance',
-    title: 'Governança de classes C1, C2 e C3',
+    title: 'Governança e Enquadramento',
     description:
-      'Enquadramento automático por receita semestral, controle de prazos normativos e geração de dossiê comprobatório.',
+      'Gestão estruturada por classe e subclasse, controle de prazos normativos e geração de dossiê comprobatório.',
   },
 ] as const

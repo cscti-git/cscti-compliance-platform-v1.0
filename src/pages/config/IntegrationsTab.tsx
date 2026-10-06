@@ -5,7 +5,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { saveGlpiConfig, saveEmailConfig, logAudit } from '@/services/csctiService'
+import {
+  saveGlpiConfig,
+  saveEmailConfig,
+  logAudit,
+  testGlpiConnection,
+  testEmailConnection,
+  triggerGlpiSync,
+} from '@/services/csctiService'
 import type { IntegrationItem } from '@/types/cscti'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -139,22 +146,24 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
     }
     setIsTestingGlpi(true)
     try {
-      // Simulate endpoint ping / format verification
-      await new Promise((r) => setTimeout(r, 900))
-      const urlValid = glpiUrl.startsWith('http://') || glpiUrl.startsWith('https://')
-      if (!urlValid) {
-        throw new Error('A URL deve iniciar com http:// ou https://')
+      const res = await testGlpiConnection(organizationId, {
+        url: glpiUrl.trim(),
+        appToken: glpiAppToken.trim() || undefined,
+        userToken: glpiUserToken.trim() || undefined,
+      })
+
+      if (res.success) {
+        toast({
+          title: 'Conexão GLPI validada',
+          description: res.message,
+        })
+      } else {
+        toast({
+          title: 'Falha no teste GLPI',
+          description: res.message,
+          variant: 'destructive',
+        })
       }
-      await logAudit({
-        action: 'INTEGRATION_GLPI_TEST',
-        entity: 'Integrações',
-        detail: `Teste de conexão GLPI executado com sucesso para ${glpiUrl}`,
-        organizationId,
-      })
-      toast({
-        title: 'Conexão validada',
-        description: 'Parâmetros de comunicação e endpoint GLPI validados com sucesso.',
-      })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Falha ao conectar ao servidor GLPI.'
       toast({ title: 'Falha no teste', description: msg, variant: 'destructive' })
@@ -166,17 +175,23 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   const handleSyncGlpi = async () => {
     setIsSyncingGlpi(true)
     try {
-      await new Promise((r) => setTimeout(r, 1200))
-      await logAudit({
-        action: 'INTEGRATION_GLPI_SYNC',
-        entity: 'Integrações',
-        detail: `Tentativa de sincronização manual GLPI registrada na trilha de auditoria.`,
-        organizationId,
-      })
-      toast({
-        title: 'Sincronização solicitada',
-        description: 'Tentativa de sincronização registrada na trilha de auditoria.',
-      })
+      const res = await triggerGlpiSync(organizationId)
+      if (res.success) {
+        toast({
+          title: 'Sincronização GLPI concluída',
+          description: res.message || 'Ativos sincronizados com sucesso.',
+        })
+        await onRefresh()
+      } else {
+        toast({
+          title: 'Aviso na sincronização',
+          description: res.message,
+          variant: 'destructive',
+        })
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha ao sincronizar com GLPI.'
+      toast({ title: 'Erro de sincronização', description: msg, variant: 'destructive' })
     } finally {
       setIsSyncingGlpi(false)
     }
@@ -235,17 +250,30 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
     }
     setIsTestingEmail(true)
     try {
-      await new Promise((r) => setTimeout(r, 900))
-      await logAudit({
-        action: 'INTEGRATION_EMAIL_TEST',
-        entity: 'Integrações',
-        detail: `Teste de conectividade IMAP executado para ${emailUser}@${emailHost}`,
-        organizationId,
+      const res = await testEmailConnection(organizationId, {
+        host: emailHost.trim(),
+        port: Number(emailPort) || 993,
+        user: emailUser.trim(),
+        folder: emailFolder.trim() || 'INBOX',
+        security: emailSecurity,
+        password: emailPassword.trim() || undefined,
       })
-      toast({
-        title: 'Comunicação validada',
-        description: 'Parâmetros de conexão IMAP e portas de segurança testados com sucesso.',
-      })
+
+      if (res.success) {
+        toast({
+          title: 'Comunicação IMAP validada',
+          description: res.message,
+        })
+      } else {
+        toast({
+          title: 'Falha no teste IMAP',
+          description: res.message,
+          variant: 'destructive',
+        })
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha ao testar conexão IMAP.'
+      toast({ title: 'Falha no teste', description: msg, variant: 'destructive' })
     } finally {
       setIsTestingEmail(false)
     }

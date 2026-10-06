@@ -102,7 +102,7 @@ export const Signup: React.FC = () => {
             <h3 className="text-base font-bold text-slate-900">Solicitação Recebida</h3>
             <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
               Sua conta vinculada a <strong>{email}</strong> foi cadastrada. O Administrador da
-              serventia fará a vinculação e liberação dos módulos normativos do Provimento 243/2026.
+              serventia fará a vinculação e liberação dos módulos da plataforma.
             </p>
           </div>
 

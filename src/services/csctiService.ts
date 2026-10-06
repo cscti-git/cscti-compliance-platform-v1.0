@@ -781,3 +781,77 @@ export async function triggerGlpiSync(orgId: string): Promise<{
     }
   }
 }
+
+export async function testGlpiConnection(
+  orgId: string,
+  params?: {
+    url?: string
+    appToken?: string
+    userToken?: string
+  },
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(`${pb.baseUrl}/backend/v1/integrations/test-glpi`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: pb.authStore.token,
+      },
+      body: JSON.stringify({
+        organizationId: orgId,
+        url: params?.url,
+        appToken: params?.appToken,
+        userToken: params?.userToken,
+      }),
+    })
+
+    const data = await response.json()
+    return data
+  } catch (err) {
+    console.error('Erro ao testar GLPI:', err)
+    return {
+      success: false,
+      message: 'Falha de comunicação com o serviço de validação do conector GLPI.',
+    }
+  }
+}
+
+export async function testEmailConnection(
+  orgId: string,
+  params?: {
+    host?: string
+    port?: number
+    user?: string
+    folder?: string
+    security?: string
+    password?: string
+  },
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(`${pb.baseUrl}/backend/v1/integrations/test-imap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: pb.authStore.token,
+      },
+      body: JSON.stringify({
+        organizationId: orgId,
+        host: params?.host,
+        port: params?.port,
+        user: params?.user,
+        folder: params?.folder,
+        security: params?.security,
+        password: params?.password,
+      }),
+    })
+
+    const data = await response.json()
+    return data
+  } catch (err) {
+    console.error('Erro ao testar IMAP:', err)
+    return {
+      success: false,
+      message: 'Falha de comunicação com o serviço de validação do conector IMAP.',
+    }
+  }
+}

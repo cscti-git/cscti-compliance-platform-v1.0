@@ -38,9 +38,9 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({
           </div>
           <CardTitle className="text-lg font-bold text-slate-900">Módulo em preparação</CardTitle>
           <CardDescription className="text-sm text-slate-600 mt-1 max-w-2xl">
-            Este módulo estará disponível na próxima etapa do ciclo de conformidade do Provimento
-            243/2026 do CNJ. Os parâmetros cadastrados no módulo de Configurações serão integrados
-            automaticamente a este painel.
+            Este módulo estará disponível na próxima etapa do ciclo de conformidade da plataforma.
+            Os parâmetros cadastrados no módulo de Configurações serão integrados automaticamente a
+            este painel.
           </CardDescription>
         </CardHeader>
 

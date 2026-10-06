@@ -44,7 +44,7 @@ export const OrgDataTab: React.FC<OrgDataTabProps> = ({
   const [typeId, setTypeId] = useState(organization.type || '')
   const [selectedServices, setSelectedServices] = useState<string[]>(organization.services || [])
 
-  // Provimento 243/2026
+  // Enquadramento por Classe e Subclasse
   const [provClass, setProvClass] = useState<'C1' | 'C2' | 'C3'>(
     organization.provimento_class || 'C2',
   )
@@ -159,7 +159,7 @@ export const OrgDataTab: React.FC<OrgDataTabProps> = ({
                 Dados da Organização (Serventia Extrajudicial)
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Informações cadastrais e regimentais da serventia perante a Corregedoria.
+                Informações cadastrais e institucionais da serventia e do cliente.
               </CardDescription>
             </div>
           </div>
@@ -330,14 +330,14 @@ export const OrgDataTab: React.FC<OrgDataTabProps> = ({
         </CardContent>
       </Card>
 
-      {/* Bloco 2: Enquadramento Provimento 243/2026 CNJ */}
+      {/* Bloco 2: Enquadramento de Governança */}
       <Card className="border-slate-200 shadow-xs">
         <CardHeader className="border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2.5">
             <Award className="w-5 h-5 text-indigo-600" />
             <div>
               <CardTitle className="text-base font-bold text-slate-900">
-                Enquadramento no Provimento 243/2026 CNJ (Altera Prov. 213/2026)
+                Enquadramento da Organização
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
                 Critérios de classe semestral por receita e prazos regimentais de cumprimento.
@@ -395,7 +395,7 @@ export const OrgDataTab: React.FC<OrgDataTabProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
             <div className="space-y-1">
               <p className="text-xs font-semibold text-slate-800">
-                Prazo Etapa 1 (Anexo IV — Requisitos Básicos)
+                Prazo Etapa 1 (Requisitos Básicos)
               </p>
               <div className="flex items-center gap-2">
                 <Input
@@ -411,7 +411,7 @@ export const OrgDataTab: React.FC<OrgDataTabProps> = ({
 
             <div className="space-y-1">
               <p className="text-xs font-semibold text-slate-800">
-                Prazo Etapa 2 (Anexo IV — Requisitos Complementares)
+                Prazo Etapa 2 (Requisitos Complementares)
               </p>
               <div className="flex items-center gap-2">
                 <Input

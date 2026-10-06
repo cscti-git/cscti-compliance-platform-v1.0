@@ -84,7 +84,7 @@ const navSections: NavSection[] = [
       { title: 'Configurações', href: '/configuracoes', icon: Settings },
       {
         title: 'Integrações',
-        href: '/configuracoes?tab=integracoes',
+        href: '/integracoes',
         icon: Puzzle,
         suporteOrAdmin: true,
       },
@@ -146,10 +146,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-900 text-sm sm:text-base leading-tight tracking-tight group-hover:text-[#0B2545] transition-colors">
-                  {productName}
-                </span>
-                <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300">
-                  Prov. 243/2026
+                  {productName || 'CSCTI - Compliance'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 hidden sm:block truncate max-w-md">
@@ -167,7 +164,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-slate-600 font-medium">Serventia:</span>
+            <span className="text-slate-600 font-medium">Cliente:</span>
             <span className="font-semibold text-slate-900 truncate max-w-[200px]" title={orgName}>
               {orgName}
             </span>
@@ -177,6 +174,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className="text-[10px] px-1.5 py-0 h-4 bg-white text-blue-700 border-blue-300"
               >
                 Classe {organization.provimento_class}
+                {organization?.provimento_subclass ? ` • ${organization.provimento_subclass}` : ''}
               </Badge>
             )}
           </div>
@@ -269,10 +267,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="p-3.5 border-t border-slate-800/80 bg-slate-950/60 text-xs text-slate-400 flex items-center justify-between">
             <div className="flex items-center gap-2 truncate">
               <CsctiLogoMark size={16} />
-              <span className="truncate">{CSCTI_BRAND.name} Compliance</span>
+              <span className="truncate">CSCTI - Compliance</span>
             </div>
             <span className="text-[10px] font-mono text-[#D4AF37] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
-              243/213
+              v{CSCTI_BRAND.version}
             </span>
           </div>
         </aside>

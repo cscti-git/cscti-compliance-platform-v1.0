@@ -72,7 +72,7 @@ export const ResetPassword: React.FC = () => {
   return (
     <AuthShell
       title="Definir Nova Senha"
-      subtitle="Cadastre uma credencial segura em conformidade com as diretrizes do Provimento CNJ."
+      subtitle="Cadastre uma credencial segura em conformidade com as diretrizes de segurança."
       badgeText="Redefinição de Acesso"
       footerLink={{
         text: 'Não precisa redefinir?',

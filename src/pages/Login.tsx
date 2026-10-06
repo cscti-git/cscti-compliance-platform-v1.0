@@ -56,8 +56,8 @@ export const Login: React.FC = () => {
             <span>Acesso Seguro para Serventias</span>
           </div>
           <p>
-            O acesso a relatórios e evidências do Provimento CNJ é restrito a operadores cadastrados
-            com perfis Administrador, Suporte e Usuário.
+            O acesso a relatórios e evidências é restrito a operadores cadastrados com perfis
+            Administrador, Suporte e Usuário.
           </p>
         </div>
       }

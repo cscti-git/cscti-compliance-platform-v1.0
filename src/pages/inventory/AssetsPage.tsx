@@ -228,8 +228,8 @@ export const AssetsPage: React.FC = () => {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Mapeamento dos servidores, bancos de dados, storages e estações da serventia conforme{' '}
-            <strong>Provimento 243/2026 CNJ</strong> (base funcional para escopo de backup).
+            Mapeamento dos servidores, bancos de dados, storages e estações da serventia (base
+            funcional para escopo de continuidade e rotinas de backup).
           </p>
         </div>
 

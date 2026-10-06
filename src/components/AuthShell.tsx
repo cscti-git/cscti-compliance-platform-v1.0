@@ -82,10 +82,10 @@ export const AuthShell: React.FC<AuthShellProps> = ({
               />
             </Link>
 
-            {/* Selo CNJ Discreto */}
+            {/* Selo Institucional CSCTI */}
             <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/80 border border-slate-700/60 text-slate-300 text-[11px] font-medium backdrop-blur-md">
               <Award className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span>Prov. 243/213 CNJ</span>
+              <span>CSCTI - Compliance</span>
             </div>
           </div>
 
@@ -93,7 +93,7 @@ export const AuthShell: React.FC<AuthShellProps> = ({
           <div className="mt-8 sm:mt-12 lg:mt-14 max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#F3C969] text-xs font-semibold mb-4 backdrop-blur-xs">
               <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span>Plataforma Padrão de Governança Notarial</span>
+              <span>Plataforma de Governança e Compliance</span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
@@ -101,9 +101,8 @@ export const AuthShell: React.FC<AuthShellProps> = ({
             </h1>
 
             <p className="mt-3.5 text-slate-300/90 text-xs sm:text-sm lg:text-base leading-relaxed">
-              Ambiente unificado para cartórios e serventias extrajudiciais atenderem integralmente
-              aos 48 requisitos técnicos do CNJ, com evidências auditáveis diante do Juiz
-              Corregedor.
+              Ambiente unificado para gestão da conformidade, governança de TI e controles de
+              continuidade, com evidências auditáveis em conformidade com as normas vigentes.
             </p>
           </div>
 
@@ -138,9 +137,9 @@ export const AuthShell: React.FC<AuthShellProps> = ({
         {/* Rodapé Institucional com Referência Normativa */}
         <div className="relative z-10 mt-8 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-400">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-300">CSCTI Compliance</span>
+            <span className="font-semibold text-slate-300">CSCTI - Compliance</span>
             <span className="text-slate-600">•</span>
-            <span>{CSCTI_BRAND.normativeReference}</span>
+            <span>Plataforma Segura</span>
           </div>
           <div className="flex items-center gap-2 text-slate-500">
             <span>Versão {CSCTI_BRAND.version}</span>

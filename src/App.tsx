@@ -13,6 +13,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
 import SettingsPage from './pages/SettingsPage'
+import IntegrationsPage from './pages/IntegrationsPage'
 import AuditPage from './pages/AuditPage'
 import AssetsPage from './pages/inventory/AssetsPage'
 import InventoryReportPage from './pages/inventory/InventoryReportPage'
@@ -57,7 +58,6 @@ export const App = () => (
           >
             {/* 1. Visão Geral (Dashboard) */}
             <Route path="/" element={<Index />} />
-
             {/* 2. Governança */}
             <Route
               path="/conformidade"
@@ -65,12 +65,12 @@ export const App = () => (
                 <PlaceholderPage
                   moduleTitle="Conformidade Normativa"
                   moduleSection="Governança"
-                  description="Painel de aderência aos 48 requisitos técnicos e diretrizes do Provimento CNJ 243/2026."
+                  description="Painel de aderência aos requisitos técnicos e diretrizes vigentes."
                   featuresPlanned={[
                     'Matriz de requisitos por classe (C1, C2 e C3)',
                     'Checklist interativo com pontuação e aderência',
-                    'Acompanhamento de prazos de 180, 240 e 300 dias',
-                    'Relatório formal de conformidade para o Juiz Corregedor',
+                    'Acompanhamento de prazos regimentais',
+                    'Relatório formal de conformidade para o juízo competente',
                   ]}
                 />
               }
@@ -81,7 +81,7 @@ export const App = () => (
                 <PlaceholderPage
                   moduleTitle="Planos de Ação e Remediação"
                   moduleSection="Governança"
-                  description="Gestão de pendências e planos de adequação para itens não conformes do Anexo IV."
+                  description="Gestão de pendências e planos de adequação para itens em desconformidade."
                   featuresPlanned={[
                     'Definição de prazos de remediação e responsáveis',
                     'Status de execução dos planos corretivos',
@@ -91,7 +91,6 @@ export const App = () => (
                 />
               }
             />
-
             {/* 3. Evidências */}
             <Route
               path="/evidencias"
@@ -102,15 +101,14 @@ export const App = () => (
                   description="Repositório central de arquivos e comprovações técnicas das políticas da serventia."
                   featuresPlanned={[
                     'Upload e indexação de evidências comprobatórias',
-                    'Vinculação direta com os requisitos do Provimento 243',
+                    'Vinculação direta com requisitos e controles',
                     'Assinatura digital e carimbo de tempo nos relatórios',
-                    'Exportação de dossiê consolidado para correição',
+                    'Exportação de dossiê consolidado de comprovação',
                   ]}
                 />
               }
-            />
+            />{' '}
             <Route path="/auditoria" element={<AuditPage />} />
-
             {/* 4. Ambiente */}
             <Route path="/ativos" element={<AssetsPage />} />
             <Route
@@ -128,7 +126,6 @@ export const App = () => (
                 />
               }
             />
-
             {/* 5. Segurança */}
             <Route
               path="/seguranca"
@@ -145,7 +142,6 @@ export const App = () => (
                 />
               }
             />
-
             {/* 6. Continuidade */}
             <Route
               path="/backup"
@@ -163,9 +159,9 @@ export const App = () => (
                 />
               }
             />
-
-            {/* 7. Administração */}
+            {/* 7. Administração e Integrações */}
             <Route path="/configuracoes" element={<SettingsPage />} />
+            <Route path="/integracoes" element={<IntegrationsPage />} />
           </Route>
 
           {/* Relatório Comprobatório Formatado (Visualização limpa e Impressão A4) */}

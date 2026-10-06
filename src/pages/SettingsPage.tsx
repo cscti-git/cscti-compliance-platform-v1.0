@@ -154,7 +154,7 @@ export const SettingsPage: React.FC = () => {
     {
       id: 'papeis-resp',
       title: 'Papéis e Responsabilidades',
-      desc: 'Vigência e designação regimental perante o CNJ',
+      desc: 'Vigência e designação de responsabilidades da serventia',
       isComplete: step5Assignments,
       targetTab: 'papeis',
       pendingMsg: 'Falta atribuir ao menos uma responsabilidade institucional ativa.',
@@ -252,7 +252,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                   <CardDescription className="text-xs text-slate-500 mt-1">
                     Validador real do cumprimento dos requisitos estruturais da serventia para
-                    conformidade com o CNJ.
+                    conformidade institucional.
                   </CardDescription>
                 </div>
                 <div className="text-right">
@@ -334,7 +334,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                   <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-100">
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">
-                      Enquadramento CNJ
+                      Enquadramento Operacional
                     </span>
                     <span className="font-bold text-blue-700">
                       Classe {organization.provimento_class || 'C2'} • Subclasse{' '}
@@ -347,7 +347,7 @@ export const SettingsPage: React.FC = () => {
           </Card>
         </TabsContent>
 
-        {/* ABA 2: DADOS DA ORGANIZAÇÃO (Serventia + Localização + Provimento) */}
+        {/* ABA 2: DADOS DA ORGANIZAÇÃO (Serventia + Localização + Enquadramento) */}
         <TabsContent value="organizacao">
           {organization && (
             <OrgDataTab

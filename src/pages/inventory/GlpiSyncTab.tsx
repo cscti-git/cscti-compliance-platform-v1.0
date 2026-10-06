@@ -141,15 +141,15 @@ export const GlpiSyncTab: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <Link to="/configuracoes?tab=integracoes">
+              <Link to="/integracoes">
                 <Button
                   variant="outline"
                   size="sm"
                   className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs gap-1.5"
                 >
-                  Configurar Conector <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="w-3.5 h-3.5" /> Conector GLPI
                 </Button>
-              </Link>
+              </Link>{' '}
               {canOperate && (
                 <Button
                   onClick={handleSyncNow}

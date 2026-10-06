@@ -124,13 +124,13 @@ export const VisualIdentityTab: React.FC<VisualIdentityTabProps> = ({
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">
-                Texto Institucional / Referência Normativa
+                Texto Institucional / Descrição do Cliente
               </Label>
               <Input
                 value={institutionalText}
                 onChange={(e) => setInstitutionalText(e.target.value)}
                 disabled={readOnly}
-                placeholder="Serventia Extrajudicial em Conformidade com o Provimento 243/2026 CNJ"
+                placeholder="Serventia Extrajudicial em Conformidade — CSCTI Compliance"
                 className="text-xs h-9 bg-slate-50 border-slate-200"
               />
               <p className="text-[11px] text-slate-400">
@@ -151,9 +151,6 @@ export const VisualIdentityTab: React.FC<VisualIdentityTabProps> = ({
                     <p className="text-xs font-bold text-slate-900 leading-tight">
                       {productName || DEFAULT_PRODUCT_NAME}
                     </p>
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-300">
-                      Prov. 243/2026
-                    </span>
                   </div>
                   <p className="text-[11px] text-slate-500 truncate">
                     {headerTitle || DEFAULT_HEADER_TITLE}

@@ -84,29 +84,62 @@ export const Index: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Banner de Boas-Vindas e Status Geral */}
+      {/* Banner de Boas-Vindas com Dados Reais do Cliente Cadastrado */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-        <div className="space-y-2 max-w-2xl">
+        <div className="space-y-3 max-w-2xl">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-blue-600/90 hover:bg-blue-600 text-white border-0 text-xs px-2.5 py-0.5">
-              Provimento CNJ 243/2026
+            <Badge className="bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#F3C969] text-xs px-2.5 py-0.5 font-semibold">
+              CSCTI - Compliance
             </Badge>
-            <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+            <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-800/40">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Ambiente Institucional Ativo
+              Cliente Ativo
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-            {organization?.name || 'Serventia Extrajudicial'}
-          </h1>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              {organization?.name || 'Cliente CSCTI'}
+            </h1>
+            {organization?.corporate_name && organization.corporate_name !== organization.name && (
+              <p className="text-xs text-slate-300 font-medium mt-0.5">
+                Razão Social: {organization.corporate_name}
+              </p>
+            )}
+          </div>
+
           <p className="text-sm text-slate-300 leading-relaxed">
-            Painel consolidado de governança, evidências comprobatórias e controles de tecnologia
-            para atendimento às exigências normativas da Corregedoria Nacional de Justiça.
+            Painel consolidado de governança, evidências comprobatórias e controles de tecnologia em
+            conformidade com as normas do juízo competente.
           </p>
+
+          {/* Dados Adicionais do Cliente Cadastrado */}
+          <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-slate-300">
+            {organization?.cnpj && (
+              <span className="flex items-center gap-1.5 bg-white/5 px-2.5 py-1 rounded-md border border-white/10">
+                <span className="text-slate-400">CNPJ:</span>
+                <span className="font-mono font-semibold text-white">{organization.cnpj}</span>
+              </span>
+            )}
+            {organization?.city && (
+              <span className="flex items-center gap-1.5 bg-white/5 px-2.5 py-1 rounded-md border border-white/10">
+                <span className="text-slate-400">Localidade:</span>
+                <span className="font-semibold text-white">
+                  {organization.city}
+                  {organization.state ? `/${organization.state}` : ''}
+                </span>
+              </span>
+            )}
+            {organization?.contact_name && (
+              <span className="flex items-center gap-1.5 bg-white/5 px-2.5 py-1 rounded-md border border-white/10">
+                <span className="text-slate-400">Titular:</span>
+                <span className="font-semibold text-white">{organization.contact_name}</span>
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Card Resumo do Provimento */}
+        {/* Card Resumo do Enquadramento */}
         <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/15 w-full sm:w-auto shrink-0 min-w-[240px]">
           <div className="flex items-center justify-between gap-4 text-xs text-slate-300 mb-2">
             <span>Enquadramento:</span>
@@ -168,7 +201,7 @@ export const Index: React.FC = () => {
         <Card className="border-slate-200/90 shadow-xs hover:border-slate-300 transition-colors">
           <CardHeader className="p-5 pb-3 flex flex-row items-center justify-between space-y-0">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Conformidade CNJ
+              Conformidade
             </span>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
               <ShieldCheck className="w-4 h-4" />
@@ -177,7 +210,7 @@ export const Index: React.FC = () => {
           <CardContent className="p-5 pt-0 space-y-2">
             <div className="text-2xl font-bold text-slate-900">Em preparação</div>
             <p className="text-xs text-slate-500">
-              Mapeamento de 48 requisitos técnicos do Anexo IV em fase de parametrização.
+              Mapeamento de requisitos técnicos e controles em fase de parametrização.
             </p>
             <div className="pt-2">
               <Link
@@ -244,7 +277,7 @@ export const Index: React.FC = () => {
             </p>
             <div className="pt-2">
               <Link
-                to="/configuracoes?tab=integracoes"
+                to="/integracoes"
                 className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 inline-flex items-center"
               >
                 Configurar conector <ArrowRight className="w-3 h-3 ml-1" />
