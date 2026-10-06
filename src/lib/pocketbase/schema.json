@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T13:35:50.077Z",
+  "generatedAt": "2026-10-06T14:23:08.285Z",
   "collections": [
     {
       "name": "users",
@@ -1588,7 +1588,14 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["EMAIL_HTML_GENERICO", "VEEAM_HTML", "LOG_BRUTO_TEXTO", "JSON_WEBHOOK"]
+          "selectValues": [
+            "EMAIL_HTML_GENERICO",
+            "VEEAM_HTML",
+            "ACRONIS_PDF",
+            "NOC_DIARIO",
+            "LOG_BRUTO_TEXTO",
+            "JSON_WEBHOOK"
+          ]
         },
         {
           "name": "ativo",
@@ -2155,6 +2162,118 @@
       ],
       "indexes": [
         "CREATE INDEX idx_bktestes_org_data ON backup_testes_recuperacao (organization, data_teste DESC)"
+      ]
+    },
+    {
+      "name": "backup_monitoramentos_externos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "data_monitoramento",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origem_remetente",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assunto",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status_geral",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ok", "falha", "atencao"]
+        },
+        {
+          "name": "clientes_status",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "acoes_realizadas",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "evidencias_mencionadas",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "comprovante_tem_imagem",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_conteudo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "evidencia",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_evidencias"
+        },
+        {
+          "name": "conteudo_bruto",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bkmonit_org ON backup_monitoramentos_externos (organization)",
+        "CREATE UNIQUE INDEX idx_bkmonit_org_hash ON backup_monitoramentos_externos (organization, hash_conteudo)"
       ]
     }
   ]

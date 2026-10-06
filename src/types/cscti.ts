@@ -322,6 +322,8 @@ export interface BackupFonteItem {
 export type BackupAdaptador =
   | 'EMAIL_HTML_GENERICO'
   | 'VEEAM_HTML'
+  | 'ACRONIS_PDF'
+  | 'NOC_DIARIO'
   | 'LOG_BRUTO_TEXTO'
   | 'JSON_WEBHOOK'
 
@@ -390,6 +392,14 @@ export interface BackupProcessamentoResultado {
   adaptador?: string
   versao?: string
   veeam_version?: string | null
+  acronis_version?: string | null
+  acronis_info?: {
+    data_geracao?: string
+    intervalo?: string
+    nome_arquivo?: string
+  } | null
+  nome_arquivo_anexo?: string | null
+  origem_anexo_pdf?: boolean
   contadores?: {
     total_vms?: number
     processadas?: number
@@ -464,6 +474,34 @@ export interface BackupAvaliacaoItem {
   updated?: string
   expand?: {
     execucao?: BackupExecucaoItem
+  }
+}
+
+export interface BackupNocClienteStatusItem {
+  cliente: string
+  status: string
+  acoes?: string
+}
+
+export interface BackupMonitoramentoExternoItem {
+  id: string
+  organization: string
+  data_monitoramento?: string
+  origem_remetente?: string
+  assunto?: string
+  status_geral: 'ok' | 'falha' | 'atencao'
+  clientes_status?: BackupNocClienteStatusItem[]
+  acoes_realizadas?: string
+  observacoes?: string
+  evidencias_mencionadas?: string
+  comprovante_tem_imagem?: boolean
+  hash_conteudo: string
+  evidencia?: string
+  conteudo_bruto?: string
+  created?: string
+  updated?: string
+  expand?: {
+    evidencia?: BackupEvidenciaItem
   }
 }
 

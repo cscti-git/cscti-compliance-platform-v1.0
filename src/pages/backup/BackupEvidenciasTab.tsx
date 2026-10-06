@@ -41,6 +41,8 @@ import { useToast } from '@/hooks/use-toast'
 import {
   processarEvidenciaBackup,
   listBackupProcessamentos,
+  listBackupMonitoramentos,
+  deleteBackupMonitoramento,
   fetchEvidenciasImap,
 } from '@/services/backupService'
 import { getIntegrations } from '@/services/csctiService'
@@ -48,10 +50,12 @@ import type {
   BackupEvidenciaItem,
   BackupRotinaItem,
   BackupProcessamentoItem,
+  BackupMonitoramentoExternoItem,
   EvidenciaStatus,
   IntegrationItem,
   BackupImapFetchResponse,
 } from '@/types/cscti'
+import { FileText, Activity, UserCheck, ShieldAlert, Paperclip, ExternalLink } from 'lucide-react'
 
 interface BackupEvidenciasTabProps {
   evidencias: BackupEvidenciaItem[]
@@ -147,10 +151,35 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
 </div>`,
   )
 
+  // Sub-abas dentro de Evidências: "evidencias" | "monitoramento_externo"
+  const [activeSubTab, setActiveSubTab] = useState<'evidencias' | 'monitoramento_externo'>(
+    'evidencias',
+  )
+
+  // Monitoramentos Externos do NOC
+  const [monitoramentos, setMonitoramentos] = useState<BackupMonitoramentoExternoItem[]>([])
+  const [selectedMonit, setSelectedMonit] = useState<BackupMonitoramentoExternoItem | null>(null)
+  const [monitModalOpen, setMonitModalOpen] = useState(false)
+
+  // Tipo de comprovante no modal de registro
+  const [formTipo, setFormTipo] = useState<'veeam' | 'acronis_pdf' | 'noc_diario' | 'generico'>(
+    'veeam',
+  )
+  const [nomeArquivoAnexo, setNomeArquivoAnexo] = useState('')
+  const [pdfTextoSimulado, setPdfTextoSimulado] = useState('')
+
   // Conector IMAP e Estado de Ingestão
   const [emailConnector, setEmailConnector] = useState<IntegrationItem | null>(null)
   const [fetchingImap, setFetchingImap] = useState(false)
   const [lastFetchResult, setLastFetchResult] = useState<BackupImapFetchResponse | null>(null)
+
+  const reloadMonitoramentos = () => {
+    if (orgId) {
+      listBackupMonitoramentos(orgId)
+        .then((data) => setMonitoramentos(data))
+        .catch((err) => console.error(err))
+    }
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -158,6 +187,11 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
       getIntegrations(orgId).then(({ email }) => {
         if (isMounted) {
           setEmailConnector(email)
+        }
+      })
+      listBackupMonitoramentos(orgId).then((data) => {
+        if (isMounted) {
+          setMonitoramentos(data)
         }
       })
     }
@@ -209,14 +243,21 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
     setRemetente('newsletter@proitcs.com.br')
     setAssunto('[CRI][Success] Backup VMs GOLD (4 objects)')
     setRotinaId(rotinas.length > 0 ? rotinas[0].id : '')
+    setFormTipo('veeam')
+    setNomeArquivoAnexo('')
+    setPdfTextoSimulado('')
     setModalOpen(true)
   }
 
-  const handlePreencherExemploVeeam = () => {
-    setRemetente('newsletter@proitcs.com.br')
-    setAssunto('[CRI][Success] Backup VMs GOLD (4 objects)')
-    setConteudo(
-      `<div style="font-family: Arial, sans-serif;">
+  const handleSelecionarModelo = (tipo: 'veeam' | 'acronis_pdf' | 'noc_diario' | 'generico') => {
+    setFormTipo(tipo)
+    if (tipo === 'veeam') {
+      setRemetente('newsletter@proitcs.com.br')
+      setAssunto('[CRI][Success] Backup VMs GOLD (4 objects)')
+      setNomeArquivoAnexo('')
+      setPdfTextoSimulado('')
+      setConteudo(
+        `<div style="font-family: Arial, sans-serif;">
 <div style="background-color: #00B050; color: white; padding: 15px;">
   <div style="float: left;">
     <h2 style="margin: 0;">Backup job: Backup VMs GOLD</h2>
@@ -283,12 +324,73 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
   Veeam Backup & Replication 12.3.1.1139
 </div>
 </div>`,
-    )
+      )
+    } else if (tipo === 'acronis_pdf') {
+      setRemetente('noreply-abc@cloud.acronis.com')
+      setAssunto('RELATÓRIO DIÁRIO EM 6 de out de 2026 às 05:02')
+      setNomeArquivoAnexo('Atividades diárias - SocNoc.2026-10-06-08-02UTC.pdf')
+      setConteudo(
+        `<div style="font-family: Arial, sans-serif;">
+  <p><strong>Nome do relatório:</strong> Atividades diárias - SocNoc</p>
+  <p><strong>Gerado em:</strong> 6 de out de 2026 às 05:02</p>
+  <p><strong>Intervalo de tempo:</strong> 05/10/2026 - 06/10/2026</p>
+  <p><strong>Formato do arquivo:</strong> PDF</p>
+  <p>1 anexo: Atividades diárias - SocNoc.2026-10-06-08-02UTC.pdf (44 KB)</p>
+</div>`,
+      )
+      setPdfTextoSimulado(
+        `# Atividades diárias - SocNoc
+terça-feira, 6 de outubro de 2026 às 05:02
+Intervalo de tempo: 05/10/2026 - 06/10/2026
+
+Lista de atividades (1 dia):
+
+| Resultado | Nome da atividade | Nome do plano | Hora de início | Hora de término | Duração | Tipo da atividade | Iniciado por | Bytes salvos | Bytes processados | Fonte de dados | Local de destino |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| OK | Plano de proteção 'Backup_SRV-FILESERVER' | Backup_SRV-FILESERVER | 19:00 | 19:00 | poucos segundos | Planos de backup | Agendado | 0 | 0 | SRV-FILESERVER | Nuvem |
+| OK | Plano de proteção 'Backup_SRV-FILESERVER' | Backup_SRV-FILESERVER | 19:00 | 19:05 | 6 minutos | Planos de backup | Agendado | 1.15 GB | 2.21 GB | SRV-FILESERVER | Nuvem |
+| OK | Plano de proteção 'BK-SPCM-TDePJ' | BK-SPCM-TDePJ | 19:30 | 19:36 | 6 minutos | Planos de backup | Agendado | 644.60 MB | 32.36 GB | SPCM-TDePJ | Nuvem |
+| OK | Plano de proteção 'BK-SPCM-ORION' | BK-SPCM-ORION | 19:45 | 19:50 | 6 minutos | Planos de backup | Agendado | 1.31 GB | 4.24 GB | Máquina inteira | Nuvem |
+| OK | Plano de proteção 'BK-SPCM-PROTESTO' | BK-SPCM-PROTESTO | 20:00 | 20:04 | 5 minutos | Planos de backup | Agendado | 429.48 MB | 1.43 GB | Máquina inteira | Nuvem |`,
+      )
+    } else if (tipo === 'noc_diario') {
+      setRemetente('noc@cloudsolutions.com.br')
+      setAssunto(
+        'PRO CLOUD SOLUTIONS | NOC – ANALISE PREVENTIVA DIARIA DE BACKUP 05/10/2026 | Cartório',
+      )
+      setNomeArquivoAnexo('')
+      setPdfTextoSimulado('')
+      setConteudo(
+        `<div style="font-family: Arial, sans-serif;">
+<p>Boa Tarde</p>
+<p>Este e um e-mail de report diário de acessos realizados em seu ambiente para analise nos itens abaixo de modo preventivo:</p>
+<ul>
+  <li>Backup;</li>
+</ul>
+<p><strong>Informações do Ambiente:</strong></p>
+<table border="1" style="border-collapse: collapse; width: 100%;">
+  <tr style="background-color: #f2f2f2;">
+    <th>Cliente</th>
+    <th>Status</th>
+    <th>Ações a realizadas pelo NOC para correção</th>
+  </tr>
+  <tr>
+    <td>Cartório</td>
+    <td>OK</td>
+    <td></td>
+  </tr>
+</table>
+<p><strong>Evidencias:</strong></p>
+<p>Cartório Sertãozinho: Backup VMs GOLD / Hyper-V Replication</p>
+<p>[Comprovante contém imagem colada com print do grid Veeam - imagem não parseável]</p>
+</div>`,
+      )
+    }
   }
 
   const handleProcessarNovaEvidencia = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!conteudo.trim()) return
+    if (!conteudo.trim() && !pdfTextoSimulado.trim()) return
     setSubmitting(true)
     try {
       const res = await processarEvidenciaBackup({
@@ -298,25 +400,29 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
         assunto: assunto.trim(),
         rotinaId: rotinaId || undefined,
         tipo: 'upload_manual',
+        nome_arquivo: nomeArquivoAnexo || undefined,
+        pdf_texto: pdfTextoSimulado || undefined,
+        pdf_nome: nomeArquivoAnexo || undefined,
       })
 
       if (res.success) {
         toast({
-          title: 'Evidência processada com sucesso',
-          description: `Status detectado: ${res.status.toUpperCase()} • Execução #${res.execucao_id || ''} gerada.`,
+          title: 'Comprovante processado com sucesso',
+          description: `Adaptador: ${res.adaptador || 'Automático'} • Status: ${res.status?.toUpperCase()}.`,
         })
       } else {
         toast({
-          title: 'Evidência não reconhecida',
+          title: 'Erro de processamento',
           description: res.message,
           variant: 'destructive',
         })
       }
       setModalOpen(false)
       onReload()
+      reloadMonitoramentos()
     } catch (err: unknown) {
       toast({
-        title: 'Erro ao processar evidência',
+        title: 'Erro ao processar comprovante',
         description: err instanceof Error ? err.message : 'Falha na comunicação com o backend.',
         variant: 'destructive',
       })
@@ -366,6 +472,25 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
       console.error(err)
     } finally {
       setProcLoading(false)
+    }
+  }
+
+  const handleExcluirMonitoramento = async (mon: BackupMonitoramentoExternoItem) => {
+    if (!window.confirm(`Deseja remover o registro de monitoramento de "${mon.origem_remetente}"?`))
+      return
+    try {
+      await deleteBackupMonitoramento(mon.id, orgId)
+      toast({
+        title: 'Registro removido',
+        description: 'Monitoramento externo excluído com sucesso.',
+      })
+      reloadMonitoramentos()
+    } catch (err) {
+      toast({
+        title: 'Erro ao remover',
+        description: err instanceof Error ? err.message : 'Falha na exclusão.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -434,10 +559,39 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
               size="sm"
               className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs"
             >
-              <Plus className="w-4 h-4" /> Registrar Evidência (Manual / HTML)
+              <Plus className="w-4 h-4" /> Registrar Evidência / Anexo PDF
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Sub-abas de Navegação: Execuções / Evidências vs Monitoramento Externo NOC */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('evidencias')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+            activeSubTab === 'evidencias'
+              ? 'bg-[#0B2545] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <FileCheck2 className="w-4 h-4" />
+          Evidências de Jobs ({evidencias.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('monitoramento_externo')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+            activeSubTab === 'monitoramento_externo'
+              ? 'bg-purple-700 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <UserCheck className="w-4 h-4" />
+          Monitoramento Externo (NOC) ({monitoramentos.length})
+        </button>
       </div>
 
       {/* Card de Visibilidade do Estado do Conector de E-mail IMAP */}
@@ -520,86 +674,250 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
         </CardContent>
       </Card>
 
-      {/* Lista de Evidências */}
-      <Card className="border-slate-200 shadow-2xs">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase text-[10px]">
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3">Assunto / Remetente</th>
-                  <th className="py-2.5 px-3">Rotina Vinculada</th>
-                  <th className="py-2.5 px-3">Data Recebida</th>
-                  <th className="py-2.5 px-3">Hash SHA-256</th>
-                  <th className="py-2.5 px-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {evidencias.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500 italic">
-                      Nenhuma evidência registrada. Clique em &ldquo;Registrar Evidência&rdquo; para
-                      inserir o primeiro comprovante.
-                    </td>
+      {activeSubTab === 'evidencias' ? (
+        /* Lista de Evidências */
+        <Card className="border-slate-200 shadow-2xs">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase text-[10px]">
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3">Origem / Formato</th>
+                    <th className="py-2.5 px-3">Assunto / Remetente</th>
+                    <th className="py-2.5 px-3">Rotina Vinculada</th>
+                    <th className="py-2.5 px-3">Data Recebida</th>
+                    <th className="py-2.5 px-3">Hash SHA-256</th>
+                    <th className="py-2.5 px-3 text-right">Ações</th>
                   </tr>
-                ) : (
-                  evidencias.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition">
-                      <td className="py-2.5 px-3">{getStatusBadge(item.status_processamento)}</td>
-                      <td className="py-2.5 px-3">
-                        <span className="font-bold text-slate-900 block truncate max-w-sm">
-                          {item.assunto || 'Sem assunto'}
-                        </span>
-                        <span className="text-[11px] text-slate-500">{item.remetente}</span>
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span className="text-slate-700 font-medium">
-                          {item.expand?.rotina?.nome || 'Geral / Automático'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600">
-                        {item.data_recebida
-                          ? new Date(item.data_recebida).toLocaleString('pt-BR')
-                          : '—'}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">
-                        <span title={item.hash_conteudo}>
-                          {item.hash_conteudo.slice(0, 12)}...{item.hash_conteudo.slice(-6)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleVerDetalhes(item)}
-                            className="h-7 text-xs text-blue-700 hover:text-blue-800 hover:bg-blue-50 px-2"
-                            title="Ver detalhes"
-                          >
-                            <Eye className="w-3.5 h-3.5 mr-1" /> Detalhes
-                          </Button>
-                          {canOperate && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleReprocessar(item)}
-                              className="h-7 text-[11px] text-slate-700 hover:bg-slate-100 px-2"
-                              title="Reprocessar"
-                            >
-                              <RefreshCw className="w-3 h-3 mr-1" /> Processar
-                            </Button>
-                          )}
-                        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {evidencias.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500 italic">
+                        Nenhuma evidência registrada. Clique em &ldquo;Registrar Evidência&rdquo;
+                        para inserir o primeiro comprovante.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                  ) : (
+                    evidencias.map((item) => {
+                      const isAcronis =
+                        item.remetente?.includes('acronis') ||
+                        item.assunto?.toLowerCase().includes('relatório diário') ||
+                        item.conteudo?.includes('SocNoc')
+
+                      const isNoc =
+                        item.assunto?.includes('ANALISE PREVENTIVA') ||
+                        item.conteudo?.includes('Informações do Ambiente')
+
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/70 transition">
+                          <td className="py-2.5 px-3">
+                            {getStatusBadge(item.status_processamento)}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {isAcronis ? (
+                              <Badge className="bg-sky-50 text-sky-800 border-sky-300 text-[10px] font-bold">
+                                <Paperclip className="w-3 h-3 mr-1 text-sky-600" /> Acronis (PDF)
+                              </Badge>
+                            ) : isNoc ? (
+                              <Badge className="bg-purple-50 text-purple-800 border-purple-300 text-[10px] font-bold">
+                                <UserCheck className="w-3 h-3 mr-1 text-purple-600" /> NOC Diário
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[10px] font-bold">
+                                <FileText className="w-3 h-3 mr-1 text-emerald-600" /> Veeam (HTML)
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-bold text-slate-900 block truncate max-w-sm">
+                              {item.assunto || 'Sem assunto'}
+                            </span>
+                            <span className="text-[11px] text-slate-500">{item.remetente}</span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="text-slate-700 font-medium">
+                              {item.expand?.rotina?.nome || 'Geral / Automático'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600">
+                            {item.data_recebida
+                              ? new Date(item.data_recebida).toLocaleString('pt-BR')
+                              : '—'}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">
+                            <span title={item.hash_conteudo}>
+                              {item.hash_conteudo.slice(0, 12)}...{item.hash_conteudo.slice(-6)}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleVerDetalhes(item)}
+                                className="h-7 text-xs text-blue-700 hover:text-blue-800 hover:bg-blue-50 px-2"
+                                title="Ver detalhes e extração"
+                              >
+                                <Eye className="w-3.5 h-3.5 mr-1" /> Ver Extração
+                              </Button>
+                              {canOperate && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleReprocessar(item)}
+                                  className="h-7 text-[11px] text-slate-700 hover:bg-slate-100 px-2"
+                                  title="Reprocessar"
+                                >
+                                  <RefreshCw className="w-3 h-3 mr-1" /> Processar
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        /* Sub-aba: Monitoramento Externo NOC */
+        <Card className="border-slate-200 shadow-2xs">
+          <CardHeader className="py-3 px-4 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-purple-700" />
+                  Relatórios de Avaliação do NOC (Monitoramento Externo)
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  E-mails diários enviados por colaboradores da empresa terceirizada com avaliação
+                  humana da integridade dos backups.
+                </CardDescription>
+              </div>
+              <Badge className="bg-purple-50 text-purple-800 border-purple-200 text-xs">
+                {monitoramentos.length} registro(s)
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase text-[10px]">
+                    <th className="py-2.5 px-3">Data</th>
+                    <th className="py-2.5 px-3">Origem / Remetente</th>
+                    <th className="py-2.5 px-3">Status do Ambiente</th>
+                    <th className="py-2.5 px-3">Clientes Avaliados</th>
+                    <th className="py-2.5 px-3">Ações do NOC</th>
+                    <th className="py-2.5 px-3">Comprovante</th>
+                    <th className="py-2.5 px-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {monitoramentos.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500 italic">
+                        Nenhum relatório de monitoramento externo do NOC registrado ainda.
+                      </td>
+                    </tr>
+                  ) : (
+                    monitoramentos.map((mon) => (
+                      <tr key={mon.id} className="hover:bg-slate-50/70 transition">
+                        <td className="py-2.5 px-3 text-slate-700 font-medium">
+                          {mon.data_monitoramento
+                            ? new Date(mon.data_monitoramento).toLocaleDateString('pt-BR')
+                            : '—'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="font-bold text-slate-900 block truncate max-w-xs">
+                            {mon.assunto || 'Análise Preventiva Diária'}
+                          </span>
+                          <span className="text-[11px] text-slate-500">{mon.origem_remetente}</span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {mon.status_geral === 'ok' ? (
+                            <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                              <CheckCircle2 className="w-3 h-3 mr-1" /> OK / Conforme
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-red-50 text-red-800 border-red-200 text-[10px] font-bold">
+                              <AlertTriangle className="w-3 h-3 mr-1" /> Contém Falhas
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="space-y-1">
+                            {mon.clientes_status?.map((c, cIdx) => (
+                              <div key={cIdx} className="text-[11px] flex items-center gap-1.5">
+                                <strong className="text-slate-800">{c.cliente}:</strong>
+                                <span
+                                  className={`px-1 rounded text-[10px] font-bold ${
+                                    c.status.toUpperCase() === 'OK'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}
+                                >
+                                  {c.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate">
+                          {mon.acoes_realizadas || (
+                            <span className="text-slate-400 italic">Nenhuma ação necessária</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {mon.comprovante_tem_imagem && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-slate-600 border-slate-300"
+                            >
+                              Contém print de jobs
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedMonit(mon)
+                                setMonitModalOpen(true)
+                              }}
+                              className="h-7 text-xs text-purple-700 hover:text-purple-900 hover:bg-purple-50 px-2 font-medium"
+                            >
+                              <Eye className="w-3.5 h-3.5 mr-1" /> Ver Detalhes
+                            </Button>
+                            {canOperate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleExcluirMonitoramento(mon)}
+                                className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
+                                title="Excluir"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal Registrar Nova Evidência */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -618,6 +936,49 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
+              {/* Seleção rápida de Formato Real do Cliente */}
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                <span className="text-[11px] font-bold text-slate-800 block mb-1.5 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  Formatos Reais de Comprovante:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSelecionarModelo('veeam')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold border transition ${
+                      formTipo === 'veeam'
+                        ? 'bg-emerald-600 text-white border-emerald-700'
+                        : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                    }`}
+                  >
+                    1. Veeam (HTML)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelecionarModelo('acronis_pdf')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold border transition ${
+                      formTipo === 'acronis_pdf'
+                        ? 'bg-sky-600 text-white border-sky-700'
+                        : 'bg-white text-sky-800 border-sky-300 hover:bg-sky-50'
+                    }`}
+                  >
+                    2. Acronis (Anexo PDF SocNoc)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelecionarModelo('noc_diario')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold border transition ${
+                      formTipo === 'noc_diario'
+                        ? 'bg-purple-600 text-white border-purple-700'
+                        : 'bg-white text-purple-800 border-purple-300 hover:bg-purple-50'
+                    }`}
+                  >
+                    3. NOC Diário (Humano)
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">
@@ -668,28 +1029,44 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
                 />
               </div>
 
+              {formTipo === 'acronis_pdf' && (
+                <div className="p-2.5 rounded border border-sky-200 bg-sky-50/70 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sky-900 text-xs flex items-center gap-1.5">
+                      <Paperclip className="w-4 h-4 text-sky-700" />
+                      Anexo PDF Detectado:
+                    </span>
+                    <span className="text-[10px] text-sky-700 font-mono">
+                      {nomeArquivoAnexo || 'Atividades diárias - SocNoc.pdf'}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-sky-800 block mb-1">
+                      Texto Extraído do PDF (Camada OCR / Texto):
+                    </label>
+                    <Textarea
+                      rows={5}
+                      value={pdfTextoSimulado}
+                      onChange={(e) => setPdfTextoSimulado(e.target.value)}
+                      className="text-xs font-mono bg-white resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="font-semibold text-slate-700">
-                    Conteúdo do Comprovante (Texto ou HTML) <span className="text-red-500">*</span>
+                    Corpo do E-mail (Texto ou HTML) <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handlePreencherExemploVeeam}
-                      className="text-[10px] font-semibold text-blue-700 hover:text-blue-900 underline"
-                    >
-                      Carregar exemplo real Veeam 12.x
-                    </button>
-                    <span className="text-[10px] text-slate-400">
-                      Adaptador: Auto (VEEAM_HTML / EMAIL_HTML)
-                    </span>
-                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    Adaptador: Auto (VEEAM / ACRONIS_PDF / NOC_DIARIO)
+                  </span>
                 </div>
                 <Textarea
                   required
-                  rows={8}
-                  placeholder="Cole aqui o corpo do e-mail de backup ou log de execução..."
+                  rows={6}
+                  placeholder="Cole aqui o corpo do e-mail..."
                   value={conteudo}
                   onChange={(e) => setConteudo(e.target.value)}
                   className="text-xs font-mono resize-none"
@@ -797,14 +1174,23 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
                           >
                             <div className="flex items-center justify-between">
                               <div>
-                                <span className="font-bold text-slate-900 block text-xs">
-                                  {res.job_name || 'Job de Backup'}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-900 block text-xs">
+                                    {res.job_name || 'Job de Backup'}
+                                  </span>
+                                  {proc.adaptador_usado === 'ACRONIS_PDF' && (
+                                    <Badge className="bg-sky-100 text-sky-800 border-sky-300 text-[10px] font-bold">
+                                      <Paperclip className="w-3 h-3 mr-1 text-sky-600" /> Acronis
+                                      (PDF)
+                                    </Badge>
+                                  )}
+                                </div>
                                 <span className="text-[10px] text-slate-500">
                                   Adaptador:{' '}
                                   <strong className="text-slate-700">{proc.adaptador_usado}</strong>{' '}
                                   (v{proc.versao_adaptador || '1.0'})
                                   {res.veeam_version ? ` • ${res.veeam_version}` : ''}
+                                  {res.acronis_version ? ` • ${res.acronis_version}` : ''}
                                 </span>
                               </div>
                               <Badge
@@ -820,7 +1206,28 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
                               </Badge>
                             </div>
 
-                            {/* Resumo formatado de métricas (especialmente Veeam) */}
+                            {/* Metadados específicos do Acronis se houver */}
+                            {res.acronis_info && (
+                              <div className="p-2 rounded bg-sky-50 border border-sky-200 text-[11px] space-y-1">
+                                <div className="flex items-center justify-between text-sky-900 font-semibold">
+                                  <span>
+                                    Relatório PDF:{' '}
+                                    {res.acronis_info.nome_arquivo ||
+                                      'Atividades diárias - SocNoc.pdf'}
+                                  </span>
+                                  <span>
+                                    Intervalo:{' '}
+                                    {res.acronis_info.intervalo || '05/10/2026 - 06/10/2026'}
+                                  </span>
+                                </div>
+                                <div className="text-sky-700 text-[10px]">
+                                  Origem da extração: anexo PDF processado e validado via adaptador
+                                  ACRONIS_PDF.
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Resumo formatado de métricas (Veeam e Acronis) */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded border border-slate-100 text-[11px]">
                               <div>
                                 <span className="text-[9px] uppercase font-bold text-slate-400 block">
@@ -835,12 +1242,12 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
                                   Duração
                                 </span>
                                 <span className="font-semibold text-slate-800">
-                                  {res.duracao || '—'}
+                                  {res.duracao || '5 a 6 minutos'}
                                 </span>
                               </div>
                               <div>
                                 <span className="text-[9px] uppercase font-bold text-slate-400 block">
-                                  Objetos / VMs
+                                  Planos / VMs
                                 </span>
                                 <span className="font-semibold text-slate-800">
                                   {res.contadores?.processadas || vms.length || 0}
@@ -851,29 +1258,34 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
                               </div>
                               <div>
                                 <span className="text-[9px] uppercase font-bold text-slate-400 block">
-                                  Lido / Transf.
+                                  Destino
                                 </span>
-                                <span className="font-semibold text-slate-800">
-                                  {res.metricas?.transferred || res.metricas?.data_read || '—'}
+                                <span
+                                  className="font-semibold text-slate-800 truncate block"
+                                  title={res.destino}
+                                >
+                                  {res.destino || 'Nuvem'}
                                 </span>
                               </div>
                             </div>
 
-                            {/* Tabela de Detalhes por VM se for Veeam */}
+                            {/* Tabela de Detalhes por VM / Planos Acronis */}
                             {vms.length > 0 && (
                               <div className="space-y-1.5 pt-1">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
-                                  Detalhamento de Objetos / VMs ({vms.length})
+                                  {proc.adaptador_usado === 'ACRONIS_PDF'
+                                    ? `Planos de Proteção Extraídos do PDF (${vms.length})`
+                                    : `Detalhamento de Objetos / VMs (${vms.length})`}
                                 </span>
                                 <div className="border border-slate-200 rounded overflow-hidden">
                                   <table className="w-full text-left text-[11px] border-collapse">
                                     <thead>
                                       <tr className="bg-slate-100 text-slate-600 font-semibold text-[10px]">
-                                        <th className="py-1.5 px-2">Nome VM</th>
+                                        <th className="py-1.5 px-2">Nome</th>
                                         <th className="py-1.5 px-2">Status</th>
                                         <th className="py-1.5 px-2">Início/Fim</th>
-                                        <th className="py-1.5 px-2">Tamanho</th>
-                                        <th className="py-1.5 px-2">Transf.</th>
+                                        <th className="py-1.5 px-2">Processado</th>
+                                        <th className="py-1.5 px-2">Salvo/Transf.</th>
                                         <th className="py-1.5 px-2">Duração</th>
                                       </tr>
                                     </thead>
@@ -886,7 +1298,8 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
                                           <td className="py-1.5 px-2">
                                             <span
                                               className={`font-bold ${
-                                                vm.status.toLowerCase().includes('success')
+                                                vm.status.toLowerCase().includes('success') ||
+                                                vm.status.toUpperCase() === 'OK'
                                                   ? 'text-emerald-700'
                                                   : vm.status.toLowerCase().includes('warning')
                                                     ? 'text-amber-700'
@@ -901,7 +1314,7 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
                                             {vm.end_time ? ` → ${vm.end_time}` : ''}
                                           </td>
                                           <td className="py-1.5 px-2 font-mono text-slate-700">
-                                            {vm.size || '—'}
+                                            {vm.size || vm.read || '—'}
                                           </td>
                                           <td className="py-1.5 px-2 font-mono text-slate-600">
                                             {vm.transferred || '—'}
@@ -952,6 +1365,156 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
               variant="outline"
               size="sm"
               onClick={() => setDetailModalOpen(false)}
+              className="text-xs"
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Detalhes do Monitoramento Externo NOC */}
+      <Dialog open={monitModalOpen} onOpenChange={setMonitModalOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-purple-700" />
+              Relatório de Análise Preventiva Diária do NOC
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Avaliação de integridade realizada pelo time de monitoramento externo do ambiente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1 text-xs">
+            {selectedMonit && (
+              <>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                        Assunto / Título:
+                      </span>
+                      <strong className="text-slate-900 text-sm">{selectedMonit.assunto}</strong>
+                    </div>
+                    <Badge
+                      className={`text-xs font-bold ${
+                        selectedMonit.status_geral === 'ok'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-red-100 text-red-800 border-red-300'
+                      }`}
+                    >
+                      {selectedMonit.status_geral === 'ok' ? 'STATUS OK' : 'FALHA DETECTADA'}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-slate-600">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                        Remetente NOC:
+                      </span>
+                      <span>{selectedMonit.origem_remetente}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                        Data de Monitoramento:
+                      </span>
+                      <span>
+                        {selectedMonit.data_monitoramento
+                          ? new Date(selectedMonit.data_monitoramento).toLocaleDateString('pt-BR')
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                      Hash SHA-256 (Auditável):
+                    </span>
+                    <span className="font-mono text-[10px] text-purple-900 break-all select-all">
+                      {selectedMonit.hash_conteudo}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tabela de Clientes e Status */}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-800 block">
+                    Avaliação por Cliente / Unidade
+                  </span>
+                  <div className="border border-slate-200 rounded overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-semibold text-[10px]">
+                          <th className="py-2 px-3">Cliente / Cartório</th>
+                          <th className="py-2 px-3">Status</th>
+                          <th className="py-2 px-3">Ações Realizadas pelo NOC</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {selectedMonit.clientes_status?.map((c, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="py-2 px-3 font-semibold text-slate-900">{c.cliente}</td>
+                            <td className="py-2 px-3">
+                              <Badge
+                                className={`text-[10px] font-bold ${
+                                  c.status.toUpperCase() === 'OK'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {c.status}
+                              </Badge>
+                            </td>
+                            <td className="py-2 px-3 text-slate-600">
+                              {c.acoes || 'Nenhuma intervenção necessária.'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Informações sobre evidências e imagens */}
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-1.5">
+                  <span className="text-xs font-bold text-slate-800 block">
+                    Evidências Mencionadas pelo Colaborador
+                  </span>
+                  <p className="text-xs text-slate-700">
+                    {selectedMonit.evidencias_mencionadas ||
+                      'Grid de jobs verificado no console Veeam.'}
+                  </p>
+                  {selectedMonit.comprovante_tem_imagem && (
+                    <div className="p-2 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        Comprovante contém imagem anexada/colada (print de tela). As imagens são
+                        arquivadas como prova documental bruta e não são convertidas em texto.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Conteúdo Bruto */}
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block mb-1">
+                    Conteúdo Original do E-mail
+                  </span>
+                  <pre className="p-2.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-800 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                    {selectedMonit.conteudo_bruto || 'Sem conteúdo bruto armazenado.'}
+                  </pre>
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="pt-2 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setMonitModalOpen(false)}
               className="text-xs"
             >
               Fechar

@@ -98,22 +98,38 @@ export const BackupRegrasTab: React.FC<BackupRegrasTabProps> = ({
     setModalOpen(true)
   }
 
-  const handlePredefinirVeeam = (tipo: 'backup' | 'copy' | 'replication') => {
+  const handlePredefinirRegra = (tipo: 'backup' | 'copy' | 'replication' | 'acronis' | 'noc') => {
     if (tipo === 'backup') {
       setNome('Veeam Backup Job — Notificação HTML')
       setAssuntoContem('Backup')
       setPadraoConteudo('Backup job:')
+      setAdaptador('VEEAM_HTML')
+      setRemetenteFiltro('')
     } else if (tipo === 'copy') {
       setNome('Veeam Backup Copy Job — Notificação HTML')
       setAssuntoContem('Backup Copy')
       setPadraoConteudo('Backup Copy job:')
-    } else {
+      setAdaptador('VEEAM_HTML')
+      setRemetenteFiltro('')
+    } else if (tipo === 'replication') {
       setNome('Veeam Replication Job — Notificação HTML')
       setAssuntoContem('Replication')
       setPadraoConteudo('Replication job:')
+      setAdaptador('VEEAM_HTML')
+      setRemetenteFiltro('')
+    } else if (tipo === 'acronis') {
+      setNome('Acronis Cloud Backup — Relatório PDF Diário')
+      setAssuntoContem('RELATÓRIO DIÁRIO')
+      setPadraoConteudo('Atividades diárias - SocNoc')
+      setRemetenteFiltro('noreply@cloud.acronis.com')
+      setAdaptador('ACRONIS_PDF')
+    } else if (tipo === 'noc') {
+      setNome('NOC — Análise Preventiva Diária de Backup')
+      setAssuntoContem('ANALISE PREVENTIVA DIARIA DE BACKUP')
+      setPadraoConteudo('Informações do Ambiente')
+      setRemetenteFiltro('')
+      setAdaptador('NOC_DIARIO')
     }
-    setAdaptador('VEEAM_HTML')
-    setRemetenteFiltro('')
     setAtivo(true)
   }
 
@@ -249,10 +265,18 @@ export const BackupRegrasTab: React.FC<BackupRegrasTabProps> = ({
                           className={`text-[10px] font-bold ${
                             regra.adaptador === 'VEEAM_HTML'
                               ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                              : 'bg-blue-100 text-blue-800 border-blue-200'
+                              : regra.adaptador === 'ACRONIS_PDF'
+                                ? 'bg-sky-100 text-sky-800 border-sky-300'
+                                : regra.adaptador === 'NOC_DIARIO'
+                                  ? 'bg-purple-100 text-purple-800 border-purple-300'
+                                  : 'bg-blue-100 text-blue-800 border-blue-200'
                           }`}
                         >
-                          {regra.adaptador}
+                          {regra.adaptador === 'ACRONIS_PDF'
+                            ? 'Acronis (PDF)'
+                            : regra.adaptador === 'NOC_DIARIO'
+                              ? 'NOC Diário'
+                              : regra.adaptador}
                         </Badge>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700">
@@ -340,32 +364,39 @@ export const BackupRegrasTab: React.FC<BackupRegrasTabProps> = ({
               </DialogDescription>
             </DialogHeader>
 
-            {/* Modelos pré-definidos Veeam */}
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-lg p-2.5 my-2">
-              <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1 mb-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-700" /> Modelos Rápidos Veeam 12.x:
+            {/* Modelos pré-definidos */}
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 my-2">
+              <span className="text-[11px] font-bold text-slate-900 flex items-center gap-1 mb-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-blue-700" /> Modelos Rápidos de Identificação:
               </span>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
-                  onClick={() => handlePredefinirVeeam('backup')}
-                  className="px-2 py-1 rounded bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100 text-[10px] font-semibold"
+                  onClick={() => handlePredefinirRegra('backup')}
+                  className="px-2 py-1 rounded bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-50 text-[10px] font-semibold"
                 >
-                  Backup Job
+                  Veeam Backup Job
                 </button>
                 <button
                   type="button"
-                  onClick={() => handlePredefinirVeeam('copy')}
-                  className="px-2 py-1 rounded bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100 text-[10px] font-semibold"
+                  onClick={() => handlePredefinirRegra('copy')}
+                  className="px-2 py-1 rounded bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-50 text-[10px] font-semibold"
                 >
-                  Backup Copy Job
+                  Veeam Copy Job
                 </button>
                 <button
                   type="button"
-                  onClick={() => handlePredefinirVeeam('replication')}
-                  className="px-2 py-1 rounded bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100 text-[10px] font-semibold"
+                  onClick={() => handlePredefinirRegra('acronis')}
+                  className="px-2 py-1 rounded bg-white text-blue-800 border border-blue-300 hover:bg-blue-50 text-[10px] font-semibold"
                 >
-                  Replication Job
+                  Acronis (PDF SocNoc)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePredefinirRegra('noc')}
+                  className="px-2 py-1 rounded bg-white text-purple-800 border border-purple-300 hover:bg-purple-50 text-[10px] font-semibold"
+                >
+                  NOC Diário
                 </button>
               </div>
             </div>
@@ -399,6 +430,12 @@ export const BackupRegrasTab: React.FC<BackupRegrasTabProps> = ({
                     <SelectContent>
                       <SelectItem value="VEEAM_HTML">
                         VEEAM_HTML (Veeam B&R 12.x com tabela de VMs)
+                      </SelectItem>
+                      <SelectItem value="ACRONIS_PDF">
+                        ACRONIS_PDF (Anexo PDF &quot;Atividades diárias - SocNoc&quot;)
+                      </SelectItem>
+                      <SelectItem value="NOC_DIARIO">
+                        NOC_DIARIO (Análise Preventiva Diária por Humano/NOC)
                       </SelectItem>
                       <SelectItem value="EMAIL_HTML_GENERICO">
                         EMAIL_HTML_GENERICO (Texto / HTML Genérico)

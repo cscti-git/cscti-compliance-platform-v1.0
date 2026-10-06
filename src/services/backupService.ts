@@ -13,6 +13,7 @@ import type {
   BackupAvaliacaoItem,
   BackupOcorrenciaItem,
   BackupTesteRecuperacaoItem,
+  BackupMonitoramentoExternoItem,
 } from '@/types/cscti'
 
 // -------------------------------------------------------------
@@ -317,20 +318,25 @@ export interface ProcessarEvidenciaPayload {
   rotinaId?: string
   fonteId?: string
   tipo?: 'upload_manual' | 'e_mail' | 'webhook'
+  nome_arquivo?: string
+  pdf_texto?: string
+  pdf_nome?: string
 }
 
 export interface ProcessarEvidenciaResponse {
   success: boolean
   idempotent?: boolean
-  evidencia_id: string
+  evidencia_id?: string
   processamento_id?: string
   execucao_id?: string
+  monitoramento_id?: string
+  tipo_registro?: string
   status: string
   conformidade?: string
+  adaptador?: string
   resultado?: Record<string, unknown>
   message: string
 }
-
 export async function processarEvidenciaBackup(
   payload: ProcessarEvidenciaPayload,
 ): Promise<ProcessarEvidenciaResponse> {
@@ -569,6 +575,37 @@ export async function deleteBackupTeste(id: string, organizationId: string): Pro
     entity: 'Backup e Continuidade',
     detail: `Registro de teste de recuperação excluído (#${id})`,
     metadata: { teste_id: id },
+  })
+  return true
+}
+
+// -------------------------------------------------------------
+// 12. Monitoramentos Externos (NOC / Terceirizados)
+// -------------------------------------------------------------
+export async function listBackupMonitoramentos(
+  organizationId: string,
+): Promise<BackupMonitoramentoExternoItem[]> {
+  if (!organizationId) return []
+  return pb
+    .collection('backup_monitoramentos_externos')
+    .getFullList<BackupMonitoramentoExternoItem>({
+      filter: `organization = "${organizationId}"`,
+      expand: 'evidencia',
+      sort: '-created',
+    })
+}
+
+export async function deleteBackupMonitoramento(
+  id: string,
+  organizationId: string,
+): Promise<boolean> {
+  await pb.collection('backup_monitoramentos_externos').delete(id)
+  await logAudit({
+    organizationId,
+    action: 'BACKUP_MONITORAMENTO_DELETE',
+    entity: 'Backup e Continuidade',
+    detail: `Registro de monitoramento externo do NOC removido (#${id})`,
+    metadata: { monitoramento_id: id },
   })
   return true
 }
