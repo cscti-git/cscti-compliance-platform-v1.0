@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T13:01:59.300Z",
+  "generatedAt": "2026-10-06T13:35:50.077Z",
   "collections": [
     {
       "name": "users",
@@ -1588,7 +1588,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["EMAIL_HTML_GENERICO", "LOG_BRUTO_TEXTO", "JSON_WEBHOOK"]
+          "selectValues": ["EMAIL_HTML_GENERICO", "VEEAM_HTML", "LOG_BRUTO_TEXTO", "JSON_WEBHOOK"]
         },
         {
           "name": "ativo",
@@ -1867,6 +1867,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "detalhes_vms",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

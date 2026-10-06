@@ -29,6 +29,8 @@ import {
   listBackupEscopos,
   listBackupPlanos,
   listBackupRotinas,
+  listBackupFontes,
+  listBackupRegras,
   listBackupEvidencias,
   listBackupExecucoes,
   listBackupOcorrencias,
@@ -38,6 +40,8 @@ import type {
   BackupEscopoItem,
   BackupPlanoItem,
   BackupRotinaItem,
+  BackupFonteItem,
+  BackupRegraIdentificacaoItem,
   BackupEvidenciaItem,
   BackupExecucaoItem,
   BackupOcorrenciaItem,
@@ -50,6 +54,7 @@ import { BackupPlanosTab } from './BackupPlanosTab'
 import { BackupRotinasTab } from './BackupRotinasTab'
 import { BackupEvidenciasTab } from './BackupEvidenciasTab'
 import { BackupExecucoesTab } from './BackupExecucoesTab'
+import { BackupRegrasTab } from './BackupRegrasTab'
 import { BackupOcorrenciasTab } from './BackupOcorrenciasTab'
 import { BackupTestesTab } from './BackupTestesTab'
 
@@ -65,6 +70,8 @@ export const BackupOverviewPage: React.FC = () => {
   const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])
   const [planos, setPlanos] = useState<BackupPlanoItem[]>([])
   const [rotinas, setRotinas] = useState<BackupRotinaItem[]>([])
+  const [fontes, setFontes] = useState<BackupFonteItem[]>([])
+  const [regras, setRegras] = useState<BackupRegraIdentificacaoItem[]>([])
   const [evidencias, setEvidencias] = useState<BackupEvidenciaItem[]>([])
   const [execucoes, setExecucoes] = useState<BackupExecucaoItem[]>([])
   const [ocorrencias, setOcorrencias] = useState<BackupOcorrenciaItem[]>([])
@@ -74,18 +81,23 @@ export const BackupOverviewPage: React.FC = () => {
     if (!orgId) return
     setLoading(true)
     try {
-      const [escData, plaData, rotData, eviData, exeData, ocoData, tesData] = await Promise.all([
-        listBackupEscopos(orgId),
-        listBackupPlanos(orgId),
-        listBackupRotinas(orgId),
-        listBackupEvidencias(orgId),
-        listBackupExecucoes(orgId),
-        listBackupOcorrencias(orgId),
-        listBackupTestes(orgId),
-      ])
+      const [escData, plaData, rotData, fonData, regData, eviData, exeData, ocoData, tesData] =
+        await Promise.all([
+          listBackupEscopos(orgId),
+          listBackupPlanos(orgId),
+          listBackupRotinas(orgId),
+          listBackupFontes(orgId),
+          listBackupRegras(orgId),
+          listBackupEvidencias(orgId),
+          listBackupExecucoes(orgId),
+          listBackupOcorrencias(orgId),
+          listBackupTestes(orgId),
+        ])
       setEscopos(escData)
       setPlanos(plaData)
       setRotinas(rotData)
+      setFontes(fonData)
+      setRegras(regData)
       setEvidencias(eviData)
       setExecucoes(exeData)
       setOcorrencias(ocoData)
@@ -204,6 +216,12 @@ export const BackupOverviewPage: React.FC = () => {
             className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
           >
             <PlayCircle className="w-3.5 h-3.5 mr-1.5" /> Execuções ({execucoes.length})
+          </TabsTrigger>
+          <TabsTrigger
+            value="regras"
+            className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
+          >
+            <Sliders className="w-3.5 h-3.5 mr-1.5" /> Regras & Adaptadores ({regras.length})
           </TabsTrigger>
           <TabsTrigger
             value="ocorrencias"
@@ -675,6 +693,17 @@ export const BackupOverviewPage: React.FC = () => {
           <BackupExecucoesTab
             execucoes={execucoes}
             rotinas={rotinas}
+            canOperate={canOperate}
+            orgId={orgId}
+            onReload={loadAllData}
+          />
+        </TabsContent>
+
+        {/* 6.1 REGRAS DE IDENTIFICAÇÃO E ADAPTADORES */}
+        <TabsContent value="regras">
+          <BackupRegrasTab
+            regras={regras}
+            fontes={fontes}
             canOperate={canOperate}
             orgId={orgId}
             onReload={loadAllData}

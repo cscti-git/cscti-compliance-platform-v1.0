@@ -28,6 +28,7 @@ import {
   Clock,
   HardDrive,
   FileCheck,
+  Layers,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { saveBackupExecucao } from '@/services/backupService'
@@ -51,6 +52,11 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
   const { toast } = useToast()
   const [modalOpen, setModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [vmsModalOpen, setVmsModalOpen] = useState(false)
+  const [selectedVms, setSelectedVms] = useState<{
+    jobName: string
+    vms: NonNullable<BackupExecucaoItem['detalhes_vms']>
+  } | null>(null)
 
   // Formulário de lançamento manual de execução
   const [rotinaId, setRotinaId] = useState('')
@@ -203,11 +209,29 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
                           {exec.origem_registro}
                         </Badge>
                       </td>
-                      <td
-                        className="py-2.5 px-3 text-slate-600 max-w-xs truncate"
-                        title={exec.observacao}
-                      >
-                        {exec.observacao || 'Concluído em conformidade com o plano.'}
+                      <td className="py-2.5 px-3 text-slate-600 max-w-xs" title={exec.observacao}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate">
+                            {exec.observacao || 'Concluído em conformidade com o plano.'}
+                          </span>
+                          {exec.detalhes_vms && exec.detalhes_vms.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedVms({
+                                  jobName: exec.observacao || 'Execução de Backup Veeam',
+                                  vms: exec.detalhes_vms!,
+                                })
+                                setVmsModalOpen(true)
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 flex-shrink-0"
+                            >
+                              <Layers className="h-3 w-3" />
+                              {exec.detalhes_vms.length} VMs
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -217,6 +241,88 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal Detalhamento de VMs do Veeam */}
+      <Dialog open={vmsModalOpen} onOpenChange={setVmsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <Layers className="h-5 w-5 text-blue-600" />
+              Detalhamento de Objetos / VMs — Veeam Backup
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              {selectedVms?.jobName || 'Execução registrada por comprovante de backup.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedVms?.vms && (
+            <div className="space-y-3 pt-2">
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                      <th className="py-2.5 px-3">Nome VM</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Horário</th>
+                      <th className="py-2.5 px-3">Tamanho</th>
+                      <th className="py-2.5 px-3">Lido</th>
+                      <th className="py-2.5 px-3">Transferido</th>
+                      <th className="py-2.5 px-3">Duração</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {selectedVms.vms.map((vm, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
+                          {vm.nome}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              vm.status.toLowerCase().includes('success')
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : vm.status.toLowerCase().includes('warning')
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {vm.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">
+                          {vm.start_time || '—'}
+                          {vm.end_time ? ` → ${vm.end_time}` : ''}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-semibold text-slate-800">
+                          {vm.size || '—'}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-600">{vm.read || '—'}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-600">
+                          {vm.transferred || '—'}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">
+                          {vm.duration || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVmsModalOpen(false)}
+              className="text-xs"
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal Lançar Execução Manual */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

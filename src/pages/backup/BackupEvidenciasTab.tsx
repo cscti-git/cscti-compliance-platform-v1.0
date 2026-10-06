@@ -74,18 +74,77 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
   const [modalOpen, setModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  const [remetente, setRemetente] = useState('sistema-backup@cartorio.local')
-  const [assunto, setAssunto] = useState('[SUCESSO] Backup Noturno Base de Dados - Job #442')
+  const [remetente, setRemetente] = useState('newsletter@proitcs.com.br')
+  const [assunto, setAssunto] = useState('[CRI][Success] Backup VMs GOLD (4 objects)')
   const [rotinaId, setRotinaId] = useState('')
   const [conteudo, setConteudo] = useState(
-    `Relatório de Execução de Cópia de Segurança
-Trabalho: Job Backup Geral - PostgreSQL Atos
-Status: SUCESSO (Job completed successfully)
-Data/Hora Início: ${new Date().toISOString()}
-Data/Hora Término: ${new Date().toISOString()}
-Tamanho transferido: 4.8 GB
-Destino: Storage NAS Dedicado e Cópia Nuvem S3
-Arquivos verificados: 100% OK, hash SHA-256 verificado.`,
+    `<div style="font-family: Arial, sans-serif;">
+<div style="background-color: #00B050; color: white; padding: 15px;">
+  <div style="float: left;">
+    <h2 style="margin: 0;">Backup job: Backup VMs GOLD</h2>
+    <p style="margin: 5px 0 0 0; font-size: 12px;">Created by SRV-BK-VEEAM\\veeam at 12/07/2022 14:45.</p>
+  </div>
+  <div style="float: right; text-align: right;">
+    <h2 style="margin: 0;">Success</h2>
+    <p style="margin: 5px 0 0 0; font-size: 12px;">4 of 4 VMs processed</p>
+  </div>
+  <div style="clear: both;"></div>
+</div>
+
+<div style="background-color: #f2f2f2; padding: 10px; font-size: 12px; margin-top: 5px;">
+  terça-feira, 6 de outubro de 2026 08:05:06
+</div>
+
+<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px;" border="1">
+  <tr>
+    <td style="font-weight: bold; width: 12%;">Success</td><td style="width: 8%;">4</td>
+    <td style="font-weight: bold; width: 12%;">Start time</td><td style="width: 12%;">08:05:06</td>
+    <td style="font-weight: bold; width: 12%;">Total size</td><td style="width: 12%;">1,5 TB</td>
+    <td style="font-weight: bold; width: 12%;">Backup size</td><td style="width: 12%;">3,5 GB</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td style="font-weight: bold;">Warning</td><td>0</td>
+    <td style="font-weight: bold;">End time</td><td>08:16:22</td>
+    <td style="font-weight: bold;">Data read</td><td>18,8 GB</td>
+    <td style="font-weight: bold;">Dedupe</td><td>1,0x</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td style="font-weight: bold;">Error</td><td>0</td>
+    <td style="font-weight: bold;">Duration</td><td>0:11:15</td>
+    <td style="font-weight: bold;">Transferred</td><td>3,1 GB</td>
+    <td style="font-weight: bold;">Compression</td><td>4,0x</td>
+    <td></td>
+  </tr>
+</table>
+
+<div style="background-color: #e6e6e6; padding: 8px; font-weight: bold; font-size: 13px; margin-top: 15px;">
+  Details
+</div>
+
+<table style="width: 100%; border-collapse: collapse; font-size: 12px;" border="1">
+  <tr style="background-color: #f9f9f9; font-weight: bold;">
+    <th>Name</th><th>Status</th><th>Start time</th><th>End time</th><th>Size</th><th>Read</th><th>Transferred</th><th>Duration</th><th>Details</th>
+  </tr>
+  <tr>
+    <td>SRV-PRODUCAO-01</td><td style="color: green; font-weight: bold;">Success</td><td>08:10:05</td><td>08:11:47</td><td>620 GB</td><td>3,5 GB</td><td>275,1 MB</td><td>0:01:41</td><td></td>
+  </tr>
+  <tr>
+    <td>SPCM-PROTESTO</td><td style="color: green; font-weight: bold;">Success</td><td>08:10:05</td><td>08:12:33</td><td>270 GB</td><td>2,4 GB</td><td>448,7 MB</td><td>0:02:27</td><td></td>
+  </tr>
+  <tr>
+    <td>SRV-ATOS-DB</td><td style="color: green; font-weight: bold;">Success</td><td>08:12:26</td><td>08:16:14</td><td>420 GB</td><td>10,6 GB</td><td>1,8 GB</td><td>0:03:48</td><td></td>
+  </tr>
+  <tr>
+    <td>SRV-DOCUMENTOS</td><td style="color: green; font-weight: bold;">Success</td><td>08:11:25</td><td>08:12:54</td><td>240 GB</td><td>2,4 GB</td><td>578,3 MB</td><td>0:01:28</td><td></td>
+  </tr>
+</table>
+
+<div style="margin-top: 25px; font-size: 11px; color: #666;">
+  Veeam Backup & Replication 12.3.1.1139
+</div>
+</div>`,
   )
 
   // Conector IMAP e Estado de Ingestão
@@ -147,10 +206,84 @@ Arquivos verificados: 100% OK, hash SHA-256 verificado.`,
   const [procLoading, setProcLoading] = useState(false)
 
   const handleOpenRegistrar = () => {
-    setRemetente('sistema-backup@cartorio.local')
-    setAssunto('[SUCESSO] Backup Noturno Base de Dados - Job #442')
+    setRemetente('newsletter@proitcs.com.br')
+    setAssunto('[CRI][Success] Backup VMs GOLD (4 objects)')
     setRotinaId(rotinas.length > 0 ? rotinas[0].id : '')
     setModalOpen(true)
+  }
+
+  const handlePreencherExemploVeeam = () => {
+    setRemetente('newsletter@proitcs.com.br')
+    setAssunto('[CRI][Success] Backup VMs GOLD (4 objects)')
+    setConteudo(
+      `<div style="font-family: Arial, sans-serif;">
+<div style="background-color: #00B050; color: white; padding: 15px;">
+  <div style="float: left;">
+    <h2 style="margin: 0;">Backup job: Backup VMs GOLD</h2>
+    <p style="margin: 5px 0 0 0; font-size: 12px;">Created by SRV-BK-VEEAM\\veeam at 12/07/2022 14:45.</p>
+  </div>
+  <div style="float: right; text-align: right;">
+    <h2 style="margin: 0;">Success</h2>
+    <p style="margin: 5px 0 0 0; font-size: 12px;">4 of 4 VMs processed</p>
+  </div>
+  <div style="clear: both;"></div>
+</div>
+
+<div style="background-color: #f2f2f2; padding: 10px; font-size: 12px; margin-top: 5px;">
+  terça-feira, 6 de outubro de 2026 08:05:06
+</div>
+
+<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px;" border="1">
+  <tr>
+    <td style="font-weight: bold; width: 12%;">Success</td><td style="width: 8%;">4</td>
+    <td style="font-weight: bold; width: 12%;">Start time</td><td style="width: 12%;">08:05:06</td>
+    <td style="font-weight: bold; width: 12%;">Total size</td><td style="width: 12%;">1,5 TB</td>
+    <td style="font-weight: bold; width: 12%;">Backup size</td><td style="width: 12%;">3,5 GB</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td style="font-weight: bold;">Warning</td><td>0</td>
+    <td style="font-weight: bold;">End time</td><td>08:16:22</td>
+    <td style="font-weight: bold;">Data read</td><td>18,8 GB</td>
+    <td style="font-weight: bold;">Dedupe</td><td>1,0x</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td style="font-weight: bold;">Error</td><td>0</td>
+    <td style="font-weight: bold;">Duration</td><td>0:11:15</td>
+    <td style="font-weight: bold;">Transferred</td><td>3,1 GB</td>
+    <td style="font-weight: bold;">Compression</td><td>4,0x</td>
+    <td></td>
+  </tr>
+</table>
+
+<div style="background-color: #e6e6e6; padding: 8px; font-weight: bold; font-size: 13px; margin-top: 15px;">
+  Details
+</div>
+
+<table style="width: 100%; border-collapse: collapse; font-size: 12px;" border="1">
+  <tr style="background-color: #f9f9f9; font-weight: bold;">
+    <th>Name</th><th>Status</th><th>Start time</th><th>End time</th><th>Size</th><th>Read</th><th>Transferred</th><th>Duration</th><th>Details</th>
+  </tr>
+  <tr>
+    <td>SRV-PRODUCAO-01</td><td style="color: green; font-weight: bold;">Success</td><td>08:10:05</td><td>08:11:47</td><td>620 GB</td><td>3,5 GB</td><td>275,1 MB</td><td>0:01:41</td><td></td>
+  </tr>
+  <tr>
+    <td>SPCM-PROTESTO</td><td style="color: green; font-weight: bold;">Success</td><td>08:10:05</td><td>08:12:33</td><td>270 GB</td><td>2,4 GB</td><td>448,7 MB</td><td>0:02:27</td><td></td>
+  </tr>
+  <tr>
+    <td>SRV-ATOS-DB</td><td style="color: green; font-weight: bold;">Success</td><td>08:12:26</td><td>08:16:14</td><td>420 GB</td><td>10,6 GB</td><td>1,8 GB</td><td>0:03:48</td><td></td>
+  </tr>
+  <tr>
+    <td>SRV-DOCUMENTOS</td><td style="color: green; font-weight: bold;">Success</td><td>08:11:25</td><td>08:12:54</td><td>240 GB</td><td>2,4 GB</td><td>578,3 MB</td><td>0:01:28</td><td></td>
+  </tr>
+</table>
+
+<div style="margin-top: 25px; font-size: 11px; color: #666;">
+  Veeam Backup & Replication 12.3.1.1139
+</div>
+</div>`,
+    )
   }
 
   const handleProcessarNovaEvidencia = async (e: React.FormEvent) => {
@@ -275,7 +408,7 @@ Arquivos verificados: 100% OK, hash SHA-256 verificado.`,
           </h2>
           <p className="text-xs text-slate-500">
             Comprovantes com cálculo automático de HASH SHA-256 (garantia estrita de idempotência) e
-            extração via adaptador EMAIL_HTML_GENERICO.
+            extração inteligente via adaptadores VEEAM_HTML e EMAIL_HTML_GENERICO.
           </p>
         </div>
 
@@ -540,7 +673,18 @@ Arquivos verificados: 100% OK, hash SHA-256 verificado.`,
                   <label className="font-semibold text-slate-700">
                     Conteúdo do Comprovante (Texto ou HTML) <span className="text-red-500">*</span>
                   </label>
-                  <span className="text-[10px] text-slate-400">Adaptador: EMAIL_HTML_GENERICO</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePreencherExemploVeeam}
+                      className="text-[10px] font-semibold text-blue-700 hover:text-blue-900 underline"
+                    >
+                      Carregar exemplo real Veeam 12.x
+                    </button>
+                    <span className="text-[10px] text-slate-400">
+                      Adaptador: Auto (VEEAM_HTML / EMAIL_HTML)
+                    </span>
+                  </div>
                 </div>
                 <Textarea
                   required
@@ -641,30 +785,150 @@ Arquivos verificados: 100% OK, hash SHA-256 verificado.`,
                     </p>
                   ) : (
                     <div className="space-y-3">
-                      {processamentos.map((proc) => (
-                        <div
-                          key={proc.id}
-                          className="p-3 rounded-lg border border-slate-200 bg-white space-y-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-800">
-                              Adaptador: {proc.adaptador_usado} (v{proc.versao_adaptador || '1.0'})
-                            </span>
-                            <Badge
-                              className={`text-[10px] ${
-                                proc.resultado?.status_detectado === 'sucesso'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}
-                            >
-                              {proc.resultado?.status_detectado?.toUpperCase() || 'PARCIAL'}
-                            </Badge>
+                      {processamentos.map((proc) => {
+                        const res = (proc.resultado ||
+                          {}) as import('@/types/cscti').BackupProcessamentoResultado
+                        const vms = res.vms || []
+
+                        return (
+                          <div
+                            key={proc.id}
+                            className="p-3 rounded-lg border border-slate-200 bg-white space-y-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-slate-900 block text-xs">
+                                  {res.job_name || 'Job de Backup'}
+                                </span>
+                                <span className="text-[10px] text-slate-500">
+                                  Adaptador:{' '}
+                                  <strong className="text-slate-700">{proc.adaptador_usado}</strong>{' '}
+                                  (v{proc.versao_adaptador || '1.0'})
+                                  {res.veeam_version ? ` • ${res.veeam_version}` : ''}
+                                </span>
+                              </div>
+                              <Badge
+                                className={`text-[10px] font-bold ${
+                                  res.status_detectado === 'sucesso'
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                    : res.status_detectado === 'parcial'
+                                      ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                      : 'bg-red-100 text-red-800 border-red-200'
+                                }`}
+                              >
+                                {res.status_detectado?.toUpperCase() || 'PARCIAL'}
+                              </Badge>
+                            </div>
+
+                            {/* Resumo formatado de métricas (especialmente Veeam) */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded border border-slate-100 text-[11px]">
+                              <div>
+                                <span className="text-[9px] uppercase font-bold text-slate-400 block">
+                                  Tamanho / Backup
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  {res.tamanho_formatado || res.metricas?.backup_size || '—'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] uppercase font-bold text-slate-400 block">
+                                  Duração
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  {res.duracao || '—'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] uppercase font-bold text-slate-400 block">
+                                  Objetos / VMs
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  {res.contadores?.processadas || vms.length || 0}
+                                  {res.contadores?.total_vms
+                                    ? ` de ${res.contadores.total_vms}`
+                                    : ''}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] uppercase font-bold text-slate-400 block">
+                                  Lido / Transf.
+                                </span>
+                                <span className="font-semibold text-slate-800">
+                                  {res.metricas?.transferred || res.metricas?.data_read || '—'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Tabela de Detalhes por VM se for Veeam */}
+                            {vms.length > 0 && (
+                              <div className="space-y-1.5 pt-1">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
+                                  Detalhamento de Objetos / VMs ({vms.length})
+                                </span>
+                                <div className="border border-slate-200 rounded overflow-hidden">
+                                  <table className="w-full text-left text-[11px] border-collapse">
+                                    <thead>
+                                      <tr className="bg-slate-100 text-slate-600 font-semibold text-[10px]">
+                                        <th className="py-1.5 px-2">Nome VM</th>
+                                        <th className="py-1.5 px-2">Status</th>
+                                        <th className="py-1.5 px-2">Início/Fim</th>
+                                        <th className="py-1.5 px-2">Tamanho</th>
+                                        <th className="py-1.5 px-2">Transf.</th>
+                                        <th className="py-1.5 px-2">Duração</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {vms.map((vm, vIdx) => (
+                                        <tr key={vIdx} className="hover:bg-slate-50/70">
+                                          <td className="py-1.5 px-2 font-mono font-bold text-slate-800">
+                                            {vm.nome}
+                                          </td>
+                                          <td className="py-1.5 px-2">
+                                            <span
+                                              className={`font-bold ${
+                                                vm.status.toLowerCase().includes('success')
+                                                  ? 'text-emerald-700'
+                                                  : vm.status.toLowerCase().includes('warning')
+                                                    ? 'text-amber-700'
+                                                    : 'text-red-700'
+                                              }`}
+                                            >
+                                              {vm.status}
+                                            </span>
+                                          </td>
+                                          <td className="py-1.5 px-2 text-slate-500 font-mono text-[10px]">
+                                            {vm.start_time || '—'}
+                                            {vm.end_time ? ` → ${vm.end_time}` : ''}
+                                          </td>
+                                          <td className="py-1.5 px-2 font-mono text-slate-700">
+                                            {vm.size || '—'}
+                                          </td>
+                                          <td className="py-1.5 px-2 font-mono text-slate-600">
+                                            {vm.transferred || '—'}
+                                          </td>
+                                          <td className="py-1.5 px-2 text-slate-500 font-mono text-[10px]">
+                                            {vm.duration || '—'}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* JSON Bruto Colapsado */}
+                            <details className="text-[10px] text-slate-500">
+                              <summary className="cursor-pointer hover:text-slate-800 font-medium">
+                                Ver payload JSON completo do adaptador
+                              </summary>
+                              <pre className="mt-1 p-2.5 bg-slate-900 text-slate-100 rounded text-[10px] font-mono overflow-x-auto max-h-36">
+                                {JSON.stringify(proc.resultado, null, 2)}
+                              </pre>
+                            </details>
                           </div>
-                          <pre className="p-2.5 bg-slate-900 text-slate-100 rounded text-[11px] font-mono overflow-x-auto max-h-48">
-                            {JSON.stringify(proc.resultado, null, 2)}
-                          </pre>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>

@@ -319,6 +319,24 @@ export interface BackupFonteItem {
   }
 }
 
+export type BackupAdaptador =
+  | 'EMAIL_HTML_GENERICO'
+  | 'VEEAM_HTML'
+  | 'LOG_BRUTO_TEXTO'
+  | 'JSON_WEBHOOK'
+
+export interface BackupVmDetailItem {
+  nome: string
+  status: string
+  start_time?: string
+  end_time?: string
+  size?: string
+  read?: string
+  transferred?: string
+  duration?: string
+  details?: string
+}
+
 export interface BackupRegraIdentificacaoItem {
   id: string
   organization: string
@@ -327,7 +345,7 @@ export interface BackupRegraIdentificacaoItem {
   remetente_filtro?: string
   assunto_contem?: string
   padrao_conteudo?: string
-  adaptador: 'EMAIL_HTML_GENERICO' | 'LOG_BRUTO_TEXTO' | 'JSON_WEBHOOK'
+  adaptador: BackupAdaptador
   ativo: boolean
   created?: string
   updated?: string
@@ -361,6 +379,7 @@ export interface BackupEvidenciaItem {
 export interface BackupProcessamentoResultado {
   status_detectado: 'sucesso' | 'erro' | 'parcial'
   job_name?: string
+  job_tipo?: 'backup' | 'backup_copy' | 'replication'
   tamanho_bytes?: number
   tamanho_formatado?: string
   destino?: string
@@ -370,6 +389,30 @@ export interface BackupProcessamentoResultado {
   regra_id?: string | null
   adaptador?: string
   versao?: string
+  veeam_version?: string | null
+  contadores?: {
+    total_vms?: number
+    processadas?: number
+    success?: number
+    warning?: number
+    error?: number
+  }
+  metricas?: {
+    total_size?: string
+    backup_size?: string
+    data_read?: string
+    transferred?: string
+    dedupe?: string
+    compression?: string
+  }
+  duracao?: string | null
+  horarios?: {
+    inicio?: string | null
+    fim?: string | null
+  }
+  vms_count?: number
+  vms?: BackupVmDetailItem[]
+  avisos?: string[]
 }
 
 export interface BackupProcessamentoItem {
@@ -401,6 +444,7 @@ export interface BackupExecucaoItem {
   tamanho_formatado?: string
   destino?: string
   observacao?: string
+  detalhes_vms?: BackupVmDetailItem[]
   created?: string
   updated?: string
   expand?: {
