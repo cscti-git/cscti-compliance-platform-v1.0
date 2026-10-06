@@ -230,3 +230,231 @@ export interface InventorySyncRunItem {
     connector?: IntegrationItem
   }
 }
+
+// -------------------------------------------------------------
+// FASE 3: MÓDULO BACKUP E CONTINUIDADE
+// -------------------------------------------------------------
+
+export interface BackupEscopoItem {
+  id: string
+  organization: string
+  nome: string
+  descricao?: string
+  sistemas_protegidos?: string
+  criticidade: 'baixa' | 'media' | 'alta'
+  status: 'ativo' | 'inativo' | 'em_revisao'
+  created?: string
+  updated?: string
+}
+
+export interface BackupPlanoItem {
+  id: string
+  organization: string
+  nome: string
+  descricao?: string
+  status: 'ativo' | 'inativo'
+  created?: string
+  updated?: string
+}
+
+export interface BackupPlanoRequisitoItem {
+  id: string
+  organization: string
+  plano: string
+  requisito: string
+  parametro: string
+  tipo_requisito?: 'rpo' | 'rto' | 'retencao' | 'periodicidade' | 'armazenamento' | 'outro'
+  created?: string
+  updated?: string
+  expand?: {
+    plano?: BackupPlanoItem
+  }
+}
+
+export interface BackupRotinaItem {
+  id: string
+  organization: string
+  plano: string
+  nome: string
+  periodicidade: 'diaria' | 'semanal' | 'mensal' | 'personalizada'
+  horario?: string
+  dias_semana?: string[]
+  responsavel?: string
+  status: 'ativo' | 'inativo'
+  created?: string
+  updated?: string
+  expand?: {
+    plano?: BackupPlanoItem
+    responsavel?: PersonItem
+  }
+}
+
+export interface BackupFonteItem {
+  id: string
+  organization: string
+  rotina: string
+  ativo_inventario?: string
+  tipo_fonte: 'banco_de_dados' | 'arquivos' | 'sistema' | 'e_mail' | 'maquina_virtual' | 'outro'
+  caminho_identificacao: string
+  ativo: boolean
+  created?: string
+  updated?: string
+  expand?: {
+    rotina?: BackupRotinaItem
+    ativo_inventario?: InventoryAssetItem
+  }
+}
+
+export interface BackupRegraIdentificacaoItem {
+  id: string
+  organization: string
+  fonte?: string
+  nome: string
+  remetente_filtro?: string
+  assunto_contem?: string
+  padrao_conteudo?: string
+  adaptador: 'EMAIL_HTML_GENERICO' | 'LOG_BRUTO_TEXTO' | 'JSON_WEBHOOK'
+  ativo: boolean
+  created?: string
+  updated?: string
+  expand?: {
+    fonte?: BackupFonteItem
+  }
+}
+
+export type EvidenciaStatus = 'pendente' | 'processada' | 'erro' | 'nao_reconhecida'
+
+export interface BackupEvidenciaItem {
+  id: string
+  organization: string
+  rotina?: string
+  fonte?: string
+  tipo: 'e_mail' | 'upload_manual' | 'webhook'
+  remetente?: string
+  assunto?: string
+  data_recebida?: string
+  hash_conteudo: string
+  conteudo?: string
+  status_processamento: EvidenciaStatus
+  created?: string
+  updated?: string
+  expand?: {
+    rotina?: BackupRotinaItem
+    fonte?: BackupFonteItem
+  }
+}
+
+export interface BackupProcessamentoResultado {
+  status_detectado: 'sucesso' | 'erro' | 'parcial'
+  job_name?: string
+  tamanho_bytes?: number
+  tamanho_formatado?: string
+  destino?: string
+  remetente?: string
+  assunto?: string
+  processado_em?: string
+  regra_id?: string | null
+  adaptador?: string
+  versao?: string
+}
+
+export interface BackupProcessamentoItem {
+  id: string
+  organization: string
+  evidencia: string
+  adaptador_usado: string
+  versao_adaptador?: string
+  resultado?: BackupProcessamentoResultado
+  created?: string
+  updated?: string
+  expand?: {
+    evidencia?: BackupEvidenciaItem
+  }
+}
+
+export type BackupExecucaoStatus = 'sucesso' | 'erro' | 'parcial' | 'nao_executada'
+
+export interface BackupExecucaoItem {
+  id: string
+  organization: string
+  rotina?: string
+  evidencia?: string
+  data_inicio?: string
+  data_fim?: string
+  status: BackupExecucaoStatus
+  origem_registro: 'manual' | 'evidencia'
+  tamanho_bytes?: number
+  tamanho_formatado?: string
+  destino?: string
+  observacao?: string
+  created?: string
+  updated?: string
+  expand?: {
+    rotina?: BackupRotinaItem
+    evidencia?: BackupEvidenciaItem
+  }
+}
+
+export interface BackupAvaliacaoItem {
+  id: string
+  organization: string
+  execucao: string
+  resultado_conformidade: 'conforme' | 'nao_conforme' | 'atencao'
+  detalhe?: string
+  itens_avaliados?: Record<string, unknown>
+  created?: string
+  updated?: string
+  expand?: {
+    execucao?: BackupExecucaoItem
+  }
+}
+
+export interface BackupOcorrenciaItem {
+  id: string
+  organization: string
+  tipo:
+    | 'falha_de_backup'
+    | 'falta_de_evidencia'
+    | 'atraso_de_rotina'
+    | 'erro_de_processamento'
+    | 'teste_sem_sucesso'
+    | 'outro'
+  severidade: 'baixa' | 'media' | 'alta'
+  status: 'aberta' | 'em_analise' | 'resolvida'
+  titulo: string
+  descricao: string
+  execucao?: string
+  evidencia?: string
+  resolucao?: string
+  resolvida_em?: string
+  resolvida_por?: string
+  created?: string
+  updated?: string
+  expand?: {
+    execucao?: BackupExecucaoItem
+    evidencia?: BackupEvidenciaItem
+    resolvida_por?: PersonItem
+  }
+}
+
+export interface BackupTesteRecuperacaoItem {
+  id: string
+  organization: string
+  ativo?: string
+  fonte?: string
+  data_teste: string
+  tipo: 'restauracao_total' | 'restauracao_parcial' | 'simulacao'
+  resultado: 'sucesso' | 'parcial' | 'falha'
+  tempo_decorrido_minutos?: number
+  responsavel?: string
+  escopo_testado?: string
+  observacoes?: string
+  evidencia_comprobatoria?: string
+  created?: string
+  updated?: string
+  expand?: {
+    ativo?: InventoryAssetItem
+    fonte?: BackupFonteItem
+    responsavel?: PersonItem
+  }
+}

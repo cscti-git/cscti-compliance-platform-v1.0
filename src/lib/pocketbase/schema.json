@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T12:18:16.574Z",
+  "generatedAt": "2026-10-06T12:27:51.844Z",
   "collections": [
     {
       "name": "users",
@@ -1165,6 +1165,970 @@
       ],
       "indexes": [
         "CREATE INDEX idx_sync_runs_org_created ON inventory_sync_runs (organization, created DESC)"
+      ]
+    },
+    {
+      "name": "backup_escopo",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sistemas_protegidos",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "criticidade",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["baixa", "media", "alta"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo", "em_revisao"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_bkescopo_org_status ON backup_escopo (organization, status)"]
+    },
+    {
+      "name": "backup_planos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_bkplanos_org_status ON backup_planos (organization, status)"]
+    },
+    {
+      "name": "backup_plano_requisitos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "plano",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "backup_planos"
+        },
+        {
+          "name": "requisito",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "parametro",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tipo_requisito",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["rpo", "rto", "retencao", "periodicidade", "armazenamento", "outro"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bkreq_plano ON backup_plano_requisitos (plano)",
+        "CREATE INDEX idx_bkreq_org ON backup_plano_requisitos (organization)"
+      ]
+    },
+    {
+      "name": "backup_rotinas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "plano",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "backup_planos"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "periodicidade",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["diaria", "semanal", "mensal", "personalizada"]
+        },
+        {
+          "name": "horario",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dias_semana",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bkrotinas_org ON backup_rotinas (organization)",
+        "CREATE INDEX idx_bkrotinas_plano ON backup_rotinas (plano)"
+      ]
+    },
+    {
+      "name": "backup_fontes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "rotina",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "backup_rotinas"
+        },
+        {
+          "name": "ativo_inventario",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "inventory_assets"
+        },
+        {
+          "name": "tipo_fonte",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "banco_de_dados",
+            "arquivos",
+            "sistema",
+            "e_mail",
+            "maquina_virtual",
+            "outro"
+          ]
+        },
+        {
+          "name": "caminho_identificacao",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bkfontes_rotina ON backup_fontes (rotina)",
+        "CREATE INDEX idx_bkfontes_org ON backup_fontes (organization)"
+      ]
+    },
+    {
+      "name": "backup_regras_identificacao",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "fonte",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_fontes"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "remetente_filtro",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assunto_contem",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "padrao_conteudo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "adaptador",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["EMAIL_HTML_GENERICO", "LOG_BRUTO_TEXTO", "JSON_WEBHOOK"]
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_bkregras_org ON backup_regras_identificacao (organization)"]
+    },
+    {
+      "name": "backup_evidencias",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "rotina",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_rotinas"
+        },
+        {
+          "name": "fonte",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_fontes"
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["e_mail", "upload_manual", "webhook"]
+        },
+        {
+          "name": "remetente",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assunto",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_recebida",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_conteudo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "conteudo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status_processamento",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["pendente", "processada", "erro", "nao_reconhecida"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_bkevidencias_org_hash ON backup_evidencias (organization, hash_conteudo)",
+        "CREATE INDEX idx_bkevidencias_org_status ON backup_evidencias (organization, status_processamento)"
+      ]
+    },
+    {
+      "name": "backup_processamentos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "evidencia",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "backup_evidencias"
+        },
+        {
+          "name": "adaptador_usado",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "versao_adaptador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resultado",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bkproc_evidencia ON backup_processamentos (evidencia)",
+        "CREATE INDEX idx_bkproc_org ON backup_processamentos (organization)"
+      ]
+    },
+    {
+      "name": "backup_execucoes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "rotina",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_rotinas"
+        },
+        {
+          "name": "evidencia",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_evidencias"
+        },
+        {
+          "name": "data_inicio",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_fim",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["sucesso", "erro", "parcial", "nao_executada"]
+        },
+        {
+          "name": "origem_registro",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["manual", "evidencia"]
+        },
+        {
+          "name": "tamanho_bytes",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tamanho_formatado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "destino",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bkexec_org_status ON backup_execucoes (organization, status)",
+        "CREATE INDEX idx_bkexec_org_inicio ON backup_execucoes (organization, data_inicio DESC)"
+      ]
+    },
+    {
+      "name": "backup_avaliacoes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "execucao",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "backup_execucoes"
+        },
+        {
+          "name": "resultado_conformidade",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["conforme", "nao_conforme", "atencao"]
+        },
+        {
+          "name": "detalhe",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "itens_avaliados",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bkaval_execucao ON backup_avaliacoes (execucao)",
+        "CREATE INDEX idx_bkaval_org ON backup_avaliacoes (organization)"
+      ]
+    },
+    {
+      "name": "backup_ocorrencias",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "falha_de_backup",
+            "falta_de_evidencia",
+            "atraso_de_rotina",
+            "erro_de_processamento",
+            "teste_sem_sucesso",
+            "outro"
+          ]
+        },
+        {
+          "name": "severidade",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["baixa", "media", "alta"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["aberta", "em_analise", "resolvida"]
+        },
+        {
+          "name": "titulo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "execucao",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_execucoes"
+        },
+        {
+          "name": "evidencia",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_evidencias"
+        },
+        {
+          "name": "resolucao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolvida_em",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolvida_por",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bkocorr_org_status ON backup_ocorrencias (organization, status)",
+        "CREATE INDEX idx_bkocorr_org_tipo ON backup_ocorrencias (organization, tipo)"
+      ]
+    },
+    {
+      "name": "backup_testes_recuperacao",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "ativo",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "inventory_assets"
+        },
+        {
+          "name": "fonte",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_fontes"
+        },
+        {
+          "name": "data_teste",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["restauracao_total", "restauracao_parcial", "simulacao"]
+        },
+        {
+          "name": "resultado",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["sucesso", "parcial", "falha"]
+        },
+        {
+          "name": "tempo_decorrido_minutos",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "escopo_testado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "evidencia_comprobatoria",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_bktestes_org_data ON backup_testes_recuperacao (organization, data_teste DESC)"
       ]
     }
   ]

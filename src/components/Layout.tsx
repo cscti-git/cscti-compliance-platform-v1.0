@@ -76,7 +76,14 @@ const navSections: NavSection[] = [
   },
   {
     title: 'Continuidade',
-    items: [{ title: 'Backup e Recuperação', href: '/backup', icon: HardDriveDownload }],
+    items: [
+      {
+        title: 'Backup e Recuperação',
+        href: '/backup',
+        icon: HardDriveDownload,
+        badge: 'Fase 3',
+      },
+    ],
   },
   {
     title: 'Administração',

@@ -17,6 +17,8 @@ import IntegrationsPage from './pages/IntegrationsPage'
 import AuditPage from './pages/AuditPage'
 import AssetsPage from './pages/inventory/AssetsPage'
 import InventoryReportPage from './pages/inventory/InventoryReportPage'
+import BackupOverviewPage from './pages/backup/BackupOverviewPage'
+import BackupReportPage from './pages/backup/BackupReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
@@ -142,34 +144,34 @@ export const App = () => (
                 />
               }
             />
-            {/* 6. Continuidade */}
-            <Route
-              path="/backup"
-              element={
-                <PlaceholderPage
-                  moduleTitle="Backup e Recuperação de Desastres"
-                  moduleSection="Continuidade"
-                  description="Monitoramento automático das rotinas de cópia de segurança através dos e-mails comprobatórios."
-                  featuresPlanned={[
-                    'Leitura automática da caixa IMAP configurada nas integrações',
-                    'Processamento de e-mails de backup via adaptador de evidências',
-                    'Controle das regras de backup 3-2-1 e cópia externa',
-                    'Testes periódicos de restauração com laudo comprobatório',
-                  ]}
-                />
-              }
-            />
+            {/* 6. Continuidade e Backup (Fase 3) */}
+            <Route path="/backup" element={<BackupOverviewPage />} />
+            <Route path="/backup/escopo" element={<BackupOverviewPage />} />
+            <Route path="/backup/planos" element={<BackupOverviewPage />} />
+            <Route path="/backup/rotinas" element={<BackupOverviewPage />} />
+            <Route path="/backup/evidencias" element={<BackupOverviewPage />} />
+            <Route path="/backup/execucoes" element={<BackupOverviewPage />} />
+            <Route path="/backup/ocorrencias" element={<BackupOverviewPage />} />
+            <Route path="/backup/testes" element={<BackupOverviewPage />} />
             {/* 7. Administração e Integrações */}
             <Route path="/configuracoes" element={<SettingsPage />} />
             <Route path="/integracoes" element={<IntegrationsPage />} />
           </Route>
 
-          {/* Relatório Comprobatório Formatado (Visualização limpa e Impressão A4) */}
+          {/* Relatórios Comprobatórios Formatados (Visualização limpa e Impressão A4) */}
           <Route
             path="/relatorios/inventario"
             element={
               <ProtectedRoute>
                 <InventoryReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/backup"
+            element={
+              <ProtectedRoute>
+                <BackupReportPage />
               </ProtectedRoute>
             }
           />
