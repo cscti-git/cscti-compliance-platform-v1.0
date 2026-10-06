@@ -71,7 +71,10 @@ import {
   Fingerprint,
   Sliders,
   AlertOctagon,
+  Trash2,
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { excluirBackupEvidencia, limparTodasEvidencias } from '@/services/backupService'
 
 interface BackupEvidenciasTabProps {
   evidencias: BackupEvidenciaItem[]
@@ -188,6 +191,21 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
   const [emailConnector, setEmailConnector] = useState<IntegrationItem | null>(null)
   const [fetchingImap, setFetchingImap] = useState(false)
   const [lastFetchResult, setLastFetchResult] = useState<BackupImapFetchResponse | null>(null)
+
+  // Estado para Exclusão Controlada de Evidência Individual
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [evidenciaParaExcluir, setEvidenciaParaExcluir] = useState<BackupEvidenciaItem | null>(null)
+  const [motivoExclusao, setMotivoExclusao] = useState('')
+  const [confirmacaoExclusao, setConfirmacaoExclusao] = useState(false)
+  const [perguntaSeguranca, setPerguntaSeguranca] = useState(false)
+  const [excluindoEvidencia, setExcluindoEvidencia] = useState(false)
+
+  // Estado para Limpeza Total de Evidências (Começar do Zero)
+  const [limparTodasModalOpen, setLimparTodasModalOpen] = useState(false)
+  const [fraseLimpeza, setFraseLimpeza] = useState('')
+  const [motivoLimpeza, setMotivoLimpeza] = useState('')
+  const [confirmacaoCheckboxLimpeza, setConfirmacaoCheckboxLimpeza] = useState(false)
+  const [limpandoTodas, setLimpandoTodas] = useState(false)
 
   const reloadMonitoramentos = () => {
     if (orgId) {
@@ -519,6 +537,140 @@ Lista de atividades (1 dia):
     }
   }
 
+  // Abertura do modal de exclusão individual
+  const handleAbrirExclusaoIndividual = (evidencia: BackupEvidenciaItem) => {
+    setEvidenciaParaExcluir(evidencia)
+    setMotivoExclusao('')
+    setConfirmacaoExclusao(false)
+    setPerguntaSeguranca(false)
+    setDeleteModalOpen(true)
+  }
+
+  // Execução da exclusão individual via endpoint com auditoria
+  const handleConfirmarExclusaoIndividual = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!evidenciaParaExcluir) return
+
+    if (!motivoExclusao || motivoExclusao.trim().length < 10) {
+      toast({
+        title: 'Observação obrigatória',
+        description:
+          'Informe uma justificativa de pelo menos 10 caracteres para fins de auditoria.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!confirmacaoExclusao || !perguntaSeguranca) {
+      toast({
+        title: 'Confirmações pendentes',
+        description: 'É necessário confirmar os dois termos de segurança antes de prosseguir.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setExcluindoEvidencia(true)
+    try {
+      const res = await excluirBackupEvidencia({
+        evidenciaId: evidenciaParaExcluir.id,
+        motivo: motivoExclusao.trim(),
+        confirmacao: true,
+      })
+
+      toast({
+        title: 'Evidência excluída com sucesso',
+        description: `${res.message} Registrado na auditoria permanente. Removidas ${res.removidos.execucoes} execução(ões) e ${res.removidos.avaliacoes} avaliação(ões) vinculadas.`,
+      })
+
+      setDeleteModalOpen(false)
+      setEvidenciaParaExcluir(null)
+      // Se estava com o modal de detalhes aberto para essa evidência, fechar
+      if (selectedEvidencia?.id === evidenciaParaExcluir.id) {
+        setDetailModalOpen(false)
+        setSelectedEvidencia(null)
+      }
+      onReload()
+    } catch (err: unknown) {
+      toast({
+        title: 'Falha ao excluir evidência',
+        description: err instanceof Error ? err.message : 'Erro na comunicação com o backend.',
+        variant: 'destructive',
+      })
+    } finally {
+      setExcluindoEvidencia(false)
+    }
+  }
+
+  // Abertura do modal de limpeza total (começar do zero)
+  const handleAbrirLimparTodas = () => {
+    setFraseLimpeza('')
+    setMotivoLimpeza('')
+    setConfirmacaoCheckboxLimpeza(false)
+    setLimparTodasModalOpen(true)
+  }
+
+  // Execução da limpeza total via endpoint com auditoria
+  const handleConfirmarLimparTodas = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (fraseLimpeza.trim() !== 'LIMPAR EVIDENCIAS') {
+      toast({
+        title: 'Frase de segurança incorreta',
+        description: 'Digite exatamente "LIMPAR EVIDENCIAS" em letras maiúsculas para confirmar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!motivoLimpeza || motivoLimpeza.trim().length < 10) {
+      toast({
+        title: 'Justificativa obrigatória',
+        description:
+          'Informe a justificativa da limpeza (mínimo de 10 caracteres) para a trilha de auditoria.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!confirmacaoCheckboxLimpeza) {
+      toast({
+        title: 'Confirmação necessária',
+        description: 'Marque a caixa de ciência da ação permanente.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setLimpandoTodas(true)
+    try {
+      const res = await limparTodasEvidencias({
+        organizationId: orgId,
+        motivo: motivoLimpeza.trim(),
+        confirmacaoFrase: fraseLimpeza.trim(),
+        confirmacaoCheckbox: true,
+      })
+
+      toast({
+        title: 'Histórico reiniciado com sucesso',
+        description: `${res.removidos.evidencias} evidência(s), ${res.removidos.execucoes} execução(ões) e ${res.removidos.avaliacoes} avaliação(ões) foram removidas. Trilha gravada na auditoria.`,
+      })
+
+      setLimparTodasModalOpen(false)
+      setDetailModalOpen(false)
+      setSelectedEvidencia(null)
+      onReload()
+    } catch (err: unknown) {
+      toast({
+        title: 'Falha ao reiniciar histórico',
+        description: err instanceof Error ? err.message : 'Erro ao processar limpeza no servidor.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLimpandoTodas(false)
+    }
+  }
+
   const getStatusBadge = (st: EvidenciaStatus) => {
     switch (st) {
       case 'processada':
@@ -706,7 +858,20 @@ Lista de atividades (1 dia):
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {canOperate && evidencias.length > 0 && (
+            <Button
+              onClick={handleAbrirLimparTodas}
+              size="sm"
+              variant="outline"
+              className="border-red-300 text-red-700 bg-red-50/50 hover:bg-red-100 hover:text-red-900 text-xs font-semibold gap-1.5 shadow-2xs"
+              title="Exclusão controlada de todas as evidências para reiniciar o monitoramento do zero"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+              Limpar todas as evidências
+            </Button>
+          )}
+
           {canOperate && (
             <Button
               onClick={handleFetchImap}
@@ -940,6 +1105,17 @@ Lista de atividades (1 dia):
                                   title="Reprocessar"
                                 >
                                   <RefreshCw className="w-3 h-3 mr-1" /> Processar
+                                </Button>
+                              )}
+                              {canOperate && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleAbrirExclusaoIndividual(item)}
+                                  className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  title="Excluir evidência com auditoria"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
                               )}
                             </div>
@@ -1735,6 +1911,274 @@ Lista de atividades (1 dia):
               Fechar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 1: Exclusão Controlada de Evidência Individual */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <form onSubmit={handleConfirmarExclusaoIndividual} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold text-red-950 flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-red-100 text-red-700 flex items-center justify-center">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                Excluir Evidência de Backup
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-600">
+                Esta ação é irreversível e será registrada na trilha de auditoria do sistema CSCTI
+                com seu perfil de operador, timestamp e justificativa.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Dados-chave da evidência para conferência */}
+            {evidenciaParaExcluir && (
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-2">
+                <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                  Dados da Evidência Selecionada
+                </div>
+                <div className="space-y-1">
+                  <p className="text-slate-800">
+                    <strong className="text-slate-900">Assunto:</strong>{' '}
+                    <span className="font-medium">
+                      {evidenciaParaExcluir.assunto || 'Sem assunto'}
+                    </span>
+                  </p>
+                  <p className="text-slate-700">
+                    <strong>Remetente / Origem:</strong> {evidenciaParaExcluir.remetente}
+                  </p>
+                  <p className="text-slate-700">
+                    <strong>Data Recebida:</strong>{' '}
+                    {evidenciaParaExcluir.data_recebida
+                      ? new Date(evidenciaParaExcluir.data_recebida).toLocaleString('pt-BR')
+                      : '—'}
+                  </p>
+                  <p className="text-slate-700 flex items-center gap-1 font-mono text-[11px]">
+                    <Hash className="w-3 h-3 text-slate-400 shrink-0" />
+                    <strong>SHA-256:</strong>{' '}
+                    <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                      {evidenciaParaExcluir.hash_conteudo
+                        ? `${evidenciaParaExcluir.hash_conteudo.slice(0, 16)}...${evidenciaParaExcluir.hash_conteudo.slice(-8)}`
+                        : '—'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Pergunta de segurança 1: Motivo obrigatório */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-800 block">
+                Motivo / Observação da Exclusão <span className="text-red-500">*</span>
+              </label>
+              <Textarea
+                required
+                rows={3}
+                value={motivoExclusao}
+                onChange={(e) => setMotivoExclusao(e.target.value)}
+                placeholder="Explique o motivo técnico ou operacional para remover esta evidência (mínimo 10 caracteres)..."
+                className="text-xs resize-none"
+              />
+              <span className="text-[11px] text-slate-500 block">
+                {motivoExclusao.trim().length} / 10 caracteres mínimos • Ficará gravado no log de
+                auditoria.
+              </span>
+            </div>
+
+            {/* Pergunta de segurança 2: Confirmação do histórico comprobatório */}
+            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 space-y-3">
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="chk-pergunta-seguranca"
+                  checked={perguntaSeguranca}
+                  onCheckedChange={(c) => setPerguntaSeguranca(Boolean(c))}
+                  className="mt-0.5"
+                />
+                <label
+                  htmlFor="chk-pergunta-seguranca"
+                  className="text-xs text-amber-950 font-medium cursor-pointer leading-tight select-none"
+                >
+                  Esta evidência faz parte do histórico comprobatório. Desejo realmente removê-la e
+                  estou ciente do impacto nas métricas de conformidade.
+                </label>
+              </div>
+
+              <div className="flex items-start gap-2 pt-1 border-t border-amber-200/60">
+                <Checkbox
+                  id="chk-confirmacao-permanente"
+                  checked={confirmacaoExclusao}
+                  onCheckedChange={(c) => setConfirmacaoExclusao(Boolean(c))}
+                  className="mt-0.5"
+                />
+                <label
+                  htmlFor="chk-confirmacao-permanente"
+                  className="text-xs text-amber-950 font-medium cursor-pointer leading-tight select-none"
+                >
+                  Entendo que esta ação é permanente, removerá as execuções/laudos derivados desta
+                  evidência e será auditada pelo sistema CSCTI.
+                </label>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={excluindoEvidencia}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={
+                  excluindoEvidencia ||
+                  motivoExclusao.trim().length < 10 ||
+                  !confirmacaoExclusao ||
+                  !perguntaSeguranca
+                }
+                className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {excluindoEvidencia ? 'Excluindo...' : 'Confirmar Exclusão'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 2: Limpeza Total de Evidências (Começar do Zero) */}
+      <Dialog open={limparTodasModalOpen} onOpenChange={setLimparTodasModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <form onSubmit={handleConfirmarLimparTodas} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold text-red-950 flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-red-600 text-white flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                Reiniciar Histórico de Evidências (Zerar)
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-600">
+                Esta ação apaga <strong>TODAS as {evidencias.length} evidências</strong> de backup
+                desta serventia para permitir que o monitoramento seja iniciado novamente do zero.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Quadro de Impacto */}
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-950 space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5 text-red-900">
+                <AlertOctagon className="w-4 h-4 text-red-600" />
+                Impacto da Limpeza na Serventia Atual:
+              </div>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-red-900/90 pl-1">
+                <li>
+                  <strong>{evidencias.length}</strong> evidência(s) registrada(s) serão removidas
+                  permanentemente.
+                </li>
+                <li>
+                  Todas as execuções de backup e laudos técnicos derivados dessas evidências serão
+                  excluídos.
+                </li>
+                <li>
+                  O dashboard de Proteção e Continuidade será recalculado imediatamente do zero.
+                </li>
+                <li>
+                  Ocorrências vinculadas serão desvinculadas para manter histórico de não
+                  conformidade.
+                </li>
+                <li>
+                  Isolamento estrito: <strong>nenhum dado de outra serventia</strong> será afetado.
+                </li>
+              </ul>
+            </div>
+
+            {/* Frase de segurança digitada */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-800 block">
+                Digite a frase de confirmação:{' '}
+                <strong className="text-red-700 font-mono">LIMPAR EVIDENCIAS</strong>
+              </label>
+              <Input
+                required
+                value={fraseLimpeza}
+                onChange={(e) => setFraseLimpeza(e.target.value)}
+                placeholder="Digite LIMPAR EVIDENCIAS..."
+                className="text-xs font-mono"
+              />
+              <span className="text-[11px] text-slate-500 block">
+                A frase deve ser digitada exatamente em letras maiúsculas.
+              </span>
+            </div>
+
+            {/* Justificativa obrigatória */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-800 block">
+                Justificativa / Motivo da Limpeza <span className="text-red-500">*</span>
+              </label>
+              <Textarea
+                required
+                rows={3}
+                value={motivoLimpeza}
+                onChange={(e) => setMotivoLimpeza(e.target.value)}
+                placeholder="Descreva o motivo de reiniciar o monitoramento do zero (mínimo 10 caracteres)..."
+                className="text-xs resize-none"
+              />
+              <span className="text-[11px] text-slate-500 block">
+                {motivoLimpeza.trim().length} / 10 caracteres mínimos • Ficará gravado na trilha de
+                auditoria.
+              </span>
+            </div>
+
+            {/* Checkbox de ciência */}
+            <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="chk-confirmacao-limpeza-total"
+                  checked={confirmacaoCheckboxLimpeza}
+                  onCheckedChange={(c) => setConfirmacaoCheckboxLimpeza(Boolean(c))}
+                  className="mt-0.5"
+                />
+                <label
+                  htmlFor="chk-confirmacao-limpeza-total"
+                  className="text-xs text-slate-800 font-medium cursor-pointer leading-tight select-none"
+                >
+                  Estou ciente de que esta ação é definitiva, reiniciará o monitoramento desta
+                  serventia e registrará o evento com meu usuário na auditoria permanente do sistema
+                  CSCTI.
+                </label>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setLimparTodasModalOpen(false)}
+                disabled={limpandoTodas}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={
+                  limpandoTodas ||
+                  fraseLimpeza.trim() !== 'LIMPAR EVIDENCIAS' ||
+                  motivoLimpeza.trim().length < 10 ||
+                  !confirmacaoCheckboxLimpeza
+                }
+                className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {limpandoTodas ? 'Limpando...' : 'Zerar Todas as Evidências'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

@@ -3073,3 +3073,393 @@ cronAdd('backup_imap_fetch_cron', '*/15 * * * *', () => {
     } catch (_) {}
   }
 })
+
+// -------------------------------------------------------------------
+// 4. Exclusão controlada de evidência individual com confirmação e motivo
+// -------------------------------------------------------------------
+routerAdd(
+  'POST',
+  '/backend/v1/backup/evidencias/excluir',
+  (e) => {
+    const auth = e.auth
+    if (!auth) {
+      return e.forbiddenError('Não autenticado.')
+    }
+
+    const systemRole = auth.getString('system_role') || 'usuario'
+    if (systemRole !== 'admin' && systemRole !== 'suporte') {
+      return e.forbiddenError(
+        'Apenas perfis Administrador e Suporte têm permissão para excluir evidências de backup.',
+      )
+    }
+
+    const body = e.requestInfo().body || {}
+    const evidenciaId = String(body.evidenciaId || body.id || '').trim()
+    const motivo = String(body.motivo || body.observacao || '').trim()
+    const confirmacao = Boolean(body.confirmacao)
+
+    if (!evidenciaId) {
+      return e.badRequestError('O identificador da evidência (evidenciaId) é obrigatório.')
+    }
+
+    if (!motivo || motivo.length < 10) {
+      return e.badRequestError(
+        'A observação/motivo da exclusão é obrigatória e deve ter pelo menos 10 caracteres.',
+      )
+    }
+
+    if (!confirmacao) {
+      return e.badRequestError(
+        'É necessária a confirmação explícita de ciência da exclusão permanente.',
+      )
+    }
+
+    let evidenciaRec = null
+    try {
+      evidenciaRec = $app.findRecordById('backup_evidencias', evidenciaId)
+    } catch (_) {
+      return e.notFoundError('Evidência não encontrada.')
+    }
+
+    const orgId = evidenciaRec.getString('organization')
+    if (systemRole !== 'admin' && auth.getString('organization') !== orgId) {
+      return e.forbiddenError('Acesso restrito à própria organização.')
+    }
+
+    const remetente = evidenciaRec.getString('remetente') || ''
+    const assunto = evidenciaRec.getString('assunto') || ''
+    const hash = evidenciaRec.getString('hash_conteudo') || ''
+    const hashTrunc = hash.length > 16 ? `${hash.slice(0, 10)}...${hash.slice(-6)}` : hash
+    const dataRecebida = evidenciaRec.getString('data_recebida') || ''
+
+    let execucoesExcluidas = 0
+    let avaliacoesExcluidas = 0
+    let ocorrenciasDesvinculadas = 0
+    let monitoramentosDesvinculados = 0
+
+    // 1. Buscar execuções geradas diretamente desta evidência
+    try {
+      const execs = $app.findRecordsByFilter(
+        'backup_execucoes',
+        `organization = '${orgId}' && evidencia = '${evidenciaId}'`,
+        '',
+        500,
+        0,
+      )
+      for (let i = 0; i < execs.length; i++) {
+        const ex = execs[i]
+        // Buscar avaliações vinculadas a esta execução
+        try {
+          const avals = $app.findRecordsByFilter(
+            'backup_avaliacoes',
+            `organization = '${orgId}' && execucao = '${ex.id}'`,
+            '',
+            100,
+            0,
+          )
+          for (let j = 0; j < avals.length; j++) {
+            $app.delete(avals[j])
+            avaliacoesExcluidas++
+          }
+        } catch (_) {}
+
+        // Desvincular ocorrências que apontem para esta execução
+        try {
+          const ocs = $app.findRecordsByFilter(
+            'backup_ocorrencias',
+            `organization = '${orgId}' && execucao = '${ex.id}'`,
+            '',
+            100,
+            0,
+          )
+          for (let k = 0; k < ocs.length; k++) {
+            const oc = ocs[k]
+            oc.set('execucao', null)
+            $app.save(oc)
+          }
+        } catch (_) {}
+
+        $app.delete(ex)
+        execucoesExcluidas++
+      }
+    } catch (_) {}
+
+    // 2. Desvincular ocorrências que apontem diretamente para a evidência
+    try {
+      const ocsEv = $app.findRecordsByFilter(
+        'backup_ocorrencias',
+        `organization = '${orgId}' && evidencia = '${evidenciaId}'`,
+        '',
+        100,
+        0,
+      )
+      for (let k = 0; k < ocsEv.length; k++) {
+        const oc = ocsEv[k]
+        oc.set('evidencia', null)
+        $app.save(oc)
+        ocorrenciasDesvinculadas++
+      }
+    } catch (_) {}
+
+    // 3. Desvincular monitoramentos externos que apontem para a evidência
+    try {
+      const mons = $app.findRecordsByFilter(
+        'backup_monitoramentos_externos',
+        `organization = '${orgId}' && evidencia = '${evidenciaId}'`,
+        '',
+        100,
+        0,
+      )
+      for (let m = 0; m < mons.length; m++) {
+        const mon = mons[m]
+        mon.set('evidencia', null)
+        $app.save(mon)
+        monitoramentosDesvinculados++
+      }
+    } catch (_) {}
+
+    // 4. Excluir a evidência (seus registros em backup_processamentos caem via cascadeDelete do PB)
+    $app.delete(evidenciaRec)
+
+    // 5. Registrar no audit_log append-only
+    const nowIso = new Date().toISOString()
+    try {
+      const auditCol = $app.findCollectionByNameOrId('audit_log')
+      const auditRec = new Record(auditCol)
+      auditRec.set('organization', orgId)
+      auditRec.set('user', auth.id)
+      auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
+      auditRec.set('user_email', auth.getString('email'))
+      auditRec.set('action', 'BACKUP_EVIDENCE_DELETED')
+      auditRec.set('entity', 'Backup e Continuidade')
+      auditRec.set(
+        'detail',
+        `Evidência de backup excluída permanentemente pelo operador. Motivo informado: "${motivo}". Remetente: "${remetente}", Assunto: "${assunto}", SHA-256: ${hashTrunc}. Removidos vinculados: ${execucoesExcluidas} execução(ões), ${avaliacoesExcluidas} avaliação(ões).`,
+      )
+      auditRec.set('metadata', {
+        evidencia_id: evidenciaId,
+        motivo: motivo,
+        remetente: remetente,
+        assunto: assunto,
+        hash_sha256_trunc: hashTrunc,
+        data_recebida: dataRecebida,
+        execucoes_removidas: execucoesExcluidas,
+        avaliacoes_removidas: avaliacoesExcluidas,
+        ocorrencias_desvinculadas: ocorrenciasDesvinculadas,
+        monitoramentos_desvinculados: monitoramentosDesvinculados,
+        removido_por_role: systemRole,
+        removido_em: nowIso,
+      })
+      $app.save(auditRec)
+    } catch (_) {}
+
+    return e.json(200, {
+      success: true,
+      message: 'Evidência e registros derivados removidos com sucesso.',
+      evidencia_id: evidenciaId,
+      removidos: {
+        evidencias: 1,
+        execucoes: execucoesExcluidas,
+        avaliacoes: avaliacoesExcluidas,
+      },
+      audit: {
+        action: 'BACKUP_EVIDENCE_DELETED',
+        registrado_em: nowIso,
+      },
+    })
+  },
+  $apis.requireAuth(),
+)
+
+// -------------------------------------------------------------------
+// 5. Limpeza total de evidências da organização (para reiniciar monitoramento do zero)
+// -------------------------------------------------------------------
+routerAdd(
+  'POST',
+  '/backend/v1/backup/evidencias/limpar-todas',
+  (e) => {
+    const auth = e.auth
+    if (!auth) {
+      return e.forbiddenError('Não autenticado.')
+    }
+
+    const systemRole = auth.getString('system_role') || 'usuario'
+    if (systemRole !== 'admin' && systemRole !== 'suporte') {
+      return e.forbiddenError(
+        'Apenas perfis Administrador e Suporte têm permissão para reiniciar o histórico de evidências.',
+      )
+    }
+
+    const body = e.requestInfo().body || {}
+    let organizationId = body.organizationId || auth.getString('organization')
+
+    if (!organizationId) {
+      try {
+        const firstOrg = $app.findRecordsByFilter('organizations', '', '+name', 1, 0)
+        if (firstOrg.length > 0) {
+          organizationId = firstOrg[0].id
+        }
+      } catch (_) {}
+    }
+
+    if (!organizationId) {
+      return e.badRequestError('Nenhuma organização associada.')
+    }
+
+    if (systemRole !== 'admin' && auth.getString('organization') !== organizationId) {
+      return e.forbiddenError('Acesso restrito à própria organização.')
+    }
+
+    const motivo = String(body.motivo || body.observacao || '').trim()
+    const confirmacaoFrase = String(body.confirmacaoFrase || '').trim()
+    const confirmacaoCheckbox = Boolean(body.confirmacaoCheckbox)
+
+    // Exige frase exata "LIMPAR EVIDENCIAS"
+    if (confirmacaoFrase !== 'LIMPAR EVIDENCIAS') {
+      return e.badRequestError(
+        'Frase de segurança incorreta. Digite exatamente "LIMPAR EVIDENCIAS" (em maiúsculas) para confirmar.',
+      )
+    }
+
+    if (!confirmacaoCheckbox) {
+      return e.badRequestError(
+        'É necessária a confirmação explícita de ciência no checkbox de segurança.',
+      )
+    }
+
+    if (!motivo || motivo.length < 10) {
+      return e.badRequestError(
+        'A observação/justificativa para zerar as evidências é obrigatória (mínimo de 10 caracteres).',
+      )
+    }
+
+    // 1. Obter todas as evidências da organização
+    let evidencias = []
+    try {
+      evidencias = $app.findRecordsByFilter(
+        'backup_evidencias',
+        `organization = '${organizationId}'`,
+        '+created',
+        5000,
+        0,
+      )
+    } catch (_) {}
+
+    const totalEvidencias = evidencias.length
+    let totalExecucoes = 0
+    let totalAvaliacoes = 0
+
+    // 2. Excluir avaliações e execuções derivadas de evidências (origem_registro = 'evidencia')
+    try {
+      const execsEv = $app.findRecordsByFilter(
+        'backup_execucoes',
+        `organization = '${organizationId}' && origem_registro = 'evidencia'`,
+        '',
+        5000,
+        0,
+      )
+      for (let i = 0; i < execsEv.length; i++) {
+        const ex = execsEv[i]
+        try {
+          const avals = $app.findRecordsByFilter(
+            'backup_avaliacoes',
+            `organization = '${organizationId}' && execucao = '${ex.id}'`,
+            '',
+            100,
+            0,
+          )
+          for (let j = 0; j < avals.length; j++) {
+            $app.delete(avals[j])
+            totalAvaliacoes++
+          }
+        } catch (_) {}
+
+        $app.delete(ex)
+        totalExecucoes++
+      }
+    } catch (_) {}
+
+    // 3. Desvincular ocorrências que apontem para evidências ou execuções
+    try {
+      const ocs = $app.findRecordsByFilter(
+        'backup_ocorrencias',
+        `organization = '${organizationId}' && (evidencia != '' || execucao != '')`,
+        '',
+        1000,
+        0,
+      )
+      for (let k = 0; k < ocs.length; k++) {
+        const oc = ocs[k]
+        oc.set('evidencia', null)
+        oc.set('execucao', null)
+        $app.save(oc)
+      }
+    } catch (_) {}
+
+    // 4. Desvincular monitoramentos externos
+    try {
+      const mons = $app.findRecordsByFilter(
+        'backup_monitoramentos_externos',
+        `organization = '${organizationId}' && evidencia != ''`,
+        '',
+        1000,
+        0,
+      )
+      for (let m = 0; m < mons.length; m++) {
+        const mon = mons[m]
+        mon.set('evidencia', null)
+        $app.save(mon)
+      }
+    } catch (_) {}
+
+    // 5. Excluir todas as evidências da organização (processamentos são apagados via cascadeDelete)
+    for (let eIdx = 0; eIdx < evidencias.length; eIdx++) {
+      try {
+        $app.delete(evidencias[eIdx])
+      } catch (_) {}
+    }
+
+    // 6. Registrar no audit_log append-only
+    const nowIso = new Date().toISOString()
+    try {
+      const auditCol = $app.findCollectionByNameOrId('audit_log')
+      const auditRec = new Record(auditCol)
+      auditRec.set('organization', organizationId)
+      auditRec.set('user', auth.id)
+      auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
+      auditRec.set('user_email', auth.getString('email'))
+      auditRec.set('action', 'BACKUP_ALL_EVIDENCES_CLEARED')
+      auditRec.set('entity', 'Backup e Continuidade')
+      auditRec.set(
+        'detail',
+        `Histórico de evidências da serventia reiniciado do zero pelo operador. Total removido: ${totalEvidencias} evidência(s), ${totalExecucoes} execução(ões) vinculadas, ${totalAvaliacoes} avaliação(ões). Justificativa: "${motivo}".`,
+      )
+      auditRec.set('metadata', {
+        organization_id: organizationId,
+        evidencias_removidas: totalEvidencias,
+        execucoes_removidas: totalExecucoes,
+        avaliacoes_removidas: totalAvaliacoes,
+        justificativa: motivo,
+        operador_role: systemRole,
+        executado_em: nowIso,
+      })
+      $app.save(auditRec)
+    } catch (_) {}
+
+    return e.json(200, {
+      success: true,
+      message: `Histórico reiniciado com sucesso: ${totalEvidencias} evidência(s) removida(s).`,
+      organization_id: organizationId,
+      removidos: {
+        evidencias: totalEvidencias,
+        execucoes: totalExecucoes,
+        avaliacoes: totalAvaliacoes,
+      },
+      audit: {
+        action: 'BACKUP_ALL_EVIDENCES_CLEARED',
+        registrado_em: nowIso,
+      },
+    })
+  },
+  $apis.requireAuth(),
+)

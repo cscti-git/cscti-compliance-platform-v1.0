@@ -195,23 +195,36 @@ export const BackupRegrasTab: React.FC<BackupRegrasTabProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <SlidersHorizontal className="h-5 w-5 text-[#0B2545]" />
-            Regras de Identificação e Roteamento de Adaptadores
-          </h2>
-          <p className="text-xs text-slate-500">
-            Associação automática de e-mails/comprovantes de backup com os adaptadores de extração
-            (VEEAM_HTML, EMAIL_HTML_GENERICO) e rotinas da serventia.
-          </p>
+      {/* Cabeçalho padronizado da aba */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-sky-50/20 shadow-2xs">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#0B2545] text-white flex items-center justify-center shrink-0 mt-0.5">
+            <SlidersHorizontal className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-900">
+                4. Fontes, Regras & Adaptadores de Ingestão
+              </h2>
+              <Badge
+                variant="outline"
+                className="text-[10px] font-bold bg-white text-slate-700 border-slate-300"
+              >
+                {regras.length} {regras.length === 1 ? 'regra' : 'regras'}
+              </Badge>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Associação automática de comprovantes com adaptadores de extração (VEEAM_HTML,
+              ACRONIS_PDF, NOC_DIARIO) e rotinas.
+            </p>
+          </div>
         </div>
 
         {canOperate && (
           <Button
             onClick={handleOpenNova}
             size="sm"
-            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs"
+            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs shrink-0 self-start sm:self-center"
           >
             <Plus className="w-4 h-4" /> Nova Regra
           </Button>

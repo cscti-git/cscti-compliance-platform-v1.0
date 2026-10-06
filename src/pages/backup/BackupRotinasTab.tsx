@@ -295,21 +295,36 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">
-            Rotinas de Execução e Fontes Protegidas
-          </h2>
-          <p className="text-xs text-slate-500">
-            Cronograma de disparo (diário, semanal, mensal) associado aos ativos e bancos de dados
-            da serventia.
-          </p>
+      {/* Cabeçalho padronizado da aba */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-emerald-50/20 shadow-2xs">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#0B2545] text-white flex items-center justify-center shrink-0 mt-0.5">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-900">
+                3. Rotinas de Execução e Fontes Protegidas
+              </h2>
+              <Badge
+                variant="outline"
+                className="text-[10px] font-bold bg-white text-slate-700 border-slate-300"
+              >
+                {rotinas.length} {rotinas.length === 1 ? 'rotina' : 'rotinas'}
+              </Badge>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Cronograma de disparo (minutos, diário, semanal, mensal) associado aos ativos e fontes
+              de dados da serventia.
+            </p>
+          </div>
         </div>
+
         {canOperate && (
           <Button
             onClick={openNewRotina}
             size="sm"
-            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5"
+            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs shrink-0 self-start sm:self-center"
           >
             <Plus className="w-4 h-4" /> Nova Rotina
           </Button>
@@ -318,15 +333,22 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {rotinas.length === 0 ? (
-          <Card className="col-span-full border-dashed border-slate-300 p-8 text-center">
-            <Calendar className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-700">Nenhuma rotina cadastrada</p>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-              Cadastre horários e periodicidades para vincular as fontes e ativos de TI.
+          <Card className="col-span-full border-dashed border-amber-300 bg-amber-50/30 p-8 text-center rounded-xl">
+            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center mx-auto mb-3">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-bold text-slate-800">Nenhuma rotina de backup cadastrada</p>
+            <p className="text-xs text-slate-600 max-w-md mx-auto mt-1 leading-relaxed">
+              Configure os agendamentos e intervalos (ex.: incremental a cada 30 min ou diário
+              noturno) vinculados aos planos cadastrados.
             </p>
             {canOperate && (
-              <Button onClick={openNewRotina} size="sm" variant="outline" className="mt-4 text-xs">
-                <Plus className="w-4 h-4 mr-1" /> Criar Primeira Rotina
+              <Button
+                onClick={openNewRotina}
+                size="sm"
+                className="mt-4 text-xs bg-[#0B2545] hover:bg-[#124E78] text-white font-semibold gap-1.5 shadow-xs"
+              >
+                <Plus className="w-4 h-4" /> Cadastre a Primeira Rotina
               </Button>
             )}
           </Card>

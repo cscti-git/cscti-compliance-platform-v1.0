@@ -49,6 +49,7 @@ import type {
 } from '@/types/cscti'
 
 // Sub-abas
+import { BackupCicloStepper } from '@/components/backup/BackupCicloStepper'
 import { BackupEscopoTab } from './BackupEscopoTab'
 import { BackupPlanosTab } from './BackupPlanosTab'
 import { BackupRotinasTab } from './BackupRotinasTab'
@@ -167,6 +168,24 @@ export const BackupOverviewPage: React.FC = () => {
             Atualizar
           </Button>
         </div>
+      </div>
+
+      {/* Stepper do Ciclo de Continuidade com contagens reais e destaque de etapas vazias */}
+      <div className="mb-4">
+        <BackupCicloStepper
+          activeTab={activeTab}
+          onSelectTab={(tab) => setSearchParams({ tab })}
+          counts={{
+            escopos: escopos.length,
+            planos: planos.length,
+            rotinas: rotinas.length,
+            fontes: regras.length,
+            evidencias: evidencias.length,
+            execucoes: execucoes.length,
+            ocorrencias: ocorrenciasAbertas,
+            testes: testes.length,
+          }}
+        />
       </div>
 
       {/* Tabs Principais de Navegação do Módulo */}

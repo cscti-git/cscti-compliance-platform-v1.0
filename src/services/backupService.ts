@@ -436,6 +436,59 @@ export async function fetchEvidenciasImap(
   })
 }
 
+export interface ExcluirEvidenciaResponse {
+  success: boolean
+  message: string
+  evidencia_id: string
+  removidos: {
+    evidencias: number
+    execucoes: number
+    avaliacoes: number
+  }
+  audit: {
+    action: string
+    registrado_em: string
+  }
+}
+
+export async function excluirBackupEvidencia(payload: {
+  evidenciaId: string
+  motivo: string
+  confirmacao: boolean
+}): Promise<ExcluirEvidenciaResponse> {
+  return pb.send<ExcluirEvidenciaResponse>('/backend/v1/backup/evidencias/excluir', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export interface LimparEvidenciasResponse {
+  success: boolean
+  message: string
+  organization_id: string
+  removidos: {
+    evidencias: number
+    execucoes: number
+    avaliacoes: number
+  }
+  audit: {
+    action: string
+    registrado_em: string
+  }
+}
+
+export async function limparTodasEvidencias(payload: {
+  organizationId: string
+  motivo: string
+  confirmacaoFrase: string
+  confirmacaoCheckbox: boolean
+}): Promise<LimparEvidenciasResponse> {
+  return pb.send<LimparEvidenciasResponse>('/backend/v1/backup/evidencias/limpar-todas', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 // -------------------------------------------------------------
 // 8. Processamentos
 // -------------------------------------------------------------

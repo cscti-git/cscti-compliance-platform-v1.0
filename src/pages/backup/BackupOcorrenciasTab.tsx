@@ -140,22 +140,40 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">
-            Ocorrências e Desvios de Continuidade
-          </h2>
-          <p className="text-xs text-slate-500">
-            Gestão de falhas em cópias de segurança, falta de evidências periódicas e ações
-            corretivas adotadas.
-          </p>
+      {/* Cabeçalho padronizado da aba */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-amber-50/20 shadow-2xs">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#0B2545] text-white flex items-center justify-center shrink-0 mt-0.5">
+            <AlertTriangle className="w-5 h-5 text-amber-300" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-900">
+                7. Ocorrências e Desvios de Continuidade
+              </h2>
+              <Badge
+                variant="outline"
+                className={`text-[10px] font-bold ${
+                  ocorrencias.length > 0
+                    ? 'bg-red-50 text-red-700 border-red-300'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                }`}
+              >
+                {ocorrencias.length} {ocorrencias.length === 1 ? 'ocorrência' : 'ocorrências'}
+              </Badge>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Gestão de falhas em cópias de segurança, lapsos de evidências periódicas e medidas
+              corretivas adotadas.
+            </p>
+          </div>
         </div>
 
         {canOperate && (
           <Button
             onClick={openNova}
             size="sm"
-            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs"
+            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs shrink-0 self-start sm:self-center"
           >
             <Plus className="w-4 h-4" /> Registrar Ocorrência
           </Button>
