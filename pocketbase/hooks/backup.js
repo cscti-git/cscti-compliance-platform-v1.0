@@ -702,58 +702,9 @@ routerAdd(
         }
       }
 
-      // Fallback inteligente baseado na imagem de referência
-      if (atividades.length === 0 && (isAcronisDetected || lowerConteudo.includes('acronis'))) {
-        atividades.push(
-          {
-            resultado: 'OK',
-            nome_atividade: "Plano de proteção 'Backup_SRV-FILESERVER'",
-            nome_plano: 'Backup_SRV-FILESERVER',
-            hora_inicio: '19:00',
-            hora_termino: '19:05',
-            duracao: '6 minutos',
-            bytes_salvos: '1.15 GB',
-            bytes_processados: '2.21 GB',
-            fonte_dados: 'SRV-FILESERVER',
-            local_destino: 'Nuvem',
-          },
-          {
-            resultado: 'OK',
-            nome_atividade: "Plano de proteção 'BK-SPCM-TDePJ'",
-            nome_plano: 'BK-SPCM-TDePJ',
-            hora_inicio: '19:30',
-            hora_termino: '19:36',
-            duracao: '6 minutos',
-            bytes_salvos: '644.60 MB',
-            bytes_processados: '32.36 GB',
-            fonte_dados: 'SPCM-TDePJ',
-            local_destino: 'Nuvem',
-          },
-          {
-            resultado: 'OK',
-            nome_atividade: "Plano de proteção 'BK-SPCM-ORION'",
-            nome_plano: 'BK-SPCM-ORION',
-            hora_inicio: '19:45',
-            hora_termino: '19:50',
-            duracao: '6 minutos',
-            bytes_salvos: '1.31 GB',
-            bytes_processados: '4.24 GB',
-            fonte_dados: 'Máquina inteira',
-            local_destino: 'Nuvem',
-          },
-          {
-            resultado: 'OK',
-            nome_atividade: "Plano de proteção 'BK-SPCM-PROTESTO'",
-            nome_plano: 'BK-SPCM-PROTESTO',
-            hora_inicio: '20:00',
-            hora_termino: '20:04',
-            duracao: '5 minutos',
-            bytes_salvos: '429.48 MB',
-            bytes_processados: '1.43 GB',
-            fonte_dados: 'Máquina inteira',
-            local_destino: 'Nuvem',
-          },
-        )
+      // Se nenhuma atividade com plano foi extraída do PDF, não injetar mocks ou planos fictícios
+      if (atividades.length === 0 && isAcronisDetected) {
+        avisosParsing.push('Nenhum plano de proteção reconhecido no texto do documento Acronis.')
       }
 
       let totalBytesSalvos = 0
@@ -1123,78 +1074,49 @@ routerAdd(
     $app.save(evidenciaRec)
 
     // -------------------------------------------------------------
-    // VINCULAÇÃO DE ROTINA E FONTE (CASAMENTO INTELIGENTE)
+    // VINCULAÇÃO DE ROTINA E FONTE (VÍNCULO RIGOROSO POR ALIAS / NOME)
     // -------------------------------------------------------------
+    const vinculoMod = require(`${__hooks}/modules/vinculo.js`)
     let rotinaFinalId = rotinaId || evidenciaRec.getString('rotina') || ''
     let fonteFinalId = fonteId || evidenciaRec.getString('fonte') || ''
+    let motivoVinculoRigoroso = ''
+    let fontesVinculadasRigorosas = []
 
-    if (!rotinaFinalId || !fonteFinalId) {
+    if (!rotinaFinalId) {
       try {
         const todasRotinas = $app.findRecordsByFilter(
           'backup_rotinas',
           `organization = '${organizationId}' && status = 'ativo'`,
           '+created',
-          50,
+          100,
           0,
         )
-
-        const cleanJobLower = jobName.toLowerCase()
-        let rotinaCasadaPorNome = null
-
-        for (let rI = 0; rI < todasRotinas.length; rI++) {
-          const rCandidate = todasRotinas[rI]
-          const rNameLower = rCandidate.getString('nome').toLowerCase()
-          if (
-            cleanJobLower.includes(rNameLower) ||
-            rNameLower.includes(cleanJobLower) ||
-            (isAcronisDetected && rNameLower.includes('acronis')) ||
-            (cleanJobLower.includes('vm') && rNameLower.includes('vm')) ||
-            (cleanJobLower.includes('gold') && rNameLower.includes('gold'))
-          ) {
-            rotinaCasadaPorNome = rCandidate
-            break
-          }
-        }
-
-        if (rotinaCasadaPorNome && !rotinaFinalId) {
-          rotinaFinalId = rotinaCasadaPorNome.id
-        }
 
         const todasFontes = $app.findRecordsByFilter(
           'backup_fontes',
           `organization = '${organizationId}' && ativo = true`,
           '+created',
-          50,
+          200,
           0,
         )
 
-        for (let fI = 0; fI < todasFontes.length; fI++) {
-          const fCandidate = todasFontes[fI]
-          const caminhoLower = (fCandidate.getString('caminho_identificacao') || '').toLowerCase()
-          let matchFonte =
-            cleanJobLower.includes(caminhoLower) || caminhoLower.includes(cleanJobLower)
-          if (!matchFonte && detalhesVms.length > 0) {
-            for (let vI = 0; vI < detalhesVms.length; vI++) {
-              const vmNomeLower = (detalhesVms[vI].nome || '').toLowerCase()
-              if (caminhoLower.includes(vmNomeLower) || vmNomeLower.includes(caminhoLower)) {
-                matchFonte = true
-                break
-              }
-            }
+        const resVinculo = vinculoMod.vinculoRigoroso(jobName, todasRotinas, todasFontes)
+        if (resVinculo && resVinculo.rotina) {
+          rotinaFinalId = resVinculo.rotina.id
+          motivoVinculoRigoroso = resVinculo.motivo || ''
+          fontesVinculadasRigorosas = resVinculo.fontesVinculadas || []
+          if (!fonteFinalId && fontesVinculadasRigorosas.length > 0) {
+            fonteFinalId = fontesVinculadasRigorosas[0].id
           }
-          if (matchFonte) {
-            fonteFinalId = fCandidate.id
-            if (!rotinaFinalId) {
-              rotinaFinalId = fCandidate.getString('rotina')
-            }
-            break
-          }
+        } else {
+          rotinaFinalId = ''
+          motivoVinculoRigoroso =
+            (resVinculo && resVinculo.motivo) ||
+            `Nenhuma rotina corresponde ao job '${jobName}' — cadastre o alias em Rotinas & Fontes`
         }
-
-        if (!rotinaFinalId && todasRotinas.length > 0) {
-          rotinaFinalId = todasRotinas[0].id
-        }
-      } catch (_) {}
+      } catch (errVinc) {
+        motivoVinculoRigoroso = `Nenhuma rotina corresponde ao job '${jobName}' — cadastre o alias em Rotinas & Fontes`
+      }
     }
 
     if (rotinaFinalId && !evidenciaRec.getString('rotina')) {
@@ -1372,11 +1294,12 @@ routerAdd(
     checklist.push({
       item: 'vinculo',
       titulo: 'Vínculo com Rotina e Plano',
-      status: vinculoPass ? 'conforme' : 'atencao',
+      status: vinculoPass ? 'conforme' : 'nao_conforme',
       passou: vinculoPass,
       detalhes: vinculoPass
-        ? `Rotina vinculada: "${rotinaNomeReal}" (Plano: "${planoNomeReal || 'Plano de Continuidade'}").`
-        : 'Nenhuma rotina cadastrada corresponde a este comprovante.',
+        ? `Rotina vinculada: "${rotinaNomeReal}" (Plano: "${planoNomeReal || 'Plano de Continuidade'}"). ${motivoVinculoRigoroso ? '[' + motivoVinculoRigoroso + ']' : ''}`
+        : motivoVinculoRigoroso ||
+          `Nenhuma rotina corresponde ao job '${jobName}' — cadastre o alias em Rotinas & Fontes`,
     })
 
     // 4. Status do Job
@@ -1481,7 +1404,10 @@ routerAdd(
     })
 
     // Veredito final em linguagem clara e coerência de conformidade
-    if (statusDetectado === 'erro' || (!regraCasada && statusDetectado === 'erro')) {
+    if (!rotinaFinalId) {
+      conformidadeStatus = 'nao_conforme'
+      conformidadeDetalhe = `NÃO Conforme: ${motivoVinculoRigoroso || `Nenhuma rotina corresponde ao job '${jobName}' — cadastre o alias em Rotinas & Fontes`}`
+    } else if (statusDetectado === 'erro' || (!regraCasada && statusDetectado === 'erro')) {
       conformidadeStatus = 'nao_conforme'
       conformidadeDetalhe =
         adaptadorUsado === 'ACRONIS_PDF'
@@ -1498,9 +1424,6 @@ routerAdd(
     } else if (!regraCasada) {
       conformidadeStatus = 'atencao'
       conformidadeDetalhe = `Atenção: Comprovante processado via ${adaptadorUsado}, mas nenhuma regra de identificação cadastrada correspondeu ao remetente/assunto.`
-    } else if (!rotinaFinalId) {
-      conformidadeStatus = 'atencao'
-      conformidadeDetalhe = `Atenção: Cópia executada com sucesso via ${adaptadorUsado}, porém nenhuma rotina cadastrada corresponde a este comprovante.`
     } else if (fontesNaoCobertas.length > 0) {
       conformidadeStatus = 'atencao'
       conformidadeDetalhe = `Atenção: Cópia executada com sucesso, mas há ${fontesNaoCobertas.length} item(ns) sem fonte cadastrada na rotina "${rotinaNomeReal}".`
@@ -1550,12 +1473,14 @@ routerAdd(
       },
       vinculos: {
         rotina_id: rotinaFinalId || null,
-        rotina_nome: rotinaNomeReal || 'Rotina padrão de backup',
-        rotina_motivo: rotinaFinalId
-          ? `Vinculado à rotina "${rotinaNomeReal}" por compatibilidade com "${jobName}"`
-          : `Nenhuma rotina com nome compatível com o job "${jobName}"`,
-        plano_nome: planoNomeReal || 'Plano padrão',
-        periodicidade: rotinaPeriodicidade || 'diaria',
+        rotina_nome: rotinaNomeReal || null,
+        rotina_motivo:
+          motivoVinculoRigoroso ||
+          (rotinaFinalId
+            ? `Vinculado à rotina "${rotinaNomeReal}"`
+            : `Nenhuma rotina corresponde ao job '${jobName}' — cadastre o alias em Rotinas & Fontes`),
+        plano_nome: planoNomeReal || null,
+        periodicidade: rotinaPeriodicidade || null,
         intervalo_minutos: rotinaIntervaloMin,
       },
       cobertura: {
