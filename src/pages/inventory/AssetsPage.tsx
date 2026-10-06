@@ -45,6 +45,7 @@ import {
   Database,
   Cloud,
   Monitor,
+  Cpu,
   Wifi,
   Shield,
   Trash2,
@@ -144,6 +145,8 @@ export const AssetsPage: React.FC = () => {
     switch (tipo) {
       case 'servidor_aplicacao':
         return <Server className="w-4 h-4 text-indigo-600" />
+      case 'servidor_virtualizado':
+        return <Cpu className="w-4 h-4 text-sky-600" />
       case 'banco_dados':
         return <Database className="w-4 h-4 text-blue-600" />
       case 'storage_backup':

@@ -32,6 +32,8 @@ export const InventoryReportPage: React.FC = () => {
     switch (tipo) {
       case 'servidor_aplicacao':
         return 'Servidor de Aplicação'
+      case 'servidor_virtualizado':
+        return 'Servidor Virtualizado'
       case 'banco_dados':
         return 'Banco de Dados'
       case 'storage_backup':

@@ -248,7 +248,32 @@ routerAdd(
         let tipo = 'estacao'
         const lowerName = assetName.toLowerCase()
         const comment = (item.comment || '').toLowerCase()
-        if (
+        const itemType = String(item.itemtype || item._type || item.type || '').toLowerCase()
+        const isVm =
+          item.is_dynamic === 1 ||
+          item.is_dynamic === true ||
+          item.is_virtual === 1 ||
+          item.is_virtual === true ||
+          itemType.includes('virtualmachine') ||
+          itemType.includes('vm') ||
+          lowerName.includes('vm-') ||
+          lowerName.includes('-vm') ||
+          lowerName.startsWith('vm') ||
+          lowerName.includes('virtual') ||
+          comment.includes('virtual machine') ||
+          comment.includes('máquina virtual') ||
+          comment.includes('maquina virtual') ||
+          comment.includes('vmware') ||
+          comment.includes('hyper-v') ||
+          comment.includes('hyperv') ||
+          comment.includes('proxmox') ||
+          comment.includes('kvm') ||
+          comment.includes('virtualbox') ||
+          comment.includes('xen')
+
+        if (isVm) {
+          tipo = 'servidor_virtualizado'
+        } else if (
           lowerName.includes('srv') ||
           lowerName.includes('server') ||
           comment.includes('servidor')
@@ -284,7 +309,12 @@ routerAdd(
 
         // Criticidade
         let criticidade = 'media'
-        if (tipo === 'servidor_aplicacao' || tipo === 'banco_dados' || tipo === 'storage_backup') {
+        if (
+          tipo === 'servidor_aplicacao' ||
+          tipo === 'servidor_virtualizado' ||
+          tipo === 'banco_dados' ||
+          tipo === 'storage_backup'
+        ) {
           criticidade = 'alta'
         }
 

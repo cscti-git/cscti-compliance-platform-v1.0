@@ -39,6 +39,7 @@ interface AssetModalProps {
 
 export const ASSET_TYPES: { value: AssetType; label: string }[] = [
   { value: 'servidor_aplicacao', label: 'Servidor de Aplicação' },
+  { value: 'servidor_virtualizado', label: 'Servidor Virtualizado' },
   { value: 'banco_dados', label: 'Banco de Dados' },
   { value: 'storage_backup', label: 'Storage / Unidade de Backup' },
   { value: 'servico_nuvem', label: 'Serviço em Nuvem / SaaS' },

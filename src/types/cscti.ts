@@ -169,6 +169,7 @@ export interface AuditLogItem {
 
 export type AssetType =
   | 'servidor_aplicacao'
+  | 'servidor_virtualizado'
   | 'banco_dados'
   | 'storage_backup'
   | 'servico_nuvem'
