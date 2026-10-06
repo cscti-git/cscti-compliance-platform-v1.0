@@ -84,23 +84,104 @@ export async function saveBackupPlano(
   data: Partial<BackupPlanoItem> & { organization: string },
 ): Promise<BackupPlanoItem> {
   let result: BackupPlanoItem
+
+  // Sanitização de periodicidade / intervalo / janela / destino
+  const payload: Record<string, unknown> = { ...data }
+  if (payload.periodicidade === 'intervalo_minutos') {
+    payload.janela_horario = ''
+    if (!payload.intervalo_minutos || Number(payload.intervalo_minutos) < 5) {
+      payload.intervalo_minutos = 30
+    } else {
+      payload.intervalo_minutos = Number(payload.intervalo_minutos)
+    }
+  } else if (payload.periodicidade) {
+    payload.intervalo_minutos = 0
+  }
+
+  if (payload.rto_horas !== undefined && payload.rto_horas !== null && payload.rto_horas !== '') {
+    payload.rto_horas = Number(payload.rto_horas)
+  } else {
+    payload.rto_horas = null
+  }
+
+  if (payload.rpo_horas !== undefined && payload.rpo_horas !== null && payload.rpo_horas !== '') {
+    payload.rpo_horas = Number(payload.rpo_horas)
+  } else {
+    payload.rpo_horas = null
+  }
+
+  if (
+    payload.retencao_dias !== undefined &&
+    payload.retencao_dias !== null &&
+    payload.retencao_dias !== ''
+  ) {
+    payload.retencao_dias = Number(payload.retencao_dias)
+  } else {
+    payload.retencao_dias = null
+  }
+
+  if (!Array.isArray(payload.destino)) {
+    payload.destino = []
+  }
+
+  const requisitosResumoParts: string[] = []
+  if (payload.rpo_horas !== null && payload.rpo_horas !== undefined) {
+    requisitosResumoParts.push(`RPO: ${payload.rpo_horas}h`)
+  }
+  if (payload.rto_horas !== null && payload.rto_horas !== undefined) {
+    requisitosResumoParts.push(`RTO: ${payload.rto_horas}h`)
+  }
+  if (payload.retencao_dias !== null && payload.retencao_dias !== undefined) {
+    requisitosResumoParts.push(`Retenção: ${payload.retencao_dias}d`)
+  }
+  if (payload.periodicidade) {
+    const perStr =
+      payload.periodicidade === 'intervalo_minutos'
+        ? `A cada ${payload.intervalo_minutos}m`
+        : `${payload.periodicidade}${payload.janela_horario ? ` ${payload.janela_horario}` : ''}`
+    requisitosResumoParts.push(`Periodicidade: ${perStr}`)
+  }
+  if (Array.isArray(payload.destino) && payload.destino.length > 0) {
+    requisitosResumoParts.push(`Destino: ${payload.destino.join(', ')}`)
+  }
+  const requisitosTexto =
+    requisitosResumoParts.length > 0 ? ` [${requisitosResumoParts.join(' · ')}]` : ''
+
   if (data.id) {
-    result = await pb.collection('backup_planos').update<BackupPlanoItem>(data.id, data)
+    result = await pb.collection('backup_planos').update<BackupPlanoItem>(data.id, payload)
     await logAudit({
       organizationId: data.organization,
       action: 'BACKUP_PLANO_UPDATE',
       entity: 'Backup e Continuidade',
-      detail: `Plano de backup atualizado: ${result.nome}`,
-      metadata: { plano_id: result.id },
+      detail: `Plano de backup atualizado: ${result.nome}${requisitosTexto}`,
+      metadata: {
+        plano_id: result.id,
+        rto_horas: result.rto_horas,
+        rpo_horas: result.rpo_horas,
+        retencao_dias: result.retencao_dias,
+        periodicidade: result.periodicidade,
+        intervalo_minutos: result.intervalo_minutos,
+        janela_horario: result.janela_horario,
+        destino: result.destino,
+      },
     })
   } else {
-    result = await pb.collection('backup_planos').create<BackupPlanoItem>(data)
+    result = await pb.collection('backup_planos').create<BackupPlanoItem>(payload)
     await logAudit({
       organizationId: data.organization,
       action: 'BACKUP_PLANO_CREATE',
       entity: 'Backup e Continuidade',
-      detail: `Novo plano de backup cadastrado: ${result.nome}`,
-      metadata: { plano_id: result.id },
+      detail: `Novo plano de backup cadastrado: ${result.nome}${requisitosTexto}`,
+      metadata: {
+        plano_id: result.id,
+        rto_horas: result.rto_horas,
+        rpo_horas: result.rpo_horas,
+        retencao_dias: result.retencao_dias,
+        periodicidade: result.periodicidade,
+        intervalo_minutos: result.intervalo_minutos,
+        janela_horario: result.janela_horario,
+        destino: result.destino,
+      },
     })
   }
   return result

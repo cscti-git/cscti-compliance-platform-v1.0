@@ -29,8 +29,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, Edit2, Trash2, Sliders, CheckCircle2, ListPlus, X } from 'lucide-react'
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Sliders,
+  CheckCircle2,
+  ListPlus,
+  X,
+  Clock,
+  RotateCcw,
+  Calendar,
+  Cloud,
+  HardDrive,
+  ExternalLink,
+  Layers,
+} from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   saveBackupPlano,
   deleteBackupPlano,
@@ -38,7 +54,12 @@ import {
   saveBackupPlanoRequisito,
   deleteBackupPlanoRequisito,
 } from '@/services/backupService'
-import type { BackupPlanoItem, BackupPlanoRequisitoItem } from '@/types/cscti'
+import type {
+  BackupPlanoItem,
+  BackupPlanoRequisitoItem,
+  BackupPlanoPeriodicidade,
+  BackupPlanoDestino,
+} from '@/types/cscti'
 
 interface BackupPlanosTabProps {
   planos: BackupPlanoItem[]
@@ -65,6 +86,15 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
   const [descricao, setDescricao] = useState('')
   const [status, setStatus] = useState<'ativo' | 'inativo'>('ativo')
 
+  // Requisitos Técnicos do Plano
+  const [rtoHoras, setRtoHoras] = useState<string>('')
+  const [rpoHoras, setRpoHoras] = useState<string>('')
+  const [retencaoDias, setRetencaoDias] = useState<string>('')
+  const [periodicidade, setPeriodicidade] = useState<BackupPlanoPeriodicidade | ''>('')
+  const [intervaloMinutos, setIntervaloMinutos] = useState<number>(30)
+  const [janelaHorario, setJanelaHorario] = useState<string>('23:00')
+  const [destinos, setDestinos] = useState<BackupPlanoDestino[]>([])
+
   // Modal Requisitos do Plano
   const [reqModalOpen, setReqModalOpen] = useState(false)
   const [selectedPlanoForReq, setSelectedPlanoForReq] = useState<BackupPlanoItem | null>(null)
@@ -78,11 +108,22 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
     'rpo' | 'rto' | 'retencao' | 'periodicidade' | 'armazenamento' | 'outro'
   >('rpo')
 
+  const toggleDestino = (dest: BackupPlanoDestino) => {
+    setDestinos((prev) => (prev.includes(dest) ? prev.filter((d) => d !== dest) : [...prev, dest]))
+  }
+
   const openNewPlano = () => {
     setEditingItem(null)
     setNome('')
     setDescricao('')
     setStatus('ativo')
+    setRtoHoras('')
+    setRpoHoras('')
+    setRetencaoDias('')
+    setPeriodicidade('')
+    setIntervaloMinutos(30)
+    setJanelaHorario('23:00')
+    setDestinos([])
     setModalOpen(true)
   }
 
@@ -91,12 +132,59 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
     setNome(p.nome)
     setDescricao(p.descricao || '')
     setStatus(p.status)
+    setRtoHoras(p.rto_horas !== undefined && p.rto_horas !== null ? String(p.rto_horas) : '')
+    setRpoHoras(p.rpo_horas !== undefined && p.rpo_horas !== null ? String(p.rpo_horas) : '')
+    setRetencaoDias(
+      p.retencao_dias !== undefined && p.retencao_dias !== null ? String(p.retencao_dias) : '',
+    )
+    setPeriodicidade(p.periodicidade || '')
+    setIntervaloMinutos(p.intervalo_minutos && p.intervalo_minutos >= 5 ? p.intervalo_minutos : 30)
+    setJanelaHorario(p.janela_horario || (p.periodicidade === 'intervalo_minutos' ? '' : '23:00'))
+    setDestinos(Array.isArray(p.destino) ? p.destino : [])
     setModalOpen(true)
   }
 
   const handleSavePlano = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!nome.trim()) return
+
+    // Validações simples opcionais
+    if (rtoHoras && Number(rtoHoras) < 0) {
+      toast({
+        title: 'Valor inválido',
+        description: 'O RTO deve ser maior ou igual a 0.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (rpoHoras && Number(rpoHoras) < 0) {
+      toast({
+        title: 'Valor inválido',
+        description: 'O RPO deve ser maior ou igual a 0.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (retencaoDias && Number(retencaoDias) < 0) {
+      toast({
+        title: 'Valor inválido',
+        description: 'A retenção deve ser maior ou igual a 0.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (
+      periodicidade === 'intervalo_minutos' &&
+      (intervaloMinutos < 5 || intervaloMinutos > 1440)
+    ) {
+      toast({
+        title: 'Intervalo inválido',
+        description: 'O intervalo deve estar entre 5 e 1440 minutos.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setSubmitting(true)
     try {
       await saveBackupPlano({
@@ -105,6 +193,15 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
         nome: nome.trim(),
         descricao: descricao.trim(),
         status,
+        rto_horas: rtoHoras ? Number(rtoHoras) : undefined,
+        rpo_horas: rpoHoras ? Number(rpoHoras) : undefined,
+        retencao_dias: retencaoDias ? Number(retencaoDias) : undefined,
+        periodicidade: periodicidade ? (periodicidade as BackupPlanoPeriodicidade) : undefined,
+        intervalo_minutos:
+          periodicidade === 'intervalo_minutos' ? Number(intervaloMinutos) : undefined,
+        janela_horario:
+          periodicidade && periodicidade !== 'intervalo_minutos' ? janelaHorario.trim() : undefined,
+        destino: destinos,
       })
       toast({
         title: editingItem ? 'Plano atualizado' : 'Plano criado',
@@ -258,6 +355,69 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
                   <p className="text-slate-600 line-clamp-3">{plano.descricao}</p>
                 )}
 
+                {/* Bloco de Requisitos Técnicos do Plano (quando configurados) */}
+                {((plano.rto_horas !== undefined && plano.rto_horas !== null) ||
+                  (plano.rpo_horas !== undefined && plano.rpo_horas !== null) ||
+                  (plano.retencao_dias !== undefined && plano.retencao_dias !== null) ||
+                  plano.periodicidade ||
+                  (Array.isArray(plano.destino) && plano.destino.length > 0)) && (
+                  <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <Sliders className="w-3 h-3 text-slate-400" />
+                      <span>Requisitos Técnicos</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                      {plano.rpo_horas !== undefined && plano.rpo_horas !== null && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-blue-50 text-blue-900 border border-blue-200 px-1.5 py-0 font-medium"
+                        >
+                          RPO: {plano.rpo_horas}h
+                        </Badge>
+                      )}
+
+                      {plano.rto_horas !== undefined && plano.rto_horas !== null && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-indigo-50 text-indigo-900 border border-indigo-200 px-1.5 py-0 font-medium"
+                        >
+                          RTO: {plano.rto_horas}h
+                        </Badge>
+                      )}
+
+                      {plano.retencao_dias !== undefined && plano.retencao_dias !== null && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-1.5 py-0 font-medium"
+                        >
+                          Retenção: {plano.retencao_dias}d
+                        </Badge>
+                      )}
+
+                      {plano.periodicidade && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-purple-50 text-purple-900 border border-purple-200 px-1.5 py-0 font-medium capitalize"
+                        >
+                          {plano.periodicidade === 'intervalo_minutos'
+                            ? `A cada ${plano.intervalo_minutos || 30} min`
+                            : `${plano.periodicidade}${plano.janela_horario ? ` (${plano.janela_horario})` : ''}`}
+                        </Badge>
+                      )}
+
+                      {Array.isArray(plano.destino) && plano.destino.length > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0 font-medium capitalize"
+                        >
+                          Destino: {plano.destino.join(', ')}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="pt-2 flex items-center justify-between border-t border-slate-100">
                   <Button
                     variant="outline"
@@ -265,7 +425,7 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
                     onClick={() => openGerenciarRequisitos(plano)}
                     className="h-8 text-xs text-blue-700 border-blue-200 bg-blue-50/50 hover:bg-blue-100/50"
                   >
-                    <ListPlus className="w-3.5 h-3.5 mr-1" /> Requisitos do Plano
+                    <ListPlus className="w-3.5 h-3.5 mr-1" /> Requisitos Detalhados
                   </Button>
 
                   {canOperate && (
@@ -299,7 +459,7 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
 
       {/* Modal Criar/Editar Plano */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSavePlano}>
             <DialogHeader>
               <DialogTitle className="text-base font-bold text-slate-900">
@@ -342,12 +502,233 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
                   Descrição e Diretrizes do Plano
                 </label>
                 <Textarea
-                  rows={3}
+                  rows={2}
                   placeholder="Descreva a frequência, método de cópia e objetivos de proteção."
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
                   className="text-xs resize-none"
                 />
+              </div>
+
+              {/* Seção Requisitos Técnicos do Plano */}
+              <div className="pt-3 border-t border-slate-200 space-y-3">
+                <div className="flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-[#0B2545]" />
+                  <span className="font-bold text-slate-900 text-xs">
+                    Requisitos Técnicos do Plano
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] font-normal text-slate-500 py-0 px-1.5"
+                  >
+                    Opcional
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Defina os alvos de RPO, RTO, retenção, periodicidade e destinos (ex.: Veeam local
+                  contínuo vs Acronis noturno em nuvem).
+                </p>
+
+                {/* Grid RTO / RPO / Retenção */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="font-semibold text-slate-700 block text-[11px] mb-1">
+                      RTO (horas)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder="Ex: 4"
+                      value={rtoHoras}
+                      onChange={(e) => setRtoHoras(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Tempo retomada</span>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-slate-700 block text-[11px] mb-1">
+                      RPO (horas)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder="Ex: 24"
+                      value={rpoHoras}
+                      onChange={(e) => setRpoHoras(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Perda máxima</span>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-slate-700 block text-[11px] mb-1">
+                      Retenção (dias)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="Ex: 30"
+                      value={retencaoDias}
+                      onChange={(e) => setRetencaoDias(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Dias guardados</span>
+                  </div>
+                </div>
+
+                {/* Periodicidade Geral */}
+                <div>
+                  <label className="font-semibold text-slate-700 block text-[11px] mb-1">
+                    Periodicidade Geral do Plano
+                  </label>
+                  <Select
+                    value={periodicidade || 'none'}
+                    onValueChange={(val) => {
+                      if (val === 'none') {
+                        setPeriodicidade('')
+                      } else {
+                        const per = val as BackupPlanoPeriodicidade
+                        setPeriodicidade(per)
+                        if (per === 'intervalo_minutos') {
+                          setJanelaHorario('')
+                        } else if (!janelaHorario) {
+                          setJanelaHorario('23:00')
+                        }
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="text-xs h-8">
+                      <SelectValue placeholder="Selecione a periodicidade (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Não especificada</SelectItem>
+                      <SelectItem value="intervalo_minutos">
+                        A cada X minutos (contínuo / alta frequência)
+                      </SelectItem>
+                      <SelectItem value="diaria">Diária</SelectItem>
+                      <SelectItem value="semanal">Semanal</SelectItem>
+                      <SelectItem value="mensal">Mensal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Subcampo condicional: intervalo_minutos vs janela_horario */}
+                {periodicidade === 'intervalo_minutos' && (
+                  <div className="p-2.5 rounded-md bg-blue-50/50 border border-blue-200/60 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-semibold text-blue-950 block text-[11px]">
+                        Intervalo de Execução (Minutos)
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {[15, 30, 60, 120].map((quickVal) => (
+                          <button
+                            key={quickVal}
+                            type="button"
+                            onClick={() => setIntervaloMinutos(quickVal)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-mono transition ${
+                              Number(intervaloMinutos) === quickVal
+                                ? 'bg-blue-600 text-white font-bold'
+                                : 'bg-white border border-blue-200 text-blue-800 hover:bg-blue-100'
+                            }`}
+                          >
+                            {quickVal}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <Input
+                      type="number"
+                      min={5}
+                      max={1440}
+                      placeholder="30"
+                      value={intervaloMinutos}
+                      onChange={(e) =>
+                        setIntervaloMinutos(
+                          Math.max(5, Math.min(1440, Number(e.target.value) || 5)),
+                        )
+                      }
+                      className="text-xs bg-white h-8"
+                    />
+                    <p className="text-[10px] text-blue-800/80">
+                      Ciclo a cada {intervaloMinutos || 30} minutos (intervalo permitido de 5 a 1440
+                      min). Ideal para replicação e snapshots contínuos (ex: Veeam local).
+                    </p>
+                  </div>
+                )}
+
+                {periodicidade && periodicidade !== 'intervalo_minutos' && (
+                  <div>
+                    <label className="font-semibold text-slate-700 block text-[11px] mb-1">
+                      Horário da Janela
+                    </label>
+                    <Input
+                      placeholder="Ex: 23:00 (noturna)"
+                      value={janelaHorario}
+                      onChange={(e) => setJanelaHorario(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Horário de início da janela programada de cópia.
+                    </span>
+                  </div>
+                )}
+
+                {/* Destino: Checkboxes Local / Nuvem / Externo */}
+                <div>
+                  <label className="font-semibold text-slate-700 block text-[11px] mb-1.5">
+                    Destino da Cópia (estratégia de armazenamento)
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <label
+                      className={`flex items-center gap-2 p-2 rounded border cursor-pointer text-xs transition ${
+                        destinos.includes('local')
+                          ? 'bg-blue-50/70 border-blue-300 text-blue-900 font-semibold'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={destinos.includes('local')}
+                        onCheckedChange={() => toggleDestino('local')}
+                      />
+                      <HardDrive className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Local</span>
+                    </label>
+
+                    <label
+                      className={`flex items-center gap-2 p-2 rounded border cursor-pointer text-xs transition ${
+                        destinos.includes('nuvem')
+                          ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 font-semibold'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={destinos.includes('nuvem')}
+                        onCheckedChange={() => toggleDestino('nuvem')}
+                      />
+                      <Cloud className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span>Nuvem</span>
+                    </label>
+
+                    <label
+                      className={`flex items-center gap-2 p-2 rounded border cursor-pointer text-xs transition ${
+                        destinos.includes('externo')
+                          ? 'bg-amber-50/70 border-amber-300 text-amber-900 font-semibold'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={destinos.includes('externo')}
+                        onCheckedChange={() => toggleDestino('externo')}
+                      />
+                      <ExternalLink className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Externo</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
 

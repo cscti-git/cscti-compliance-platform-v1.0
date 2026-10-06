@@ -262,10 +262,53 @@ export const BackupReportPage: React.FC = () => {
                   </div>
                   {p.descricao && <p className="text-slate-600 text-[11px]">{p.descricao}</p>}
 
+                  {/* Requisitos Técnicos Estruturados do Plano */}
+                  {((p.rto_horas !== undefined && p.rto_horas !== null) ||
+                    (p.rpo_horas !== undefined && p.rpo_horas !== null) ||
+                    (p.retencao_dias !== undefined && p.retencao_dias !== null) ||
+                    p.periodicidade ||
+                    (Array.isArray(p.destino) && p.destino.length > 0)) && (
+                    <div className="pt-1.5 border-t border-slate-100">
+                      <span className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
+                        Requisitos Técnicos Homologados:
+                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {p.rpo_horas !== undefined && p.rpo_horas !== null && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-200 font-medium">
+                            <strong>RPO Máx.:</strong>&nbsp;{p.rpo_horas}h
+                          </span>
+                        )}
+                        {p.rto_horas !== undefined && p.rto_horas !== null && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-indigo-50 text-indigo-900 border border-indigo-200 font-medium">
+                            <strong>RTO Máx.:</strong>&nbsp;{p.rto_horas}h
+                          </span>
+                        )}
+                        {p.retencao_dias !== undefined && p.retencao_dias !== null && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-900 border border-emerald-200 font-medium">
+                            <strong>Retenção:</strong>&nbsp;{p.retencao_dias} dias
+                          </span>
+                        )}
+                        {p.periodicidade && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-200 font-medium capitalize">
+                            <strong>Periodicidade:</strong>&nbsp;
+                            {p.periodicidade === 'intervalo_minutos'
+                              ? `A cada ${p.intervalo_minutos || 30} min`
+                              : `${p.periodicidade}${p.janela_horario ? ` (${p.janela_horario})` : ''}`}
+                          </span>
+                        )}
+                        {Array.isArray(p.destino) && p.destino.length > 0 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-medium capitalize">
+                            <strong>Destino:</strong>&nbsp;{p.destino.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {reqsDoPlano.length > 0 && (
                     <div className="pt-1.5 border-t border-slate-100">
                       <span className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
-                        Requisitos do Plano:
+                        Requisitos Detalhados Adicionais:
                       </span>
                       <div className="grid grid-cols-2 gap-1 text-[11px]">
                         {reqsDoPlano.map((rq) => (

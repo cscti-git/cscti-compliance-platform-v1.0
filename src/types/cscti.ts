@@ -247,12 +247,22 @@ export interface BackupEscopoItem {
   updated?: string
 }
 
+export type BackupPlanoPeriodicidade = 'intervalo_minutos' | 'diaria' | 'semanal' | 'mensal'
+export type BackupPlanoDestino = 'local' | 'nuvem' | 'externo'
+
 export interface BackupPlanoItem {
   id: string
   organization: string
   nome: string
   descricao?: string
   status: 'ativo' | 'inativo'
+  rto_horas?: number
+  rpo_horas?: number
+  retencao_dias?: number
+  periodicidade?: BackupPlanoPeriodicidade
+  intervalo_minutos?: number
+  janela_horario?: string
+  destino?: BackupPlanoDestino[]
   created?: string
   updated?: string
 }
