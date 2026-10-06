@@ -537,9 +537,43 @@ export async function listBackupAvaliacoes(organizationId: string): Promise<Back
   if (!organizationId) return []
   return pb.collection('backup_avaliacoes').getFullList<BackupAvaliacaoItem>({
     filter: `organization = "${organizationId}"`,
-    expand: 'execucao',
+    expand: 'execucao,execucao.evidencia',
     sort: '-created',
   })
+}
+
+export async function getBackupAvaliacaoByExecucao(
+  execucaoId: string,
+  organizationId: string,
+): Promise<BackupAvaliacaoItem | null> {
+  if (!execucaoId || !organizationId) return null
+  try {
+    const list = await pb.collection('backup_avaliacoes').getList<BackupAvaliacaoItem>(1, 1, {
+      filter: `organization = "${organizationId}" && execucao = "${execucaoId}"`,
+      sort: '-created',
+    })
+    return list.items[0] || null
+  } catch (_) {
+    return null
+  }
+}
+
+export async function getBackupAvaliacaoByEvidencia(
+  evidenciaId: string,
+  organizationId: string,
+): Promise<BackupAvaliacaoItem | null> {
+  if (!evidenciaId || !organizationId) return null
+  try {
+    // 1. Procurar execução vinculada à evidência
+    const execs = await pb.collection('backup_execucoes').getList(1, 1, {
+      filter: `organization = "${organizationId}" && evidencia = "${evidenciaId}"`,
+      sort: '-created',
+    })
+    if (execs.items.length === 0) return null
+    return await getBackupAvaliacaoByExecucao(execs.items[0].id, organizationId)
+  } catch (_) {
+    return null
+  }
 }
 
 // -------------------------------------------------------------

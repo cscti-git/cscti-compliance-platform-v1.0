@@ -1338,13 +1338,59 @@ routerAdd(
 
     const checklist = []
 
-    // 1. Status do Job
+    // 1. Identificação (Regra)
+    const identificacaoPass = Boolean(regraCasada)
+    checklist.push({
+      item: 'identificacao',
+      titulo: 'Identificação pela Regra',
+      status: identificacaoPass ? 'conforme' : 'nao_conforme',
+      passou: identificacaoPass,
+      detalhes: identificacaoPass
+        ? `Regra "${regraCasada.getString('nome') || 'Regra ativa'}" casada com sucesso (remetente: "${remetente || 'detectado'}", assunto: "${assunto || 'detectado'}").`
+        : `Nenhuma regra de identificação cadastrada correspondeu ao comprovante (remetente: "${remetente || 'desconhecido'}", assunto: "${assunto || 'não informado'}").`,
+    })
+
+    // 2. Extração (Adaptador)
+    const extracaoPass = statusDetectado !== 'erro'
+    const extracaoStatus =
+      statusDetectado === 'sucesso'
+        ? 'conforme'
+        : statusDetectado === 'parcial'
+          ? 'atencao'
+          : 'nao_conforme'
+    const totalItensExtracao = contadores.total_vms || itensComprovante.length
+    checklist.push({
+      item: 'extracao',
+      titulo: 'Extração pelo Adaptador',
+      status: extracaoStatus,
+      passou: extracaoPass,
+      detalhes: `Adaptador ${adaptadorUsado}: status "${statusDetectado}", ${totalItensExtracao} item(ns)/VM(s) detectado(s), ${contadores.success || 0} sucesso, ${contadores.warning || 0} aviso(s), ${contadores.error || 0} falha(s), volume: ${tamanhoFormatado || 'não especificado'}.`,
+    })
+
+    // 3. Vínculo (Rotina e Plano)
+    const vinculoPass = Boolean(rotinaFinalId)
+    checklist.push({
+      item: 'vinculo',
+      titulo: 'Vínculo com Rotina e Plano',
+      status: vinculoPass ? 'conforme' : 'atencao',
+      passou: vinculoPass,
+      detalhes: vinculoPass
+        ? `Rotina vinculada: "${rotinaNomeReal}" (Plano: "${planoNomeReal || 'Plano de Continuidade'}").`
+        : 'Nenhuma rotina cadastrada corresponde a este comprovante.',
+    })
+
+    // 4. Status do Job
     const statusPass = statusDetectado === 'sucesso'
     checklist.push({
       item: 'status_job',
       titulo: 'Status da Execução do Job',
+      status:
+        statusDetectado === 'sucesso'
+          ? 'conforme'
+          : statusDetectado === 'parcial'
+            ? 'atencao'
+            : 'nao_conforme',
       passou: statusPass,
-      status: statusDetectado,
       detalhes:
         statusDetectado === 'sucesso'
           ? `O trabalho de backup reportou sucesso completo (0 erros detectados).`
@@ -1353,74 +1399,79 @@ routerAdd(
             : `O trabalho reportou falha crítica na execução (${contadores.error || 1} erro(s)).`,
     })
 
-    // 2. Periodicidade vs. Horário da Rotina
+    // 5. Periodicidade vs. Horário da Rotina
     let periodicidadeDesc = 'Não vinculada'
     let periodicidadePass = true
+    let periodicidadeStatus = 'conforme'
     if (rotinaPeriodicidade === 'intervalo_minutos' && rotinaIntervaloMin > 0) {
       periodicidadeDesc = `Intervalo a cada ${rotinaIntervaloMin} minutos (${rotinaTipoExecucao || 'incremental'})`
       periodicidadePass = true
+      periodicidadeStatus = 'conforme'
     } else if (rotinaPeriodicidade) {
       periodicidadeDesc = `Periodicidade ${rotinaPeriodicidade}${rotinaHorario ? ' às ' + rotinaHorario : ''}`
       periodicidadePass = true
+      periodicidadeStatus = 'conforme'
     } else {
       periodicidadeDesc = 'Comprovante não vinculado a uma rotina de periodicidade específica'
       periodicidadePass = false
+      periodicidadeStatus = 'atencao'
     }
     checklist.push({
       item: 'periodicidade',
       titulo: 'Periodicidade e Janela da Rotina',
+      status: periodicidadeStatus,
       passou: periodicidadePass,
       detalhes: rotinaNomeReal
         ? `Rotina vinculada "${rotinaNomeReal}": ${periodicidadeDesc}. Execução recebida em conformidade temporal.`
         : 'Aviso: Comprovante processado sem vínculo de rotina pré-definida. Avaliado pelos dados do relatório.',
     })
 
-    // 3. Cobertura de Fontes
-    const coberturaPass = fontesNaoCobertas.length === 0 || fontesCobertas.length > 0
+    // 6. Cobertura de Fontes
+    const coberturaPass = fontesNaoCobertas.length === 0
+    const coberturaStatus = fontesNaoCobertas.length === 0 ? 'conforme' : 'atencao'
     checklist.push({
       item: 'cobertura_fontes',
       titulo: 'Cobertura de Fontes Monitoradas',
+      status: coberturaStatus,
       passou: coberturaPass,
       cobertas_count: fontesCobertas.length,
       nao_cobertas_count: fontesNaoCobertas.length,
       detalhes:
         fontesNaoCobertas.length === 0
           ? `Todos os ${itensComprovante.length} itens do comprovante possuem fonte cadastrada correspondente.`
-          : fontesCobertas.length > 0
-            ? `${fontesCobertas.length} de ${itensComprovante.length} itens vinculados a fontes ativas. ${fontesNaoCobertas.length} item(ns) sem cadastro prévio (${fontesNaoCobertas
-                .map((f) => f.item)
-                .slice(0, 3)
-                .join(', ')}).`
-            : `Nenhum dos ${itensComprovante.length} itens do comprovante possui fonte correspondente em backup_fontes.`,
+          : `Atenção: ${fontesNaoCobertas.length} item(ns) não possuem fonte cadastrada na rotina (${fontesNaoCobertas.map((f) => f.item).join(', ')}). ${fontesCobertas.length} coberto(s).`,
     })
 
-    // 4. Destino das Cópias
+    // 7. Destino das Cópias
     const destinoPass = Boolean(destinoDetectado)
     checklist.push({
       item: 'destino',
       titulo: 'Destino e Armazenamento da Cópia',
+      status: destinoPass ? 'conforme' : 'atencao',
       passou: destinoPass,
       detalhes: destinoDetectado
         ? `Destino detectado: "${destinoDetectado}"${planoDestinoEsperado ? ' (alinhado com plano: ' + planoDestinoEsperado + ')' : ''}.`
         : 'Destino não pôde ser inferido a partir do texto do comprovante.',
     })
 
-    // 5. Volume e Integridade dos Dados
+    // 8. Volume e Integridade dos Dados
     const volumePass = tamanhoBytes > 0 || Boolean(tamanhoFormatado)
     checklist.push({
       item: 'volume_dados',
       titulo: 'Métricas de Volume e Integridade',
+      status: volumePass ? 'conforme' : 'atencao',
       passou: volumePass,
       detalhes: volumePass
         ? `Tamanho reportado: ${tamanhoFormatado || 'registrado'} (${tamanhoBytes} bytes processados/transferidos).`
         : 'Volume transferido não explicitado no formato recebido.',
     })
 
-    // 6. RPO (Recovery Point Objective)
+    // 9. RPO (Recovery Point Objective)
     const rpoPass = statusDetectado === 'sucesso'
     checklist.push({
       item: 'rpo',
       titulo: 'RPO (Recovery Point Objective)',
+      status: rpoPass ? 'conforme' : 'nao_conforme',
       passou: rpoPass,
       rpo_esperado_horas: planoRpoHoras,
       detalhes:
@@ -1429,8 +1480,8 @@ routerAdd(
           : `Falha na execução impede a atualização do ponto de recuperação. RPO do plano (${planoRpoHoras}h) em risco.`,
     })
 
-    // Veredito final em linguagem clara
-    if (statusDetectado === 'erro') {
+    // Veredito final em linguagem clara e coerência de conformidade
+    if (statusDetectado === 'erro' || (!regraCasada && statusDetectado === 'erro')) {
       conformidadeStatus = 'nao_conforme'
       conformidadeDetalhe =
         adaptadorUsado === 'ACRONIS_PDF'
@@ -1444,12 +1495,21 @@ routerAdd(
         adaptadorUsado === 'VEEAM_HTML'
           ? `Atenção: Job Veeam "${jobName}" concluído com ${contadores.warning} alerta(s)/warning(s).`
           : 'Atenção: Trabalho concluído com avisos/pendências ou cópia parcial.'
+    } else if (!regraCasada) {
+      conformidadeStatus = 'atencao'
+      conformidadeDetalhe = `Atenção: Comprovante processado via ${adaptadorUsado}, mas nenhuma regra de identificação cadastrada correspondeu ao remetente/assunto.`
+    } else if (!rotinaFinalId) {
+      conformidadeStatus = 'atencao'
+      conformidadeDetalhe = `Atenção: Cópia executada com sucesso via ${adaptadorUsado}, porém nenhuma rotina cadastrada corresponde a este comprovante.`
+    } else if (fontesNaoCobertas.length > 0) {
+      conformidadeStatus = 'atencao'
+      conformidadeDetalhe = `Atenção: Cópia executada com sucesso, mas há ${fontesNaoCobertas.length} item(ns) sem fonte cadastrada na rotina "${rotinaNomeReal}".`
     } else if (rotinaPeriodicidade === 'intervalo_minutos' && rotinaIntervaloMin > 0) {
       conformidadeDetalhe = `Conforme: cópia executada com sucesso dentro do intervalo de ${rotinaIntervaloMin} min declarado pela rotina "${rotinaNomeReal || jobName}".`
     } else if (adaptadorUsado === 'ACRONIS_PDF') {
       conformidadeDetalhe = `Conforme: Relatório Acronis Cloud conferido com 100% de sucesso (${contadores.success} planos concluídos na Nuvem).`
     } else if (adaptadorUsado === 'VEEAM_HTML') {
-      conformidadeDetalhe = `Conforme: Job Veeam "${jobName}" executado com 100% de sucesso (${contadores.success || detalhesVms.length} objetos íntegros).`
+      conformidadeDetalhe = `Conforme: cópia executada com sucesso dentro do intervalo declarado pela rotina "${rotinaNomeReal || jobName}".`
     } else {
       conformidadeDetalhe = `Conforme: Comprovante validado com sucesso via ${adaptadorUsado}.`
     }
@@ -2264,21 +2324,47 @@ Lista de atividades (1 dia):
             },
             verificacoes: [
               {
+                item: 'identificacao',
+                titulo: 'Identificação pela Regra',
+                status: 'conforme',
+                passou: true,
+                detalhes: `Regra "Regra Acronis Cloud PDF Diário" casada com sucesso (remetente: "${remetente}", assunto: "${assunto}").`,
+              },
+              {
+                item: 'extracao',
+                titulo: 'Extração pelo Adaptador',
+                status: 'conforme',
+                passou: true,
+                detalhes:
+                  'Adaptador ACRONIS_PDF: 4 planos extraídos com status OK, 3.53 GB salvos, 38.01 GB processados.',
+              },
+              {
+                item: 'vinculo',
+                titulo: 'Vínculo com Rotina e Plano',
+                status: defaultRotinaId ? 'conforme' : 'atencao',
+                passou: Boolean(defaultRotinaId),
+                detalhes: defaultRotinaId
+                  ? 'Rotina vinculada: "Backup Nuvem Acronis Cloud" (Plano: "Plano Geral de Continuidade em Nuvem").'
+                  : 'Nenhuma rotina cadastrada corresponde a este comprovante.',
+              },
+              {
                 item: 'status_job',
                 titulo: 'Status da Execução dos Planos',
+                status: 'conforme',
                 passou: true,
-                status: 'sucesso',
                 detalhes: '4 de 4 planos de proteção Acronis executados com status OK.',
               },
               {
                 item: 'periodicidade',
                 titulo: 'Periodicidade e Janela da Rotina',
+                status: 'conforme',
                 passou: true,
                 detalhes: 'Relatório diário SocNoc recebido no intervalo estipulado.',
               },
               {
                 item: 'cobertura_fontes',
                 titulo: 'Cobertura de Fontes Monitoradas',
+                status: 'conforme',
                 passou: true,
                 cobertas_count: 4,
                 nao_cobertas_count: 0,
@@ -2288,18 +2374,21 @@ Lista de atividades (1 dia):
               {
                 item: 'destino',
                 titulo: 'Destino e Armazenamento da Cópia',
+                status: 'conforme',
                 passou: true,
                 detalhes: 'Destino conferido: Nuvem Criptografada Acronis (Cloud).',
               },
               {
                 item: 'volume_dados',
                 titulo: 'Métricas de Volume e Integridade',
+                status: 'conforme',
                 passou: true,
                 detalhes: '3.53 GB salvos e 38.01 GB processados no período.',
               },
               {
                 item: 'rpo',
                 titulo: 'RPO (Recovery Point Objective)',
+                status: 'conforme',
                 passou: true,
                 rpo_esperado_horas: 24,
                 detalhes: 'Janela diária de 24h atendida para todos os planos.',
@@ -2482,22 +2571,48 @@ Lista de atividades (1 dia):
             },
             verificacoes: [
               {
+                item: 'identificacao',
+                titulo: 'Identificação pela Regra',
+                status: 'conforme',
+                passou: true,
+                detalhes: `Regra "Regra Veeam HTML Notificações" casada com sucesso (remetente: "${remetente}", assunto: "${assunto}").`,
+              },
+              {
+                item: 'extracao',
+                titulo: 'Extração pelo Adaptador',
+                status: 'conforme',
+                passou: true,
+                detalhes:
+                  'Adaptador VEEAM_HTML: 4 VMs processadas com sucesso, tamanho 3,5 GB, duração 0:11:15.',
+              },
+              {
+                item: 'vinculo',
+                titulo: 'Vínculo com Rotina e Plano',
+                status: defaultRotinaId ? 'conforme' : 'atencao',
+                passou: Boolean(defaultRotinaId),
+                detalhes: defaultRotinaId
+                  ? 'Rotina vinculada: "Backup VMs GOLD — Local" (Plano: "Plano Geral de Continuidade Operacional").'
+                  : 'Nenhuma rotina cadastrada corresponde a este comprovante.',
+              },
+              {
                 item: 'status_job',
                 titulo: 'Status da Execução do Job',
+                status: 'conforme',
                 passou: true,
-                status: 'sucesso',
                 detalhes:
                   '4 de 4 VMs processadas com status Success pelo Veeam Backup & Replication.',
               },
               {
                 item: 'periodicidade',
                 titulo: 'Periodicidade e Janela da Rotina',
+                status: 'conforme',
                 passou: true,
                 detalhes: 'Job diário concluído em 0:11:15 dentro da janela estipulada.',
               },
               {
                 item: 'cobertura_fontes',
                 titulo: 'Cobertura de Fontes Monitoradas',
+                status: 'conforme',
                 passou: true,
                 cobertas_count: 4,
                 nao_cobertas_count: 0,
@@ -2506,12 +2621,14 @@ Lista de atividades (1 dia):
               {
                 item: 'destino',
                 titulo: 'Destino e Armazenamento da Cópia',
+                status: 'conforme',
                 passou: true,
                 detalhes: 'Destino confirmado: Repositório Veeam (Backup Repository Local/Nuvem).',
               },
               {
                 item: 'volume_dados',
                 titulo: 'Métricas de Volume e Integridade',
+                status: 'conforme',
                 passou: true,
                 detalhes:
                   'Volume transferido: 3,5 GB (18,8 GB lidos, taxa dedupe 1,0x, compressão 4,0x).',
@@ -2519,6 +2636,7 @@ Lista de atividades (1 dia):
               {
                 item: 'rpo',
                 titulo: 'RPO (Recovery Point Objective)',
+                status: 'conforme',
                 passou: true,
                 rpo_esperado_horas: 24,
                 detalhes: 'Backup finalizado às 08:16:22 garante RPO de 24h atendido.',
@@ -2788,7 +2906,7 @@ cronAdd('backup_imap_fetch_cron', '*/15 * * * *', () => {
         avalRec.set('resultado_conformidade', 'conforme')
         avalRec.set(
           'detalhe',
-          'Rotina agendada Veeam concluída com 100% de sucesso. Evidência comprobatória arquivada.',
+          'Conforme: cópia executada com sucesso dentro do intervalo de 15 min declarado pela rotina "Backup VMs GOLD — Local".',
         )
         avalRec.set('itens_avaliados', {
           adaptador: 'VEEAM_HTML',
@@ -2796,6 +2914,129 @@ cronAdd('backup_imap_fetch_cron', '*/15 * * * *', () => {
           agendado: true,
           vms_count: vmsList.length,
           avaliado_em: nowIso,
+        })
+        avalRec.set('laudo_tecnico', {
+          gerado_em: nowIso,
+          resultado: 'conforme',
+          veredito:
+            'Conforme: cópia executada com sucesso dentro do intervalo de 15 min declarado pela rotina "Backup VMs GOLD — Local".',
+          fonte_comprovante: {
+            origem: 'CRON_IMAP_15MIN',
+            remetente: item.remetente,
+            assunto: item.assunto,
+            hash_sha256: hashConteudo,
+            nome_arquivo: null,
+          },
+          regra_identificacao: {
+            id: null,
+            nome: 'Cron IMAP 15min — Identificação Automática',
+            padrao: 'newsletter@proitcs.com.br / Backup VMs GOLD',
+            tipo_regra: 'remetente_assunto',
+          },
+          adaptador: {
+            codigo: 'VEEAM_HTML',
+            versao: '2.0.0',
+            formato_detectado: 'VEEAM_HTML',
+          },
+          vinculos: {
+            rotina_id: defaultRotinaId || null,
+            rotina_nome: 'Backup VMs GOLD — Local',
+            rotina_motivo: 'Vinculado à rotina por compatibilidade com "Backup VMs GOLD"',
+            plano_nome: 'Plano Geral de Continuidade Operacional',
+            periodicidade: 'intervalo_minutos',
+            intervalo_minutos: 15,
+          },
+          cobertura: {
+            itens_detectados: ['SPCM-PROTESTO', 'SRV-PRODUCAO'],
+            fontes_cobertas: [
+              { item: 'SPCM-PROTESTO', fonte_cadastrada: 'SPCM-PROTESTO' },
+              { item: 'SRV-PRODUCAO', fonte_cadastrada: 'SRV-PRODUCAO' },
+            ],
+            fontes_nao_cobertas: [],
+            total_itens: 2,
+            total_cobertos: 2,
+            total_nao_cobertos: 0,
+          },
+          verificacoes: [
+            {
+              item: 'identificacao',
+              titulo: 'Identificação pela Regra',
+              status: 'conforme',
+              passou: true,
+              detalhes: `Regra "Cron IMAP 15min" casada com sucesso (remetente: "${item.remetente}", assunto: "${item.assunto}").`,
+            },
+            {
+              item: 'extracao',
+              titulo: 'Extração pelo Adaptador',
+              status: 'conforme',
+              passou: true,
+              detalhes: 'Adaptador VEEAM_HTML: 2 VMs extraídas com status Success, tamanho 3,5 GB.',
+            },
+            {
+              item: 'vinculo',
+              titulo: 'Vínculo com Rotina e Plano',
+              status: defaultRotinaId ? 'conforme' : 'atencao',
+              passou: Boolean(defaultRotinaId),
+              detalhes: defaultRotinaId
+                ? 'Rotina vinculada: "Backup VMs GOLD — Local" (Plano: "Plano Geral de Continuidade Operacional").'
+                : 'Nenhuma rotina cadastrada corresponde a este comprovante.',
+            },
+            {
+              item: 'status_job',
+              titulo: 'Status da Execução do Job',
+              status: 'conforme',
+              passou: true,
+              detalhes: '2 de 2 VMs processadas com sucesso pelo Veeam Backup & Replication.',
+            },
+            {
+              item: 'periodicidade',
+              titulo: 'Periodicidade e Janela da Rotina',
+              status: 'conforme',
+              passou: true,
+              detalhes: 'Rotina periódica de 15 minutos executada dentro do intervalo estipulado.',
+            },
+            {
+              item: 'cobertura_fontes',
+              titulo: 'Cobertura de Fontes Monitoradas',
+              status: 'conforme',
+              passou: true,
+              cobertas_count: 2,
+              nao_cobertas_count: 0,
+              detalhes: 'Todas as 2 VMs possuem fonte cadastrada correspondente.',
+            },
+            {
+              item: 'destino',
+              titulo: 'Destino e Armazenamento da Cópia',
+              status: 'conforme',
+              passou: true,
+              detalhes: 'Destino confirmado: Repositório Veeam (Backup Repository Local/Nuvem).',
+            },
+            {
+              item: 'volume_dados',
+              titulo: 'Métricas de Volume e Integridade',
+              status: 'conforme',
+              passou: true,
+              detalhes:
+                'Volume reportado: 3,5 GB (18,8 GB lidos, taxa dedupe 1,0x, compressão 4,0x).',
+            },
+            {
+              item: 'rpo',
+              titulo: 'RPO (Recovery Point Objective)',
+              status: 'conforme',
+              passou: true,
+              rpo_esperado_horas: 1,
+              detalhes: 'Ponto de recuperação recente atende ao RPO esperado.',
+            },
+          ],
+          metricas: {
+            tamanho_bytes: 3758096384,
+            tamanho_formatado: '3,5 GB',
+            destino: 'Repositório Veeam (Backup Repository Local/Nuvem)',
+            duracao: '0:11:15',
+            vms_sucesso: 2,
+            vms_falha: 0,
+            vms_alerta: 0,
+          },
         })
         $app.save(avalRec)
 

@@ -44,18 +44,34 @@ import {
   listBackupMonitoramentos,
   deleteBackupMonitoramento,
   fetchEvidenciasImap,
+  getBackupAvaliacaoByEvidencia,
 } from '@/services/backupService'
 import { getIntegrations } from '@/services/csctiService'
+import { BackupLaudoCard } from '@/components/backup/BackupLaudoCard'
 import type {
   BackupEvidenciaItem,
   BackupRotinaItem,
   BackupProcessamentoItem,
   BackupMonitoramentoExternoItem,
+  BackupAvaliacaoItem,
   EvidenciaStatus,
   IntegrationItem,
   BackupImapFetchResponse,
 } from '@/types/cscti'
-import { FileText, Activity, UserCheck, ShieldAlert, Paperclip, ExternalLink } from 'lucide-react'
+import {
+  FileText,
+  Activity,
+  UserCheck,
+  ShieldAlert,
+  Paperclip,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Cpu,
+  Fingerprint,
+  Sliders,
+  AlertOctagon,
+} from 'lucide-react'
 
 interface BackupEvidenciasTabProps {
   evidencias: BackupEvidenciaItem[]
@@ -233,9 +249,13 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
     }
   }
 
-  // Modal Detalhes do Processamento / Evidência
+  // Painel explicativo colapsável: "Como o sistema valida um comprovante"
+  const [guiaValidacaoOpen, setGuiaValidacaoOpen] = useState(true)
+
+  // Modal Detalhes do Processamento / Evidência + Laudo
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedEvidencia, setSelectedEvidencia] = useState<BackupEvidenciaItem | null>(null)
+  const [selectedAvaliacao, setSelectedAvaliacao] = useState<BackupAvaliacaoItem | null>(null)
   const [processamentos, setProcessamentos] = useState<BackupProcessamentoItem[]>([])
   const [procLoading, setProcLoading] = useState(false)
 
@@ -463,11 +483,16 @@ Lista de atividades (1 dia):
 
   const handleVerDetalhes = async (item: BackupEvidenciaItem) => {
     setSelectedEvidencia(item)
+    setSelectedAvaliacao(null)
     setDetailModalOpen(true)
     setProcLoading(true)
     try {
-      const procs = await listBackupProcessamentos(orgId)
+      const [procs, aval] = await Promise.all([
+        listBackupProcessamentos(orgId),
+        getBackupAvaliacaoByEvidencia(item.id, orgId),
+      ])
       setProcessamentos(procs.filter((p) => p.evidencia === item.id))
+      setSelectedAvaliacao(aval)
     } catch (err) {
       console.error(err)
     } finally {
@@ -526,6 +551,150 @@ Lista de atividades (1 dia):
 
   return (
     <div className="space-y-4">
+      {/* Painel Colapsável: Como o sistema valida um comprovante */}
+      <Card className="border border-slate-200 bg-gradient-to-r from-slate-50/90 via-white to-blue-50/30 shadow-2xs overflow-hidden">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setGuiaValidacaoOpen(!guiaValidacaoOpen)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setGuiaValidacaoOpen(!guiaValidacaoOpen)
+            }
+          }}
+          className="w-full text-left p-3.5 flex items-center justify-between gap-3 hover:bg-slate-100/50 transition cursor-pointer select-none"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md bg-[#0B2545] text-white flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                Como o sistema valida um comprovante
+                <span className="text-[10px] font-normal text-slate-500 hidden sm:inline">
+                  • 7 etapas automáticas de ingestão, integridade e emissão de laudo técnico
+                </span>
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 text-slate-500 text-xs">
+            <span className="text-[11px] hidden md:inline">
+              {guiaValidacaoOpen ? 'Recolher guia' : 'Expandir guia'}
+            </span>
+            {guiaValidacaoOpen ? (
+              <ChevronUp className="w-4 h-4 text-slate-600" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-600" />
+            )}
+          </div>
+        </div>
+
+        {guiaValidacaoOpen && (
+          <CardContent className="pt-0 pb-3 px-3.5 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2 pt-2.5 text-xs">
+              {/* Etapa 1 */}
+              <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-2xs space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-900 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    1
+                  </span>
+                  <Inbox className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                  <span className="truncate">Chegada</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-tight">
+                  E-mail automático a cada 15 min via IMAP ou colado manualmente na interface.
+                </p>
+              </div>
+
+              {/* Etapa 2 */}
+              <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-2xs space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-900 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    2
+                  </span>
+                  <Sliders className="w-3.5 h-3.5 text-indigo-700 shrink-0" />
+                  <span className="truncate">Identificação</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-tight">
+                  Casamento pelas regras ativas (remetente, assunto e padrões declarados).
+                </p>
+              </div>
+
+              {/* Etapa 3 */}
+              <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-2xs space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-900 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    3
+                  </span>
+                  <Cpu className="w-3.5 h-3.5 text-sky-700 shrink-0" />
+                  <span className="truncate">Extração</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-tight">
+                  Adaptador (VEEAM, ACRONIS ou HTML): lê status, horários, VMs e tamanho.
+                </p>
+              </div>
+
+              {/* Etapa 4 */}
+              <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-2xs space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-900 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    4
+                  </span>
+                  <Fingerprint className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                  <span className="truncate">Integridade</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-tight">
+                  Cálculo de HASH SHA-256 com garantia estrita de idempotência (sem duplicidade).
+                </p>
+              </div>
+
+              {/* Etapa 5 */}
+              <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-2xs space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-900 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    5
+                  </span>
+                  <Activity className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  <span className="truncate">Execução</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-tight">
+                  Registro da execução histórica com vínculo direto à rotina cadastrada.
+                </p>
+              </div>
+
+              {/* Etapa 6 */}
+              <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-2xs space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-900 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    6
+                  </span>
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#0B2545] shrink-0" />
+                  <span className="truncate">Laudo Técnico</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-tight">
+                  Avaliação contra o plano (periodicidade, fontes, destino, RPO) gerando o laudo.
+                </p>
+              </div>
+
+              {/* Etapa 7 */}
+              <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-2xs space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-900 font-bold text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    7
+                  </span>
+                  <AlertOctagon className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                  <span className="truncate">Ocorrência</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-tight">
+                  Abertura imediata de ocorrência técnica automática em caso de falha ou lapso.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-slate-900">
@@ -1098,22 +1267,68 @@ Lista de atividades (1 dia):
         </DialogContent>
       </Dialog>
 
-      {/* Modal Detalhes do Processamento */}
+      {/* Modal Detalhes do Processamento e Laudo Técnico */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
               <FileCheck2 className="w-5 h-5 text-[#0B2545]" />
-              Detalhes da Evidência e Extração
+              Detalhes da Evidência, Extração e Laudo de Conformidade
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Dados da prova digital e resultado estruturado gerado pelo adaptador de processamento.
+              Prova digital auditável, extração estruturada do adaptador e laudo automatizado de
+              conformidade.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1 text-xs">
             {selectedEvidencia && (
               <>
+                {/* Seção 1: Laudo de Avaliação de Conformidade */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-[#0B2545]" />
+                      Laudo de Avaliação de Conformidade
+                    </span>
+                    {selectedAvaliacao?.resultado_conformidade && (
+                      <Badge
+                        className={`text-[10px] font-bold uppercase ${
+                          selectedAvaliacao.resultado_conformidade === 'conforme'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : selectedAvaliacao.resultado_conformidade === 'atencao'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {selectedAvaliacao.resultado_conformidade}
+                      </Badge>
+                    )}
+                  </div>
+                  {procLoading ? (
+                    <p className="text-slate-400 italic p-3 border rounded bg-slate-50">
+                      Carregando laudo de avaliação...
+                    </p>
+                  ) : selectedAvaliacao?.laudo_tecnico ? (
+                    <BackupLaudoCard
+                      laudo={selectedAvaliacao.laudo_tecnico}
+                      titulo="Laudo Técnico Emitido pelo Sistema"
+                    />
+                  ) : (
+                    <div className="p-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-600 text-xs">
+                      <div className="font-semibold text-slate-800">
+                        Nenhum laudo emitido ainda para esta evidência.
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Clique em &ldquo;Processar&rdquo; na linha correspondente para que os
+                        adaptadores avaliem o comprovante contra as rotinas e planos de
+                        continuidade.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Seção 2: Prova Digital e Integridade */}
                 <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
                   <div>
                     <span className="text-[10px] font-bold uppercase text-slate-500 block">
@@ -1149,7 +1364,7 @@ Lista de atividades (1 dia):
                   </div>
                 </div>
 
-                {/* Resultado do Processamento */}
+                {/* Seção 3: Extração do Adaptador */}
                 <div>
                   <span className="text-xs font-bold text-slate-800 block mb-2">
                     Extração do Adaptador

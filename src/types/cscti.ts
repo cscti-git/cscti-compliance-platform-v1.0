@@ -473,6 +473,77 @@ export interface BackupExecucaoItem {
   }
 }
 
+export interface BackupVerificacaoItem {
+  item:
+    | 'identificacao'
+    | 'extracao'
+    | 'vinculo'
+    | 'status_job'
+    | 'periodicidade'
+    | 'cobertura_fontes'
+    | 'destino'
+    | 'volume_dados'
+    | 'rpo'
+    | string
+  titulo: string
+  status: 'conforme' | 'nao_conforme' | 'atencao'
+  passou: boolean
+  detalhes: string
+  cobertas_count?: number
+  nao_cobertas_count?: number
+  rpo_esperado_horas?: number
+}
+
+export interface BackupLaudoTecnico {
+  gerado_em?: string
+  resultado: 'conforme' | 'nao_conforme' | 'atencao'
+  veredito: string
+  fonte_comprovante?: {
+    origem?: string
+    remetente?: string
+    assunto?: string
+    hash_sha256?: string
+    nome_arquivo?: string | null
+  }
+  regra_identificacao?: {
+    id?: string | null
+    nome?: string
+    padrao?: string
+    tipo_regra?: string
+  }
+  adaptador?: {
+    codigo?: string
+    versao?: string
+    formato_detectado?: string
+  }
+  vinculos?: {
+    rotina_id?: string | null
+    rotina_nome?: string
+    rotina_motivo?: string
+    plano_nome?: string
+    periodicidade?: string
+    intervalo_minutos?: number
+  }
+  cobertura?: {
+    itens_detectados?: string[]
+    fontes_cobertas?: Array<{ item: string; fonte_cadastrada?: string }>
+    fontes_nao_cobertas?: Array<{ item: string; motivo?: string }>
+    total_itens?: number
+    total_cobertos?: number
+    total_nao_cobertos?: number
+  }
+  verificacoes?: BackupVerificacaoItem[]
+  metricas?: {
+    tamanho_bytes?: number
+    tamanho_formatado?: string
+    destino?: string
+    duracao?: string | null
+    vms_sucesso?: number
+    vms_falha?: number
+    vms_alerta?: number
+  }
+}
+
 export interface BackupAvaliacaoItem {
   id: string
   organization: string
@@ -480,6 +551,7 @@ export interface BackupAvaliacaoItem {
   resultado_conformidade: 'conforme' | 'nao_conforme' | 'atencao'
   detalhe?: string
   itens_avaliados?: Record<string, unknown>
+  laudo_tecnico?: BackupLaudoTecnico
   created?: string
   updated?: string
   expand?: {
