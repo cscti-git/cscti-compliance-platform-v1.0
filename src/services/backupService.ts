@@ -777,3 +777,28 @@ export async function deleteBackupMonitoramento(
   })
   return true
 }
+
+export async function excluirBackupExecucoes(payload: {
+  execucaoId?: string
+  execucaoIds?: string[]
+  motivo: string
+  confirmacao: boolean
+}): Promise<{ success: boolean; message: string; removidos: number }> {
+  const body = {
+    ...payload,
+    justificativa: payload.motivo,
+  }
+  const res = await pb.send<{ ok?: boolean; excluidas?: number; message?: string }>(
+    '/backend/v1/backup/execucoes/excluir',
+    {
+      method: 'POST',
+      body,
+    },
+  )
+  const removidos = res?.excluidas ?? (payload.execucaoIds?.length || (payload.execucaoId ? 1 : 0))
+  return {
+    success: true,
+    message: res?.message || `${removidos} execução(ões) excluída(s) com sucesso.`,
+    removidos,
+  }
+}

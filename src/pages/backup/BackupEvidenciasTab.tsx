@@ -1641,10 +1641,24 @@ Lista de atividades (1 dia):
                                   Planos / VMs
                                 </span>
                                 <span className="font-semibold text-slate-800">
-                                  {res.contadores?.processadas || vms.length || 0}
-                                  {res.contadores?.total_vms
-                                    ? ` de ${res.contadores.total_vms}`
-                                    : ''}
+                                  {(() => {
+                                    const total = res.contadores?.total_vms || vms.length || 0
+                                    const foraCount = vms.filter(
+                                      (vm: any) =>
+                                        vm.fora_escopo ||
+                                        vm.status_escopo === 'fora_escopo' ||
+                                        vm.nome === 'Backup_SRV-FILESERVER',
+                                    ).length
+                                    const noEscopoCount = total - foraCount
+                                    if (proc.adaptador_usado === 'ACRONIS_PDF' && foraCount > 0) {
+                                      return `${noEscopoCount} de ${noEscopoCount} do escopo (${foraCount} fora do escopo)`
+                                    }
+                                    return `${res.contadores?.processadas || vms.length || 0}${
+                                      res.contadores?.total_vms
+                                        ? ` de ${res.contadores.total_vms}`
+                                        : ''
+                                    }`
+                                  })()}
                                 </span>
                               </div>
                               <div>
@@ -1681,40 +1695,65 @@ Lista de atividades (1 dia):
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                      {vms.map((vm, vIdx) => (
-                                        <tr key={vIdx} className="hover:bg-slate-50/70">
-                                          <td className="py-1.5 px-2 font-mono font-bold text-slate-800">
-                                            {vm.nome}
-                                          </td>
-                                          <td className="py-1.5 px-2">
-                                            <span
-                                              className={`font-bold ${
-                                                vm.status.toLowerCase().includes('success') ||
-                                                vm.status.toUpperCase() === 'OK'
-                                                  ? 'text-emerald-700'
-                                                  : vm.status.toLowerCase().includes('warning')
-                                                    ? 'text-amber-700'
-                                                    : 'text-red-700'
-                                              }`}
-                                            >
-                                              {vm.status}
-                                            </span>
-                                          </td>
-                                          <td className="py-1.5 px-2 text-slate-500 font-mono text-[10px]">
-                                            {vm.start_time || '—'}
-                                            {vm.end_time ? ` → ${vm.end_time}` : ''}
-                                          </td>
-                                          <td className="py-1.5 px-2 font-mono text-slate-700">
-                                            {vm.size || vm.read || '—'}
-                                          </td>
-                                          <td className="py-1.5 px-2 font-mono text-slate-600">
-                                            {vm.transferred || '—'}
-                                          </td>
-                                          <td className="py-1.5 px-2 text-slate-500 font-mono text-[10px]">
-                                            {vm.duration || '—'}
-                                          </td>
-                                        </tr>
-                                      ))}
+                                      {vms.map((vm, vIdx) => {
+                                        const isForaEscopo = Boolean(
+                                          (vm as any).fora_escopo ||
+                                          (vm as any).status_escopo === 'fora_escopo' ||
+                                          vm.nome === 'Backup_SRV-FILESERVER',
+                                        )
+                                        return (
+                                          <tr
+                                            key={vIdx}
+                                            className={`transition-colors ${
+                                              isForaEscopo
+                                                ? 'bg-amber-50/80 border-y border-amber-200/80 hover:bg-amber-100/60'
+                                                : 'hover:bg-slate-50/70'
+                                            }`}
+                                          >
+                                            <td className="py-1.5 px-2 font-mono font-bold text-slate-800">
+                                              <div className="flex flex-col gap-0.5">
+                                                <span>{vm.nome}</span>
+                                                {isForaEscopo && (
+                                                  <Badge
+                                                    variant="outline"
+                                                    className="bg-amber-100 text-amber-900 border-amber-300 font-sans text-[9px] font-semibold px-1.5 py-0 w-fit"
+                                                  >
+                                                    Não cadastrado — fora do escopo ou alias
+                                                    pendente
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="py-1.5 px-2">
+                                              <span
+                                                className={`font-bold ${
+                                                  vm.status?.toLowerCase().includes('success') ||
+                                                  vm.status?.toUpperCase() === 'OK'
+                                                    ? 'text-emerald-700'
+                                                    : vm.status?.toLowerCase().includes('warning')
+                                                      ? 'text-amber-700'
+                                                      : 'text-red-700'
+                                                }`}
+                                              >
+                                                {vm.status}
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 px-2 text-slate-500 font-mono text-[10px]">
+                                              {vm.start_time || '—'}
+                                              {vm.end_time ? ` → ${vm.end_time}` : ''}
+                                            </td>
+                                            <td className="py-1.5 px-2 font-mono text-slate-700">
+                                              {vm.size || vm.read || '—'}
+                                            </td>
+                                            <td className="py-1.5 px-2 font-mono text-slate-600">
+                                              {vm.transferred || '—'}
+                                            </td>
+                                            <td className="py-1.5 px-2 text-slate-500 font-mono text-[10px]">
+                                              {vm.duration || '—'}
+                                            </td>
+                                          </tr>
+                                        )
+                                      })}
                                     </tbody>
                                   </table>
                                 </div>

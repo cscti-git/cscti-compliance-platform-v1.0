@@ -30,9 +30,14 @@ import {
   FileCheck,
   Layers,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { saveBackupExecucao, getBackupAvaliacaoByExecucao } from '@/services/backupService'
+import {
+  saveBackupExecucao,
+  getBackupAvaliacaoByExecucao,
+  excluirBackupExecucoes,
+} from '@/services/backupService'
 import { BackupLaudoCard } from '@/components/backup/BackupLaudoCard'
 import type {
   BackupExecucaoItem,
@@ -64,6 +69,89 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
     jobName: string
     vms: NonNullable<BackupExecucaoItem['detalhes_vms']>
   } | null>(null)
+
+  // Seleção e Exclusão de Execuções
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [execucoesParaExcluir, setExecucoesParaExcluir] = useState<BackupExecucaoItem[]>([])
+  const [motivoExclusao, setMotivoExclusao] = useState('')
+  const [confirmacaoCiencia, setConfirmacaoCiencia] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(execucoes.map((e) => e.id))
+    } else {
+      setSelectedIds([])
+    }
+  }
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    )
+  }
+
+  const handleOpenDeleteSingle = (exec: BackupExecucaoItem) => {
+    setExecucoesParaExcluir([exec])
+    setMotivoExclusao('')
+    setConfirmacaoCiencia(false)
+    setDeleteModalOpen(true)
+  }
+
+  const handleOpenDeleteBatch = () => {
+    const itens = execucoes.filter((e) => selectedIds.includes(e.id))
+    setExecucoesParaExcluir(itens)
+    setMotivoExclusao('')
+    setConfirmacaoCiencia(false)
+    setDeleteModalOpen(true)
+  }
+
+  const handleConfirmExclusao = async () => {
+    if (!motivoExclusao.trim() || motivoExclusao.trim().length < 10) {
+      toast({
+        title: 'Motivo obrigatório',
+        description: 'Informe uma justificativa com no mínimo 10 caracteres para auditoria.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (!confirmacaoCiencia) {
+      toast({
+        title: 'Confirmação necessária',
+        description: 'Confirme a ciência da exclusão permanente e registro na trilha de auditoria.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const ids = execucoesParaExcluir.map((e) => e.id)
+      const payload =
+        ids.length === 1
+          ? { execucaoId: ids[0], motivo: motivoExclusao.trim(), confirmacao: true }
+          : { execucaoIds: ids, motivo: motivoExclusao.trim(), confirmacao: true }
+
+      const res = await excluirBackupExecucoes(payload)
+      toast({
+        title: 'Execução(ões) excluída(s)',
+        description: res.message || `${res.removidos} execução(ões) removida(s) com sucesso.`,
+      })
+      setSelectedIds([])
+      setExecucoesParaExcluir([])
+      setDeleteModalOpen(false)
+      onReload()
+    } catch (err: unknown) {
+      toast({
+        title: 'Falha ao excluir execução',
+        description: err instanceof Error ? err.message : 'Erro ao processar exclusão no backend.',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // Modal Laudo Técnico da Execução
   const [laudoModalOpen, setLaudoModalOpen] = useState(false)
@@ -196,13 +284,26 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
         </div>
 
         {canOperate && (
-          <Button
-            onClick={handleOpenNova}
-            size="sm"
-            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs shrink-0 self-start sm:self-center"
-          >
-            <Plus className="w-4 h-4" /> Lançar Execução Manual
-          </Button>
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+            {selectedIds.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleOpenDeleteBatch}
+                className="text-xs font-semibold gap-1.5 shadow-xs bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Excluir Selecionadas ({selectedIds.length})
+              </Button>
+            )}
+            <Button
+              onClick={handleOpenNova}
+              size="sm"
+              className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs"
+            >
+              <Plus className="w-4 h-4" /> Lançar Execução Manual
+            </Button>
+          </div>
         )}
       </div>
 
@@ -212,6 +313,17 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase text-[10px]">
+                  {canOperate && (
+                    <th className="py-2.5 px-3 w-8 text-center">
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 text-[#0B2545] focus:ring-[#0B2545] h-3.5 w-3.5 cursor-pointer align-middle"
+                        title="Selecionar todas as execuções"
+                        checked={execucoes.length > 0 && selectedIds.length === execucoes.length}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                      />
+                    </th>
+                  )}
                   <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3">Rotina de Origem</th>
                   <th className="py-2.5 px-3">Início / Término</th>
@@ -219,19 +331,37 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
                   <th className="py-2.5 px-3">Destino</th>
                   <th className="py-2.5 px-3">Origem</th>
                   <th className="py-2.5 px-3">Observações / Parecer</th>
-                  <th className="py-2.5 px-3 text-right">Laudo</th>
+                  <th className="py-2.5 px-3 text-right">Laudo / Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {execucoes.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500 italic">
+                    <td
+                      colSpan={canOperate ? 9 : 8}
+                      className="py-8 text-center text-slate-500 italic"
+                    >
                       Nenhuma execução registrada no histórico da serventia.
                     </td>
                   </tr>
                 ) : (
                   execucoes.map((exec) => (
-                    <tr key={exec.id} className="hover:bg-slate-50/70 transition">
+                    <tr
+                      key={exec.id}
+                      className={`hover:bg-slate-50/70 transition ${
+                        selectedIds.includes(exec.id) ? 'bg-blue-50/40' : ''
+                      }`}
+                    >
+                      {canOperate && (
+                        <td className="py-2.5 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-300 text-[#0B2545] focus:ring-[#0B2545] h-3.5 w-3.5 cursor-pointer align-middle"
+                            checked={selectedIds.includes(exec.id)}
+                            onChange={() => handleToggleSelect(exec.id)}
+                          />
+                        </td>
+                      )}
                       <td className="py-2.5 px-3">{getStatusBadge(exec.status)}</td>
                       <td className="py-2.5 px-3 font-semibold text-slate-900">
                         {exec.expand?.rotina?.nome || 'Rotina Geral'}
@@ -278,15 +408,28 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
                         </div>
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenLaudo(exec)}
-                          className="h-7 px-2.5 text-xs text-[#0B2545] border-slate-300 hover:bg-slate-100 font-semibold gap-1"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5 text-[#0B2545]" />
-                          Ver Laudo
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenLaudo(exec)}
+                            className="h-7 px-2.5 text-xs text-[#0B2545] border-slate-300 hover:bg-slate-100 font-semibold gap-1"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#0B2545]" />
+                            Ver Laudo
+                          </Button>
+                          {canOperate && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenDeleteSingle(exec)}
+                              className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                              title="Excluir execução do histórico"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -583,6 +726,121 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Confirmação de Exclusão de Execuções */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-red-700">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              Confirmar Exclusão de Execução de Backup
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-600">
+              Esta ação removerá o registro de execução, suas avaliações automatizadas em cascata e
+              desvinculará eventuais ocorrências. Todos os passos serão auditados de forma
+              permanente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 py-2 text-xs">
+            {/* Resumo do que será excluído */}
+            <div className="p-3 rounded-lg border border-red-100 bg-red-50/50 space-y-2">
+              <div className="font-semibold text-slate-900 flex items-center justify-between">
+                <span>
+                  Resumo ({execucoesParaExcluir.length}{' '}
+                  {execucoesParaExcluir.length === 1 ? 'registro' : 'registros'})
+                </span>
+                <span className="text-[11px] font-mono text-red-700">Ação irreversível</span>
+              </div>
+              <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 divide-y divide-red-100/60">
+                {execucoesParaExcluir.map((e) => (
+                  <div
+                    key={e.id}
+                    className="pt-1.5 first:pt-0 text-[11px] text-slate-700 space-y-0.5"
+                  >
+                    <div className="font-medium text-slate-900 flex items-center justify-between">
+                      <span>{e.expand?.rotina?.nome || 'Rotina Geral'}</span>
+                      <span className="font-mono text-[10px] text-slate-500">
+                        {e.tamanho_formatado || 'Tamanho n/d'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                      <span>
+                        Data:{' '}
+                        {e.data_inicio
+                          ? new Date(e.data_inicio).toLocaleString('pt-BR')
+                          : 'Data n/d'}
+                      </span>
+                      <span>•</span>
+                      <span>Origem: {e.origem_registro}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Justificativa obrigatória */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="font-semibold text-slate-800">
+                  Justificativa da Exclusão <span className="text-red-500">*</span>
+                </label>
+                <span
+                  className={`text-[10px] font-mono ${
+                    motivoExclusao.trim().length >= 10 ? 'text-emerald-600' : 'text-slate-400'
+                  }`}
+                >
+                  {motivoExclusao.trim().length}/10 caracteres mín.
+                </span>
+              </div>
+              <Textarea
+                rows={3}
+                placeholder="Descreva o motivo técnico ou operacional para remoção deste(s) registro(s)..."
+                value={motivoExclusao}
+                onChange={(e) => setMotivoExclusao(e.target.value)}
+                className="text-xs resize-none"
+              />
+            </div>
+
+            {/* Checkbox de ciência */}
+            <label className="flex items-start gap-2 p-2.5 rounded border border-slate-200 bg-slate-50/70 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={confirmacaoCiencia}
+                onChange={(e) => setConfirmacaoCiencia(e.target.checked)}
+                className="mt-0.5 rounded border-slate-300 text-red-600 focus:ring-red-500 h-4 w-4 cursor-pointer"
+              />
+              <span className="text-[11px] text-slate-700 leading-tight">
+                Estou ciente de que esta exclusão é permanente, remove laudos técnicos associados e
+                será registrada com meu usuário e justificativa na trilha de auditoria do sistema.
+              </span>
+            </label>
+          </div>
+
+          <DialogFooter className="pt-2 border-t border-slate-100 gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteModalOpen(false)}
+              disabled={deleting}
+              className="text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleConfirmExclusao}
+              disabled={deleting || motivoExclusao.trim().length < 10 || !confirmacaoCiencia}
+              className="text-xs bg-red-600 hover:bg-red-700 font-semibold"
+            >
+              {deleting ? 'Excluindo...' : 'Confirmar e Excluir'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

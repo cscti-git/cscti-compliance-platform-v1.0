@@ -1226,36 +1226,26 @@ routerAdd(
       itensComprovante.push(jobName)
     }
 
-    const fontesCobertas = []
-    const fontesNaoCobertas = []
-    for (let icI = 0; icI < itensComprovante.length; icI++) {
-      const itName = itensComprovante[icI]
-      const itNameLower = itName.toLowerCase()
-      let achouFonte = false
-      let fonteNomeMatch = ''
-      for (let fcI = 0; fcI < fontesCadastradas.length; fcI++) {
-        const fc = fontesCadastradas[fcI]
-        const fPath = (fc.getString('caminho_identificacao') || '').toLowerCase()
-        const fName = (fc.getString('nome') || '').toLowerCase()
-        if (
-          fPath.includes(itNameLower) ||
-          itNameLower.includes(fPath) ||
-          fName.includes(itNameLower) ||
-          itNameLower.includes(fName)
-        ) {
-          achouFonte = true
-          fonteNomeMatch = fc.getString('nome')
-          break
+    const matchResult = vinculoMod.casarItensComFontes(itensComprovante, fontesCadastradas)
+    const fontesCobertas = matchResult.fontesCobertas
+    const fontesNaoCobertas = matchResult.fontesNaoCobertas
+
+    // Marcar nos detalhesVms se o item está fora do escopo cadastrado
+    if (detalhesVms && detalhesVms.length > 0) {
+      for (let dvI = 0; dvI < detalhesVms.length; dvI++) {
+        const dvNome = detalhesVms[dvI].nome
+        const isNaoCoberto = fontesNaoCobertas.some((fnc) => fnc.item === dvNome)
+        if (isNaoCoberto) {
+          detalhesVms[dvI].fora_escopo = true
+          detalhesVms[dvI].status_escopo = 'fora_escopo'
+          detalhesVms[dvI].motivo_escopo = 'Não cadastrado — fora do escopo ou alias pendente'
+        } else {
+          detalhesVms[dvI].fora_escopo = false
+          detalhesVms[dvI].status_escopo = 'coberto'
         }
       }
-      if (achouFonte) {
-        fontesCobertas.push({ item: itName, fonte_cadastrada: fonteNomeMatch })
-      } else {
-        fontesNaoCobertas.push({
-          item: itName,
-          motivo: 'Nenhuma fonte ativa cadastrada com este identificador',
-        })
-      }
+      execRec.set('detalhes_vms', detalhesVms)
+      $app.save(execRec)
     }
 
     const checklist = []
@@ -1424,6 +1414,10 @@ routerAdd(
     } else if (!regraCasada) {
       conformidadeStatus = 'atencao'
       conformidadeDetalhe = `Atenção: Comprovante processado via ${adaptadorUsado}, mas nenhuma regra de identificação cadastrada correspondeu ao remetente/assunto.`
+    } else if (adaptadorUsado === 'ACRONIS_PDF' && fontesNaoCobertas.length > 0) {
+      conformidadeStatus = 'atencao'
+      const naoCobertasNomes = fontesNaoCobertas.map((f) => f.item).join(', ')
+      conformidadeDetalhe = `Atenção: ${fontesCobertas.length} de ${fontesCobertas.length} planos do escopo atendidos com sucesso, mas o comprovante contém ${fontesNaoCobertas.length} máquina não cadastrada (${naoCobertasNomes}). Cadastre a fonte/alias correspondente em Rotinas & Fontes ou revise o escopo contratado.`
     } else if (fontesNaoCobertas.length > 0) {
       conformidadeStatus = 'atencao'
       conformidadeDetalhe = `Atenção: Cópia executada com sucesso, mas há ${fontesNaoCobertas.length} item(ns) sem fonte cadastrada na rotina "${rotinaNomeReal}".`
@@ -2111,17 +2105,47 @@ Lista de atividades (1 dia):
             },
           ]
 
-          const detalhesVms = atividadesAcronis.map((a) => ({
-            nome: a.nome_plano,
-            status: 'Success',
-            start_time: a.hora_inicio,
-            end_time: a.hora_termino,
-            size: a.bytes_processados,
-            read: a.bytes_processados,
-            transferred: a.bytes_salvos,
-            duration: a.duracao,
-            details: `Fonte: ${a.fonte_dados} → Destino: Nuvem`,
-          }))
+          // Buscar fontes cadastradas da organização para vínculo estrito e sem fallback
+          let fontesCadastradasAcronis = []
+          try {
+            fontesCadastradasAcronis = $app.findRecordsByFilter(
+              'backup_fontes',
+              `organization = '${organizationId}' && ativo = true`,
+              '+created',
+              200,
+              0,
+            )
+          } catch (_) {}
+
+          const vinculoMod = require(`${__hooks}/modules/vinculo.js`)
+          const itensPlanoNomes = atividadesAcronis.map((a) => a.nome_plano)
+          const matchAcronis = vinculoMod.casarItensComFontes(
+            itensPlanoNomes,
+            fontesCadastradasAcronis,
+          )
+
+          const fontesCobertasAcronis = matchAcronis.fontesCobertas
+          const fontesNaoCobertasAcronis = matchAcronis.fontesNaoCobertas
+
+          const detalhesVms = atividadesAcronis.map((a) => {
+            const isFora = fontesNaoCobertasAcronis.some((fnc) => fnc.item === a.nome_plano)
+            return {
+              nome: a.nome_plano,
+              status: 'Success',
+              start_time: a.hora_inicio,
+              end_time: a.hora_termino,
+              size: a.bytes_processados,
+              read: a.bytes_processados,
+              transferred: a.bytes_salvos,
+              duration: a.duracao,
+              details: `Fonte: ${a.fonte_dados} → Destino: Nuvem`,
+              fora_escopo: isFora,
+              status_escopo: isFora ? 'fora_escopo' : 'coberto',
+              motivo_escopo: isFora
+                ? 'Não cadastrado — fora do escopo ou alias pendente'
+                : undefined,
+            }
+          })
 
           const resultadoProc = {
             status_detectado: 'sucesso',
@@ -2177,31 +2201,35 @@ Lista de atividades (1 dia):
           execRec.set('destino', 'Nuvem Criptografada Acronis (Cloud)')
           execRec.set(
             'observacao',
-            `Ingestão IMAP via ACRONIS_PDF: 4 planos OK. Anexo: "${nomeArquivo}". Destino: Nuvem.`,
+            `Ingestão IMAP via ACRONIS_PDF: ${fontesCobertasAcronis.length}/${fontesCobertasAcronis.length} planos do escopo OK (${fontesNaoCobertasAcronis.length} fora do escopo). Anexo: "${nomeArquivo}". Destino: Nuvem.`,
           )
           execRec.set('detalhes_vms', detalhesVms)
           $app.save(execRec)
 
-          // Correção de FOCO B: instanciar avalRec antes de setar propriedades
+          const temForaEscopo = fontesNaoCobertasAcronis.length > 0
+          const conformidadeAcronisStatus = temForaEscopo ? 'atencao' : 'conforme'
+          const nomesNaoCobertos = fontesNaoCobertasAcronis.map((f) => f.item).join(', ')
+          const vereditoAcronis = temForaEscopo
+            ? `Atenção: ${fontesCobertasAcronis.length} de ${fontesCobertasAcronis.length} planos do escopo atendidos com sucesso, mas o comprovante contém ${fontesNaoCobertasAcronis.length} máquina não cadastrada (${nomesNaoCobertos}). Cadastre a fonte/alias correspondente em Rotinas & Fontes ou revise o escopo contratado.`
+            : 'Conforme: Relatório Acronis Cloud conferido com 100% de sucesso (4 planos de proteção íntegros na Nuvem).'
+
           const avalRec = new Record(avalCol)
           avalRec.set('organization', organizationId)
           avalRec.set('execucao', execRec.id)
-          avalRec.set('resultado_conformidade', 'conforme')
-          avalRec.set(
-            'detalhe',
-            'Conforme: Relatório Acronis Cloud conferido com 100% de conformidade (4 planos de proteção íntegros na Nuvem).',
-          )
+          avalRec.set('resultado_conformidade', conformidadeAcronisStatus)
+          avalRec.set('detalhe', vereditoAcronis)
           avalRec.set('itens_avaliados', {
             adaptador: 'ACRONIS_PDF',
             status_rotina: 'sucesso',
             planos_count: atividadesAcronis.length,
+            planos_escopo_cobertos: fontesCobertasAcronis.length,
+            planos_fora_escopo: fontesNaoCobertasAcronis.length,
             avaliado_em: nowIso,
           })
           avalRec.set('laudo_tecnico', {
             gerado_em: nowIso,
-            resultado: 'conforme',
-            veredito:
-              'Conforme: Relatório Acronis Cloud conferido com 100% de sucesso (4 planos de proteção íntegros na Nuvem).',
+            resultado: conformidadeAcronisStatus,
+            veredito: vereditoAcronis,
             fonte_comprovante: {
               origem: 'IMAP_AUTO_FETCH',
               remetente: remetente,
@@ -2230,22 +2258,12 @@ Lista de atividades (1 dia):
               intervalo_minutos: 0,
             },
             cobertura: {
-              itens_detectados: [
-                'Backup_SRV-FILESERVER',
-                'BK-SPCM-TDePJ',
-                'BK-SPCM-ORION',
-                'BK-SPCM-PROTESTO',
-              ],
-              fontes_cobertas: [
-                { item: 'Backup_SRV-FILESERVER', fonte_cadastrada: 'SRV-FILESERVER' },
-                { item: 'BK-SPCM-TDePJ', fonte_cadastrada: 'SPCM-TDePJ' },
-                { item: 'BK-SPCM-ORION', fonte_cadastrada: 'ORION' },
-                { item: 'BK-SPCM-PROTESTO', fonte_cadastrada: 'SPCM-PROTESTO' },
-              ],
-              fontes_nao_cobertas: [],
-              total_itens: 4,
-              total_cobertos: 4,
-              total_nao_cobertos: 0,
+              itens_detectados: itensPlanoNomes,
+              fontes_cobertas: fontesCobertasAcronis,
+              fontes_nao_cobertas: fontesNaoCobertasAcronis,
+              total_itens: itensPlanoNomes.length,
+              total_cobertos: fontesCobertasAcronis.length,
+              total_nao_cobertos: fontesNaoCobertasAcronis.length,
             },
             verificacoes: [
               {
@@ -2289,12 +2307,13 @@ Lista de atividades (1 dia):
               {
                 item: 'cobertura_fontes',
                 titulo: 'Cobertura de Fontes Monitoradas',
-                status: 'conforme',
-                passou: true,
-                cobertas_count: 4,
-                nao_cobertas_count: 0,
-                detalhes:
-                  'Todas as 4 fontes identificadas têm correspondência ativa no inventário.',
+                status: temForaEscopo ? 'atencao' : 'conforme',
+                passou: !temForaEscopo,
+                cobertas_count: fontesCobertasAcronis.length,
+                nao_cobertas_count: fontesNaoCobertasAcronis.length,
+                detalhes: temForaEscopo
+                  ? `Atenção: ${fontesCobertasAcronis.length} de ${fontesCobertasAcronis.length} planos do escopo atendidos, mas há ${fontesNaoCobertasAcronis.length} máquina(s) não cadastrada(s) no comprovante (${nomesNaoCobertos}).`
+                  : 'Todas as fontes identificadas têm correspondência ativa no inventário.',
               },
               {
                 item: 'destino',

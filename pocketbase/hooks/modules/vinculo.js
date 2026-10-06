@@ -136,8 +136,92 @@ function vinculoRigoroso(nomeJob, rotinas, fontes) {
   }
 }
 
+function casarItensComFontes(itensComprovante, fontesCadastradas) {
+  const itens = Array.isArray(itensComprovante) ? itensComprovante : []
+  const fontes = Array.isArray(fontesCadastradas) ? fontesCadastradas : []
+
+  const fontesCobertas = []
+  const fontesNaoCobertas = []
+
+  for (let i = 0; i < itens.length; i++) {
+    const rawItem = itens[i]
+    const itemNome = typeof rawItem === 'string' ? rawItem : (rawItem && rawItem.nome) || ''
+    const itemNorm = normalizarTexto(itemNome)
+
+    if (!itemNorm) continue
+
+    let achou = false
+    let fonteMatchNome = ''
+    let fonteMatchObj = null
+
+    for (let fI = 0; fI < fontes.length; fI++) {
+      const f = fontes[fI]
+      if (!f) continue
+
+      const fNome = typeof f.getString === 'function' ? f.getString('nome') : f.nome || ''
+      const fCaminho =
+        typeof f.getString === 'function'
+          ? f.getString('caminho_identificacao')
+          : f.caminho_identificacao || ''
+      const fAliasesRaw =
+        typeof f.getString === 'function' ? f.getString('aliases') : f.aliases || ''
+
+      const fNomeNorm = normalizarTexto(fNome)
+      const fCaminhoNorm = normalizarTexto(fCaminho)
+      const fAliases = extrairAliases(fAliasesRaw)
+
+      // Igualdade estrita normalizada (ZERO includes parciais, ZERO fallback)
+      if (fNomeNorm && fNomeNorm === itemNorm) {
+        achou = true
+        fonteMatchNome = fNome || fCaminho
+        fonteMatchObj = f
+        break
+      }
+      if (fCaminhoNorm && fCaminhoNorm === itemNorm) {
+        achou = true
+        fonteMatchNome = fCaminho || fNome
+        fonteMatchObj = f
+        break
+      }
+      for (let aI = 0; aI < fAliases.length; aI++) {
+        if (fAliases[aI] === itemNorm) {
+          achou = true
+          fonteMatchNome = fNome || fCaminho || fAliases[aI]
+          fonteMatchObj = f
+          break
+        }
+      }
+      if (achou) break
+    }
+
+    if (achou) {
+      fontesCobertas.push({
+        item: itemNome,
+        fonte_cadastrada: fonteMatchNome,
+        fonte_id: (fonteMatchObj && fonteMatchObj.id) || null,
+        fora_escopo: false,
+      })
+    } else {
+      fontesNaoCobertas.push({
+        item: itemNome,
+        motivo: 'Não cadastrado — fora do escopo ou alias pendente',
+        fora_escopo: true,
+      })
+    }
+  }
+
+  return {
+    fontesCobertas,
+    fontesNaoCobertas,
+    totalItens: itens.length,
+    totalCobertos: fontesCobertas.length,
+    totalNaoCobertos: fontesNaoCobertas.length,
+  }
+}
+
 module.exports = {
   normalizarTexto,
   extrairAliases,
   vinculoRigoroso,
+  casarItensComFontes,
 }
