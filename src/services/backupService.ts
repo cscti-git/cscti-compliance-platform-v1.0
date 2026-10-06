@@ -318,6 +318,15 @@ export async function processarEvidenciaBackup(
   })
 }
 
+export async function fetchEvidenciasImap(
+  organizationId: string,
+): Promise<import('@/types/cscti').BackupImapFetchResponse> {
+  return pb.send<import('@/types/cscti').BackupImapFetchResponse>('/backend/v1/backup/imap-fetch', {
+    method: 'POST',
+    body: { organizationId },
+  })
+}
+
 // -------------------------------------------------------------
 // 8. Processamentos
 // -------------------------------------------------------------

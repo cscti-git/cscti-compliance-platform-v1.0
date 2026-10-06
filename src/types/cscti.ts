@@ -437,6 +437,19 @@ export interface BackupOcorrenciaItem {
   }
 }
 
+export interface BackupImapFetchResponse {
+  success: boolean
+  configured: boolean
+  enabled: boolean
+  mensagens_verificadas: number
+  evidencias_criadas: number
+  evidencias_duplicadas: number
+  erros: number
+  status: 'sucesso' | 'erro' | 'aviso'
+  message: string
+  last_check: string
+}
+
 export interface BackupTesteRecuperacaoItem {
   id: string
   organization: string

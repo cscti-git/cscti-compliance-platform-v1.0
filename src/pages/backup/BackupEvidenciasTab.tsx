@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,14 +32,25 @@ import {
   Hash,
   Sparkles,
   RefreshCw,
+  Mail,
+  Clock,
+  ShieldCheck,
+  Inbox,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { processarEvidenciaBackup, listBackupProcessamentos } from '@/services/backupService'
+import {
+  processarEvidenciaBackup,
+  listBackupProcessamentos,
+  fetchEvidenciasImap,
+} from '@/services/backupService'
+import { getIntegrations } from '@/services/csctiService'
 import type {
   BackupEvidenciaItem,
   BackupRotinaItem,
   BackupProcessamentoItem,
   EvidenciaStatus,
+  IntegrationItem,
+  BackupImapFetchResponse,
 } from '@/types/cscti'
 
 interface BackupEvidenciasTabProps {
@@ -76,6 +87,58 @@ Tamanho transferido: 4.8 GB
 Destino: Storage NAS Dedicado e Cópia Nuvem S3
 Arquivos verificados: 100% OK, hash SHA-256 verificado.`,
   )
+
+  // Conector IMAP e Estado de Ingestão
+  const [emailConnector, setEmailConnector] = useState<IntegrationItem | null>(null)
+  const [fetchingImap, setFetchingImap] = useState(false)
+  const [lastFetchResult, setLastFetchResult] = useState<BackupImapFetchResponse | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+    if (orgId) {
+      getIntegrations(orgId).then(({ email }) => {
+        if (isMounted) {
+          setEmailConnector(email)
+        }
+      })
+    }
+    return () => {
+      isMounted = false
+    }
+  }, [orgId])
+
+  const handleFetchImap = async () => {
+    setFetchingImap(true)
+    try {
+      const res = await fetchEvidenciasImap(orgId)
+      setLastFetchResult(res)
+
+      if (res.success) {
+        toast({
+          title: 'Busca de e-mail concluída',
+          description: `${res.mensagens_verificadas} mensagens verificadas • ${res.evidencias_criadas} nova(s) evidência(s) ingerida(s) • ${res.evidencias_duplicadas} já existente(s).`,
+        })
+        onReload()
+        // Atualizar estado do conector
+        const { email } = await getIntegrations(orgId)
+        setEmailConnector(email)
+      } else {
+        toast({
+          title: res.configured ? 'Aviso na busca IMAP' : 'Conector IMAP não configurado',
+          description: res.message,
+          variant: res.status === 'erro' ? 'destructive' : 'default',
+        })
+      }
+    } catch (err: unknown) {
+      toast({
+        title: 'Erro na busca de evidências via e-mail',
+        description: err instanceof Error ? err.message : 'Falha na comunicação com o backend.',
+        variant: 'destructive',
+      })
+    } finally {
+      setFetchingImap(false)
+    }
+  }
 
   // Modal Detalhes do Processamento / Evidência
   const [detailModalOpen, setDetailModalOpen] = useState(false)
@@ -216,16 +279,113 @@ Arquivos verificados: 100% OK, hash SHA-256 verificado.`,
           </p>
         </div>
 
-        {canOperate && (
-          <Button
-            onClick={handleOpenRegistrar}
-            size="sm"
-            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs"
-          >
-            <Plus className="w-4 h-4" /> Registrar Evidência (Manual / HTML)
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canOperate && (
+            <Button
+              onClick={handleFetchImap}
+              disabled={fetchingImap}
+              size="sm"
+              variant="outline"
+              className="border-blue-300 text-blue-900 bg-blue-50/50 hover:bg-blue-100 hover:text-blue-950 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 text-blue-700 ${fetchingImap ? 'animate-spin' : ''}`}
+              />
+              {fetchingImap ? 'Buscando na Caixa...' : 'Buscar evidências agora'}
+            </Button>
+          )}
+
+          {canOperate && (
+            <Button
+              onClick={handleOpenRegistrar}
+              size="sm"
+              className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs"
+            >
+              <Plus className="w-4 h-4" /> Registrar Evidência (Manual / HTML)
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Card de Visibilidade do Estado do Conector de E-mail IMAP */}
+      <Card className="border-slate-200 bg-gradient-to-r from-slate-50/80 to-white shadow-2xs">
+        <CardContent className="p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-100/70 border border-blue-200 flex items-center justify-center text-blue-800 shrink-0 mt-0.5">
+              <Mail className="w-4 h-4" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-slate-900 text-xs">
+                  Ingestão Automática via E-mail IMAP
+                </span>
+                {emailConnector && emailConnector.enabled ? (
+                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold">
+                    <CheckCircle2 className="w-3 h-3 mr-1" /> Ativo (Job a cada 15 min)
+                  </Badge>
+                ) : emailConnector ? (
+                  <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold">
+                    <AlertTriangle className="w-3 h-3 mr-1" /> Desabilitado
+                  </Badge>
+                ) : (
+                  <Badge className="bg-slate-100 text-slate-600 border-slate-300 text-[10px] font-semibold">
+                    <HelpCircle className="w-3 h-3 mr-1" /> Não Configurado
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                {emailConnector?.email_user ? (
+                  <>
+                    Caixa:{' '}
+                    <span className="font-mono text-slate-700">{emailConnector.email_user}</span> (
+                    {emailConnector.email_host}:{emailConnector.email_port || 993} /{' '}
+                    {emailConnector.email_folder || 'INBOX'})
+                  </>
+                ) : (
+                  'Cadastre os parâmetros da caixa em Configurações > Integrações para busca periódica automática.'
+                )}
+              </p>
+              {/* Resumo da última verificação */}
+              <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-600">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  Última verificação:{' '}
+                  <strong className="text-slate-800">
+                    {lastFetchResult?.last_check
+                      ? new Date(lastFetchResult.last_check).toLocaleString('pt-BR')
+                      : emailConnector?.last_sync
+                        ? new Date(emailConnector.last_sync).toLocaleString('pt-BR')
+                        : 'Nunca executada'}
+                  </strong>
+                </span>
+                {(lastFetchResult?.message || emailConnector?.last_sync_message) && (
+                  <span
+                    className="text-slate-500 truncate max-w-md hidden sm:inline"
+                    title={lastFetchResult?.message || emailConnector?.last_sync_message}
+                  >
+                    • {lastFetchResult?.message || emailConnector?.last_sync_message}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+            {canOperate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleFetchImap}
+                disabled={fetchingImap}
+                className="h-8 text-xs text-blue-700 hover:text-blue-900 hover:bg-blue-50 px-2.5 font-medium"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${fetchingImap ? 'animate-spin' : ''}`} />
+                {fetchingImap ? 'Verificando...' : 'Verificar Caixa'}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Lista de Evidências */}
       <Card className="border-slate-200 shadow-2xs">
