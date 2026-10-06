@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T12:39:05.046Z",
+  "generatedAt": "2026-10-06T13:01:59.300Z",
   "collections": [
     {
       "name": "users",
@@ -1388,7 +1388,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["diaria", "semanal", "mensal", "personalizada"]
+          "selectValues": ["diaria", "semanal", "mensal", "personalizada", "intervalo_minutos"]
         },
         {
           "name": "horario",
@@ -1429,6 +1429,19 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "intervalo_minutos",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_execucao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["incremental", "diferencial", "completo"]
         }
       ],
       "indexes": [
@@ -1507,6 +1520,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "tipo_execucao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["padrao_rotina", "incremental", "diferencial", "completo"]
         }
       ],
       "indexes": [

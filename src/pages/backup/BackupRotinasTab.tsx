@@ -40,6 +40,9 @@ import {
   Server,
   X,
   FileCode,
+  Layers,
+  Repeat,
+  CheckCircle2,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -54,6 +57,9 @@ import type {
   BackupRotinaItem,
   BackupPlanoItem,
   BackupFonteItem,
+  BackupPeriodicidade,
+  BackupTipoExecucao,
+  BackupFonteTipoExecucao,
   PersonItem,
   InventoryAssetItem,
 } from '@/types/cscti'
@@ -84,9 +90,9 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
   // Formulário de Rotina
   const [planoId, setPlanoId] = useState('')
   const [nome, setNome] = useState('')
-  const [periodicidade, setPeriodicidade] = useState<
-    'diaria' | 'semanal' | 'mensal' | 'personalizada'
-  >('diaria')
+  const [periodicidade, setPeriodicidade] = useState<BackupPeriodicidade>('diaria')
+  const [intervaloMinutos, setIntervaloMinutos] = useState<number>(30)
+  const [tipoExecucao, setTipoExecucao] = useState<BackupTipoExecucao>('incremental')
   const [horario, setHorario] = useState('23:00')
   const [responsavelId, setResponsavelId] = useState('')
   const [status, setStatus] = useState<'ativo' | 'inativo'>('ativo')
@@ -107,6 +113,8 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
   const [novaFonteTipo, setNovaFonteTipo] = useState<
     'banco_de_dados' | 'arquivos' | 'sistema' | 'e_mail' | 'maquina_virtual' | 'outro'
   >('banco_de_dados')
+  const [novaFonteTipoExecucao, setNovaFonteTipoExecucao] =
+    useState<BackupFonteTipoExecucao>('padrao_rotina')
   const [novaFonteCaminho, setNovaFonteCaminho] = useState('')
   const [novaFonteAssetId, setNovaFonteAssetId] = useState('')
 
@@ -121,8 +129,10 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
     setEditingItem(null)
     setPlanoId(planos.length > 0 ? planos[0].id : '')
     setNome('')
-    setPeriodicidade('diaria')
-    setHorario('23:00')
+    setPeriodicidade('intervalo_minutos')
+    setIntervaloMinutos(30)
+    setTipoExecucao('incremental')
+    setHorario('')
     setResponsavelId('')
     setStatus('ativo')
     setModalOpen(true)
@@ -133,15 +143,48 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
     setPlanoId(r.plano)
     setNome(r.nome)
     setPeriodicidade(r.periodicidade)
-    setHorario(r.horario || '23:00')
+    setIntervaloMinutos(r.intervalo_minutos && r.intervalo_minutos >= 5 ? r.intervalo_minutos : 30)
+    setTipoExecucao(r.tipo_execucao || 'incremental')
+    setHorario(r.horario || (r.periodicidade === 'intervalo_minutos' ? '' : '23:00'))
     setResponsavelId(r.responsavel || '')
     setStatus(r.status)
     setModalOpen(true)
   }
 
+  const formatPeriodicidadeLabel = (r: BackupRotinaItem) => {
+    if (r.periodicidade === 'intervalo_minutos') {
+      const min = r.intervalo_minutos || 30
+      return `A cada ${min} min`
+    }
+    if (r.periodicidade === 'diaria') return 'Diária'
+    if (r.periodicidade === 'semanal') return 'Semanal'
+    if (r.periodicidade === 'mensal') return 'Mensal'
+    return 'Personalizada'
+  }
+
+  const formatTipoExecucaoLabel = (tipo?: string) => {
+    if (tipo === 'incremental') return 'Incremental'
+    if (tipo === 'diferencial') return 'Diferencial'
+    if (tipo === 'completo') return 'Completo (Full)'
+    return 'Incremental'
+  }
+
   const handleSaveRotina = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!nome.trim() || !planoId) return
+
+    if (periodicidade === 'intervalo_minutos') {
+      const parsed = Number(intervaloMinutos)
+      if (isNaN(parsed) || parsed < 5 || parsed > 1440) {
+        toast({
+          title: 'Intervalo inválido',
+          description: 'O intervalo deve ser um número entre 5 e 1440 minutos (ex: 30).',
+          variant: 'destructive',
+        })
+        return
+      }
+    }
+
     setSubmitting(true)
     try {
       await saveBackupRotina({
@@ -150,7 +193,9 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
         plano: planoId,
         nome: nome.trim(),
         periodicidade,
-        horario,
+        intervalo_minutos: periodicidade === 'intervalo_minutos' ? Number(intervaloMinutos) : 0,
+        tipo_execucao: tipoExecucao,
+        horario: periodicidade === 'intervalo_minutos' ? '' : horario,
         responsavel: responsavelId || undefined,
         status,
       })
@@ -216,12 +261,14 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
         organization: orgId,
         rotina: selectedRotinaForFontes.id,
         tipo_fonte: novaFonteTipo,
+        tipo_execucao: novaFonteTipoExecucao,
         caminho_identificacao: novaFonteCaminho.trim(),
         ativo_inventario: novaFonteAssetId || undefined,
         ativo: true,
       })
       setNovaFonteCaminho('')
       setNovaFonteAssetId('')
+      setNovaFonteTipoExecucao('padrao_rotina')
       const allFontes = await listBackupFontes(orgId)
       setFontesList(allFontes.filter((f) => f.rotina === selectedRotinaForFontes.id))
       toast({
@@ -313,19 +360,45 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                 </Badge>
               </CardHeader>
               <CardContent className="p-4 text-xs space-y-3">
+                {/* Linha de destaque da periodicidade + tipo de execução */}
+                <div className="flex items-center justify-between bg-blue-50/60 border border-blue-100 px-2.5 py-1.5 rounded text-[11px] text-[#0B2545] font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    {rotina.periodicidade === 'intervalo_minutos' ? (
+                      <Repeat className="w-3.5 h-3.5 text-blue-600" />
+                    ) : (
+                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    )}
+                    <span>{formatPeriodicidadeLabel(rotina)}</span>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] font-bold uppercase tracking-wider bg-white text-blue-800 border-blue-300"
+                  >
+                    {formatTipoExecucaoLabel(rotina.tipo_execucao)}
+                  </Badge>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2 text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-100">
                   <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="capitalize">{rotina.periodicidade}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{rotina.horario ? `${rotina.horario}h` : 'Manual'}</span>
+                    <span>
+                      {rotina.periodicidade === 'intervalo_minutos'
+                        ? `Ciclo contínuo (${rotina.intervalo_minutos || 30} min)`
+                        : rotina.horario
+                          ? `${rotina.horario}h`
+                          : 'Horário flexível'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">
+                      Tipo: {formatTipoExecucaoLabel(rotina.tipo_execucao)}
+                    </span>
                   </div>
                   <div className="col-span-2 flex items-center gap-1.5 pt-1 border-t border-slate-200/50">
                     <User className="w-3.5 h-3.5 text-slate-400" />
                     <span className="truncate">
-                      Resp: {rotina.expand?.responsavel?.name || 'Não designado'}
+                      Resp: {rotina.expand?.responsavel?.name || 'Equipe de TI'}
                     </span>
                   </div>
                 </div>
@@ -419,14 +492,15 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                   <label className="font-semibold text-slate-700 block mb-1">Periodicidade</label>
                   <Select
                     value={periodicidade}
-                    onValueChange={(val: 'diaria' | 'semanal' | 'mensal' | 'personalizada') =>
-                      setPeriodicidade(val)
-                    }
+                    onValueChange={(val: BackupPeriodicidade) => setPeriodicidade(val)}
                   >
                     <SelectTrigger className="text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="intervalo_minutos">
+                        A cada X minutos (ex: 30 min)
+                      </SelectItem>
                       <SelectItem value="diaria">Diária</SelectItem>
                       <SelectItem value="semanal">Semanal</SelectItem>
                       <SelectItem value="mensal">Mensal</SelectItem>
@@ -437,16 +511,82 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
 
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">
-                    Horário Previsto
+                    Tipo de Execução
                   </label>
-                  <Input
-                    placeholder="Ex: 23:00"
-                    value={horario}
-                    onChange={(e) => setHorario(e.target.value)}
-                    className="text-xs"
-                  />
+                  <Select
+                    value={tipoExecucao}
+                    onValueChange={(val: BackupTipoExecucao) => setTipoExecucao(val)}
+                  >
+                    <SelectTrigger className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="incremental">Incremental (alterações recentes)</SelectItem>
+                      <SelectItem value="diferencial">Diferencial (acumulado pós-full)</SelectItem>
+                      <SelectItem value="completo">Completo / Full (cópia integral)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+
+              {/* Seletor dinâmico: Intervalo em Minutos vs Horário/Dia da Semana */}
+              {periodicidade === 'intervalo_minutos' ? (
+                <div className="p-2.5 rounded-md bg-blue-50/50 border border-blue-200/60 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-blue-950 block text-[11px]">
+                      Intervalo de Execução (Minutos) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-1">
+                      {[15, 30, 60, 120].map((quickVal) => (
+                        <button
+                          key={quickVal}
+                          type="button"
+                          onClick={() => setIntervaloMinutos(quickVal)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-mono transition ${
+                            Number(intervaloMinutos) === quickVal
+                              ? 'bg-blue-600 text-white font-bold'
+                              : 'bg-white border border-blue-200 text-blue-800 hover:bg-blue-100'
+                          }`}
+                        >
+                          {quickVal}m
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <Input
+                    type="number"
+                    min={5}
+                    max={1440}
+                    required
+                    placeholder="30"
+                    value={intervaloMinutos}
+                    onChange={(e) => setIntervaloMinutos(Math.max(1, Number(e.target.value)))}
+                    className="text-xs bg-white h-8"
+                  />
+                  <p className="text-[10px] text-blue-800/80">
+                    Execução contínua a cada {intervaloMinutos || 30} minutos (mínimo: 5 min,
+                    máximo: 1440 min / 24h). Aplicado para banco de dados ou máquina virtual
+                    inteira.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">
+                      Horário Previsto
+                    </label>
+                    <Input
+                      placeholder="Ex: 23:00"
+                      value={horario}
+                      onChange={(e) => setHorario(e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div className="flex items-center text-[11px] text-slate-500 pt-5">
+                    Disparo programado no horário fixo configurado.
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -536,44 +676,78 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {fontesList.map((f) => (
-                    <div
-                      key={f.id}
-                      className="p-2.5 rounded-lg border border-slate-200 bg-white flex items-center justify-between shadow-2xs"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] uppercase font-mono px-1.5 py-0 bg-slate-100"
-                          >
-                            {f.tipo_fonte}
-                          </Badge>
-                          <span className="text-xs font-bold text-slate-900">
-                            {f.caminho_identificacao}
-                          </span>
+                  {fontesList.map((f) => {
+                    const tipoFonteDisplay =
+                      f.tipo_fonte === 'banco_de_dados'
+                        ? 'Banco de Dados'
+                        : f.tipo_fonte === 'maquina_virtual'
+                          ? 'Máquina Virtual Inteira'
+                          : f.tipo_fonte === 'arquivos'
+                            ? 'Arquivos / PDF/A'
+                            : f.tipo_fonte === 'sistema'
+                              ? 'Sistema / Aplicação'
+                              : f.tipo_fonte === 'e_mail'
+                                ? 'Caixa de E-mail'
+                                : 'Outro'
+
+                    const tipoExecucaoFonteDisplay =
+                      !f.tipo_execucao || f.tipo_execucao === 'padrao_rotina'
+                        ? `Herda da rotina (${formatTipoExecucaoLabel(selectedRotinaForFontes?.tipo_execucao)})`
+                        : formatTipoExecucaoLabel(f.tipo_execucao)
+
+                    return (
+                      <div
+                        key={f.id}
+                        className="p-2.5 rounded-lg border border-slate-200 bg-white flex items-center justify-between shadow-2xs"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] font-bold px-1.5 py-0 bg-blue-50 text-blue-900 border border-blue-200"
+                            >
+                              {tipoFonteDisplay}
+                            </Badge>
+                            <span className="text-xs font-bold text-slate-900">
+                              {f.caminho_identificacao}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                            <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                              <Layers className="w-3 h-3 text-slate-400" />
+                              {tipoExecucaoFonteDisplay}
+                            </span>
+
+                            {f.expand?.ativo_inventario && (
+                              <span className="text-blue-700 flex items-center gap-1 font-medium">
+                                <Server className="w-3 h-3" /> Ativo:{' '}
+                                {f.expand.ativo_inventario.name} (
+                                {f.expand.ativo_inventario.tipo === 'servidor_virtualizado'
+                                  ? 'Servidor Virtualizado / VM'
+                                  : f.expand.ativo_inventario.tipo === 'banco_dados'
+                                    ? 'Banco de Dados'
+                                    : f.expand.ativo_inventario.tipo}
+                                )
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {f.expand?.ativo_inventario && (
-                          <p className="text-[11px] text-blue-700 mt-0.5 ml-0.5 flex items-center gap-1 font-medium">
-                            <Server className="w-3 h-3" /> Ativo: {f.expand.ativo_inventario.name} (
-                            {f.expand.ativo_inventario.tipo})
-                          </p>
+
+                        {canOperate && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteFonte(f.id)}
+                            className="h-7 w-7 text-slate-400 hover:text-red-600"
+                            title="Remover fonte"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
                         )}
                       </div>
-
-                      {canOperate && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteFonte(f.id)}
-                          className="h-7 w-7 text-slate-400 hover:text-red-600"
-                          title="Remover fonte"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -587,7 +761,7 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                 <span className="text-xs font-bold text-slate-800 block">
                   Adicionar Nova Fonte à Rotina
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="text-[10px] font-semibold text-slate-600 block mb-1">
                       Tipo de Fonte
@@ -611,8 +785,10 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                         <SelectItem value="banco_de_dados">
                           Banco de Dados (SQL/PostgreSQL)
                         </SelectItem>
+                        <SelectItem value="maquina_virtual">
+                          Máquina Virtual Inteira / Snapshot
+                        </SelectItem>
                         <SelectItem value="arquivos">Repositório de Arquivos / PDF/A</SelectItem>
-                        <SelectItem value="maquina_virtual">Máquina Virtual / Snapshot</SelectItem>
                         <SelectItem value="sistema">Sistema / Aplicação</SelectItem>
                         <SelectItem value="e_mail">Caixas Postais / E-mail</SelectItem>
                         <SelectItem value="outro">Outra Fonte</SelectItem>
@@ -622,7 +798,32 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
 
                   <div>
                     <label className="text-[10px] font-semibold text-slate-600 block mb-1">
-                      Vincular Ativo de Inventário (Opcional)
+                      Tipo de Execução da Fonte
+                    </label>
+                    <Select
+                      value={novaFonteTipoExecucao}
+                      onValueChange={(val: BackupFonteTipoExecucao) =>
+                        setNovaFonteTipoExecucao(val)
+                      }
+                    >
+                      <SelectTrigger className="text-xs h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="padrao_rotina">
+                          Padrão da Rotina (
+                          {formatTipoExecucaoLabel(selectedRotinaForFontes?.tipo_execucao)})
+                        </SelectItem>
+                        <SelectItem value="incremental">Incremental</SelectItem>
+                        <SelectItem value="diferencial">Diferencial</SelectItem>
+                        <SelectItem value="completo">Completo (Full)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-600 block mb-1">
+                      Vincular Ativo de Inventário
                     </label>
                     <Select value={novaFonteAssetId} onValueChange={setNovaFonteAssetId}>
                       <SelectTrigger className="text-xs h-8">
@@ -632,7 +833,8 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                         <SelectItem value="">Nenhum ativo associado</SelectItem>
                         {assets.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
-                            {a.name} ({a.tipo})
+                            {a.name} (
+                            {a.tipo === 'servidor_virtualizado' ? 'VM / Virtualizado' : a.tipo})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -646,7 +848,13 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                   </label>
                   <div className="flex items-center gap-2">
                     <Input
-                      placeholder="Ex: /var/lib/postgresql/data (Dump Full)"
+                      placeholder={
+                        novaFonteTipo === 'maquina_virtual'
+                          ? 'Ex: Proxmox/VMware VM 101 - SVR-APLICACAO (Snapshot 30 min)'
+                          : novaFonteTipo === 'banco_de_dados'
+                            ? 'Ex: PostgreSQL /base_cartorio (WALs / Incremental 30 min)'
+                            : 'Ex: /var/lib/postgresql/data'
+                      }
                       value={novaFonteCaminho}
                       onChange={(e) => setNovaFonteCaminho(e.target.value)}
                       className="text-xs h-8 flex-1"

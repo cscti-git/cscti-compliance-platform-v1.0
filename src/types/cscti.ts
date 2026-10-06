@@ -271,12 +271,25 @@ export interface BackupPlanoRequisitoItem {
   }
 }
 
+export type BackupPeriodicidade =
+  | 'diaria'
+  | 'semanal'
+  | 'mensal'
+  | 'personalizada'
+  | 'intervalo_minutos'
+
+export type BackupTipoExecucao = 'incremental' | 'diferencial' | 'completo'
+
+export type BackupFonteTipoExecucao = 'padrao_rotina' | 'incremental' | 'diferencial' | 'completo'
+
 export interface BackupRotinaItem {
   id: string
   organization: string
   plano: string
   nome: string
-  periodicidade: 'diaria' | 'semanal' | 'mensal' | 'personalizada'
+  periodicidade: BackupPeriodicidade
+  intervalo_minutos?: number
+  tipo_execucao?: BackupTipoExecucao
   horario?: string
   dias_semana?: string[]
   responsavel?: string
@@ -295,6 +308,7 @@ export interface BackupFonteItem {
   rotina: string
   ativo_inventario?: string
   tipo_fonte: 'banco_de_dados' | 'arquivos' | 'sistema' | 'e_mail' | 'maquina_virtual' | 'outro'
+  tipo_execucao?: BackupFonteTipoExecucao
   caminho_identificacao: string
   ativo: boolean
   created?: string

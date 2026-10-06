@@ -241,11 +241,18 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">Execução Avulsa / Geral</SelectItem>
-                    {rotinas.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.nome}
-                      </SelectItem>
-                    ))}
+                    {rotinas.map((r) => {
+                      const freq =
+                        r.periodicidade === 'intervalo_minutos'
+                          ? `A cada ${r.intervalo_minutos || 30} min`
+                          : r.periodicidade
+                      const tipo = r.tipo_execucao || 'incremental'
+                      return (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.nome} ({freq} · {tipo})
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               </div>

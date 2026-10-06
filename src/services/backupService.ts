@@ -173,23 +173,45 @@ export async function saveBackupRotina(
   data: Partial<BackupRotinaItem> & { organization: string; plano: string },
 ): Promise<BackupRotinaItem> {
   let result: BackupRotinaItem
+  const payload = { ...data }
+  // Se for intervalo_minutos, limpa horario se necessário e garante intervalo válido
+  if (payload.periodicidade === 'intervalo_minutos') {
+    payload.horario = ''
+    payload.dias_semana = []
+    if (!payload.intervalo_minutos || payload.intervalo_minutos < 5) {
+      payload.intervalo_minutos = 30
+    }
+  } else {
+    payload.intervalo_minutos = 0
+  }
+
   if (data.id) {
-    result = await pb.collection('backup_rotinas').update<BackupRotinaItem>(data.id, data)
+    result = await pb.collection('backup_rotinas').update<BackupRotinaItem>(data.id, payload)
     await logAudit({
       organizationId: data.organization,
       action: 'BACKUP_ROTINA_UPDATE',
       entity: 'Backup e Continuidade',
-      detail: `Rotina de backup atualizada: ${result.nome}`,
-      metadata: { rotina_id: result.id },
+      detail: `Rotina de backup atualizada: ${result.nome} (${result.periodicidade === 'intervalo_minutos' ? `A cada ${result.intervalo_minutos} min` : result.periodicidade})`,
+      metadata: {
+        rotina_id: result.id,
+        periodicidade: result.periodicidade,
+        intervalo_minutos: result.intervalo_minutos,
+        tipo_execucao: result.tipo_execucao,
+      },
     })
   } else {
-    result = await pb.collection('backup_rotinas').create<BackupRotinaItem>(data)
+    result = await pb.collection('backup_rotinas').create<BackupRotinaItem>(payload)
     await logAudit({
       organizationId: data.organization,
       action: 'BACKUP_ROTINA_CREATE',
       entity: 'Backup e Continuidade',
-      detail: `Nova rotina de backup criada: ${result.nome}`,
-      metadata: { rotina_id: result.id },
+      detail: `Nova rotina de backup criada: ${result.nome} (${result.periodicidade === 'intervalo_minutos' ? `A cada ${result.intervalo_minutos} min` : result.periodicidade})`,
+      metadata: {
+        rotina_id: result.id,
+        periodicidade: result.periodicidade,
+        intervalo_minutos: result.intervalo_minutos,
+        tipo_execucao: result.tipo_execucao,
+      },
     })
   }
   return result
@@ -363,18 +385,51 @@ export async function saveBackupExecucao(
     result = await pb.collection('backup_execucoes').create<BackupExecucaoItem>(data)
     // Avaliação automática se criada manualmente
     try {
+      let detalheAval = `Avaliação registrada no lançamento manual de execução (${data.status}).`
+      let rotinaMeta: Record<string, unknown> = {}
+
+      if (data.rotina) {
+        try {
+          const rotinaRec = await pb
+            .collection('backup_rotinas')
+            .getOne<BackupRotinaItem>(data.rotina)
+          if (rotinaRec) {
+            rotinaMeta = {
+              rotina_nome: rotinaRec.nome,
+              periodicidade: rotinaRec.periodicidade,
+              intervalo_minutos: rotinaRec.intervalo_minutos,
+              tipo_execucao: rotinaRec.tipo_execucao,
+            }
+            if (rotinaRec.periodicidade === 'intervalo_minutos') {
+              detalheAval =
+                data.status === 'sucesso'
+                  ? `Execução manual em conformidade com rotina contínua (a cada ${rotinaRec.intervalo_minutos || 30} min · ${rotinaRec.tipo_execucao || 'incremental'}).`
+                  : `Execução manual não conforme (${data.status}) para rotina de ${rotinaRec.intervalo_minutos || 30} min.`
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
       const avalResult =
         data.status === 'sucesso'
           ? 'conforme'
           : data.status === 'parcial'
             ? 'atencao'
             : 'nao_conforme'
+
       await pb.collection('backup_avaliacoes').create({
         organization: data.organization,
         execucao: result.id,
         resultado_conformidade: avalResult,
-        detalhe: `Avaliação registrada no lançamento manual de execução (${data.status}).`,
-        itens_avaliados: { modo: 'manual', status: data.status, data: new Date().toISOString() },
+        detalhe: detalheAval,
+        itens_avaliados: {
+          modo: 'manual',
+          status: data.status,
+          ...rotinaMeta,
+          data: new Date().toISOString(),
+        },
       })
     } catch {
       /* intentionally ignored */

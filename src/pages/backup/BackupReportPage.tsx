@@ -301,21 +301,56 @@ export const BackupReportPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-[11px]">
               {rotinas.map((r) => {
                 const fontesDaRotina = fontes.filter((f) => f.rotina === r.id)
+                const periodicidadeStr =
+                  r.periodicidade === 'intervalo_minutos'
+                    ? `A cada ${r.intervalo_minutos || 30} min`
+                    : r.periodicidade
+                const tipoExecStr = r.tipo_execucao
+                  ? r.tipo_execucao === 'completo'
+                    ? 'Completo'
+                    : r.tipo_execucao === 'diferencial'
+                      ? 'Diferencial'
+                      : 'Incremental'
+                  : 'Incremental'
+
                 return (
                   <tr key={r.id}>
-                    <td className="p-2 font-semibold text-slate-900">{r.nome}</td>
-                    <td className="p-2 capitalize text-slate-700">
-                      {r.periodicidade} • {r.horario ? `${r.horario}h` : 'Manual'}
+                    <td className="p-2 font-semibold text-slate-900">
+                      <div>{r.nome}</div>
+                      <span className="text-[10px] text-blue-700 font-medium">
+                        Tipo: {tipoExecStr}
+                      </span>
+                    </td>
+                    <td className="p-2 text-slate-700">
+                      <span className="capitalize font-medium">{periodicidadeStr}</span>
+                      {r.periodicidade !== 'intervalo_minutos' && (
+                        <span className="text-slate-500">
+                          {' '}
+                          • {r.horario ? `${r.horario}h` : 'Flexível'}
+                        </span>
+                      )}
                     </td>
                     <td className="p-2 text-slate-600">
                       {fontesDaRotina.length === 0 ? (
                         <span className="italic text-slate-400">Nenhuma fonte vinculada</span>
                       ) : (
-                        fontesDaRotina.map((f) => (
-                          <div key={f.id} className="text-[10px]">
-                            • {f.caminho_identificacao} ({f.tipo_fonte})
-                          </div>
-                        ))
+                        fontesDaRotina.map((f) => {
+                          const fonteTipoLabel =
+                            f.tipo_fonte === 'banco_de_dados'
+                              ? 'Banco de Dados'
+                              : f.tipo_fonte === 'maquina_virtual'
+                                ? 'Máquina Virtual'
+                                : f.tipo_fonte
+                          return (
+                            <div key={f.id} className="text-[10px]">
+                              • {f.caminho_identificacao} ({fonteTipoLabel}
+                              {f.tipo_execucao && f.tipo_execucao !== 'padrao_rotina'
+                                ? ` · ${f.tipo_execucao}`
+                                : ''}
+                              )
+                            </div>
+                          )
+                        })
                       )}
                     </td>
                     <td className="p-2 text-slate-700">

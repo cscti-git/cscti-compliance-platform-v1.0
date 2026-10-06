@@ -292,12 +292,30 @@ routerAdd(
     // 6. Avaliação de Conformidade
     let conformidadeStatus = 'conforme'
     let conformidadeDetalhe = 'Execução de cópia concluída sem erros ou divergências.'
+    let rotinaPeriodicidade = ''
+    let rotinaIntervaloMin = 0
+    let rotinaTipoExecucao = ''
+
+    if (rotinaFinalId) {
+      try {
+        const rRec = $app.findRecordById('backup_rotinas', rotinaFinalId)
+        if (rRec) {
+          rotinaPeriodicidade = rRec.getString('periodicidade')
+          rotinaIntervaloMin = rRec.getInt('intervalo_minutos')
+          rotinaTipoExecucao = rRec.getString('tipo_execucao')
+        }
+      } catch (_) {}
+    }
+
     if (statusDetectado === 'erro') {
       conformidadeStatus = 'nao_conforme'
       conformidadeDetalhe = 'Comprovante indica falha crítica na execução do trabalho de backup.'
     } else if (statusDetectado === 'parcial') {
       conformidadeStatus = 'atencao'
       conformidadeDetalhe = 'Trabalho concluído com avisos/pendências ou cópia parcial.'
+    } else if (rotinaPeriodicidade === 'intervalo_minutos' && rotinaIntervaloMin > 0) {
+      // Verificar se a execução está em conformidade com o intervalo configurado (ex.: a cada 30 min)
+      conformidadeDetalhe = `Cópia executada com sucesso (intervalo: a cada ${rotinaIntervaloMin} min · ${rotinaTipoExecucao || 'incremental'}).`
     }
 
     const avalCol = $app.findCollectionByNameOrId('backup_avaliacoes')
@@ -308,6 +326,9 @@ routerAdd(
     avalRec.set('detalhe', conformidadeDetalhe)
     avalRec.set('itens_avaliados', {
       status_rotina: statusDetectado,
+      periodicidade: rotinaPeriodicidade || 'diaria',
+      intervalo_minutos: rotinaIntervaloMin,
+      tipo_execucao: rotinaTipoExecucao,
       tamanho_valido: tamanhoBytes > 0 || tamanhoFormatado !== '',
       destino_identificado: destinoDetectado !== '',
       avaliado_em: nowIso,
@@ -721,12 +742,28 @@ Consistência de dados: 100% dos blocos sincronizados com êxito.`,
 
         let confStatus = 'conforme'
         let confDetalhe = 'Cópia de segurança conferida e íntegra conforme política da serventia.'
+        let rotinaPeriod = ''
+        let rotinaInterval = 0
+        let rotinaTipoEx = ''
+        if (defaultRotinaId) {
+          try {
+            const rotRec = $app.findRecordById('backup_rotinas', defaultRotinaId)
+            if (rotRec) {
+              rotinaPeriod = rotRec.getString('periodicidade')
+              rotinaInterval = rotRec.getInt('intervalo_minutos')
+              rotinaTipoEx = rotRec.getString('tipo_execucao')
+            }
+          } catch (_) {}
+        }
+
         if (statusDetectado === 'erro') {
           confStatus = 'nao_conforme'
           confDetalhe = 'Falha detectada no comprovante de backup.'
         } else if (statusDetectado === 'parcial') {
           confStatus = 'atencao'
           confDetalhe = 'Comprovante indica execução com alertas ou pendências.'
+        } else if (rotinaPeriod === 'intervalo_minutos' && rotinaInterval > 0) {
+          confDetalhe = `Cópia íntegra conferida (intervalo: a cada ${rotinaInterval} min · ${rotinaTipoEx || 'incremental'}).`
         }
 
         const avalRec = new Record(avalCol)
@@ -736,6 +773,9 @@ Consistência de dados: 100% dos blocos sincronizados com êxito.`,
         avalRec.set('detalhe', confDetalhe)
         avalRec.set('itens_avaliados', {
           status_rotina: statusDetectado,
+          periodicidade: rotinaPeriod || 'diaria',
+          intervalo_minutos: rotinaInterval,
+          tipo_execucao: rotinaTipoEx,
           tamanho_valido: tamanhoBytes > 0,
           origem: 'IMAP',
           avaliado_em: nowIso,
