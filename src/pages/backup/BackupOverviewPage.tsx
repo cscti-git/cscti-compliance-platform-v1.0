@@ -64,7 +64,7 @@ export const BackupOverviewPage: React.FC = () => {
   const orgId = organization?.id || ''
   const canOperate = role === 'admin' || role === 'suporte'
 
-  const activeTab = searchParams.get('tab') || 'visao_geral'
+  const activeTab = searchParams.get('aba') || searchParams.get('tab') || 'visao_geral'
 
   const [loading, setLoading] = useState(true)
   const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])

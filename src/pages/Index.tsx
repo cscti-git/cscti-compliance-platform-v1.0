@@ -22,6 +22,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { ProtectionContinuityCard } from '@/components/backup/ProtectionContinuityCard'
 import {
   listAssignments,
   listPeople,
@@ -31,7 +32,7 @@ import {
 import type { AuditLogItem } from '@/types/cscti'
 
 export const Index: React.FC = () => {
-  const { organization, user } = useAuth()
+  const { organization, user, role } = useAuth()
   const [peopleCount, setPeopleCount] = useState<number>(0)
   const [assignmentsCount, setAssignmentsCount] = useState<number>(0)
   const [glpiActive, setGlpiActive] = useState<boolean>(false)
@@ -321,6 +322,11 @@ export const Index: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Painel de Proteção e Continuidade (Passo 2) */}
+      {organization?.id && (
+        <ProtectionContinuityCard organizationId={organization.id} userRole={role} />
+      )}
 
       {/* Grid Duplo: Resumo Institucional e Trilha Recente */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
