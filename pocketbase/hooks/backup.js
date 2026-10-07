@@ -1193,9 +1193,32 @@ routerAdd(
 
         if (detalhesVms.length === 0) {
           avisosParsing.push('Tabela Details de VMs ausente ou truncada no comprovante')
-        } else if (contadores.total_vms === 0) {
+        } else {
+          // Quando detalhesVms existir, calcular contadores a partir do array real de itens
+          let cSuc = 0
+          let cWarn = 0
+          let cErr = 0
+          for (let vi = 0; vi < detalhesVms.length; vi++) {
+            const st = String(detalhesVms[vi].status || '').toLowerCase()
+            if (st === 'success' || st === 'sucesso') {
+              cSuc++
+            } else if (st === 'warning' || st === 'aviso') {
+              cWarn++
+            } else if (st === 'failed' || st === 'error' || st === 'erro' || st === 'falha') {
+              cErr++
+            }
+          }
+          contadores.success = cSuc
+          contadores.warning = cWarn
+          contadores.error = cErr
           contadores.total_vms = detalhesVms.length
           contadores.processadas = detalhesVms.length
+
+          if (cErr > 0) {
+            statusDetectado = 'erro'
+          } else if (cWarn > 0 && statusDetectado === 'sucesso') {
+            statusDetectado = 'parcial'
+          }
         }
 
         destinoDetectado = 'Repositório Veeam (Backup Repository Local/Nuvem)'
@@ -1961,6 +1984,7 @@ routerAdd(
             let ativoComprovadoNestaEvidencia = false
             let itemCasadoNome = ''
             let fonteCasadaNome = ''
+            let statusIndividualVm = null // 'sucesso' | 'aviso' | 'erro'
 
             // 1. Match direto nome do ativo <-> item do comprovante
             for (let itI = 0; itI < itensComprovanteNorm.length; itI++) {
@@ -2014,15 +2038,53 @@ routerAdd(
               }
             }
 
+            // Descobrir status individual desta VM se houver detalhesVms
+            if (ativoComprovadoNestaEvidencia) {
+              if (detalhesVms && detalhesVms.length > 0) {
+                for (let dvI = 0; dvI < detalhesVms.length; dvI++) {
+                  const vmObj = detalhesVms[dvI]
+                  const vmNorm = normalizarTexto(vmObj.nome)
+                  const itemCasadoNorm = normalizarTexto(itemCasadoNome)
+                  if (
+                    vmNorm &&
+                    (vmNorm === aNomeNorm ||
+                      vmNorm === itemCasadoNorm ||
+                      vmNorm.includes(aNomeNorm) ||
+                      aNomeNorm.includes(vmNorm))
+                  ) {
+                    const st = String(vmObj.status || '').toLowerCase()
+                    if (st === 'success' || st === 'sucesso') {
+                      statusIndividualVm = 'sucesso'
+                    } else if (st === 'warning' || st === 'aviso') {
+                      statusIndividualVm = 'aviso'
+                    } else if (
+                      st === 'failed' ||
+                      st === 'error' ||
+                      st === 'erro' ||
+                      st === 'falha'
+                    ) {
+                      statusIndividualVm = 'erro'
+                    }
+                    break
+                  }
+                }
+              }
+              if (!statusIndividualVm) {
+                statusIndividualVm = statusDetectado === 'sucesso' ? 'sucesso' : 'erro'
+              }
+            }
+
             // 3. Avaliar quais modalidades foram comprovadas e quais ficaram pendentes
+            // GRANULARIDADE POR VM: O sucesso do item da VM prevalece sobre o status geral do job
             for (let mI = 0; mI < modalidadesExigidas.length; mI++) {
               const mod = modalidadesExigidas[mI]
               const modalidadeAtendidaPorEstaRotina = modalidadesComprovadasPorEsta.has(mod)
+              const itemVmComSucesso = statusIndividualVm === 'sucesso'
 
               if (
                 ativoComprovadoNestaEvidencia &&
                 modalidadeAtendidaPorEstaRotina &&
-                statusDetectado === 'sucesso'
+                itemVmComSucesso
               ) {
                 // (b) COMPROVADO
                 confrontoEscopo.comprovado.push({
@@ -2047,8 +2109,8 @@ routerAdd(
                   const modLabel =
                     mod === 'local' ? 'Local' : mod === 'nuvem' ? 'Nuvem' : 'Replicação'
                   motivoPendencia = `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`
-                } else if (statusDetectado !== 'sucesso') {
-                  motivoPendencia = `Execução reportou status "${statusDetectado}". Modalidade não homologada.`
+                } else if (!itemVmComSucesso) {
+                  motivoPendencia = `Item ${itemCasadoNome || aNome} reportou falha (${statusIndividualVm}) no comprovante. Modalidade não homologada.`
                 }
 
                 confrontoEscopo.pendencias.push({
@@ -2273,12 +2335,28 @@ routerAdd(
       if (!rotinaFinalId) {
         conformidadeDetalhe = `Não Conforme: ${motivoVinculoRigoroso || `Nenhuma rotina corresponde ao job '${jobName}' — cadastre o alias em Rotinas & Fontes.`}`
       } else if (statusDetectado === 'erro') {
-        conformidadeDetalhe =
-          adaptadorUsado === 'ACRONIS_PDF'
-            ? `Não Conforme: Relatório Acronis apresentou ${contadores.error} falha(s) nos planos de proteção.`
-            : adaptadorUsado === 'VEEAM_HTML'
-              ? `Não Conforme: Job Veeam "${jobName}" apresentou erro na execução (${contadores.error} falha(s)).`
-              : 'Não Conforme: Comprovante indica falha crítica na execução do trabalho de backup.'
+        if (adaptadorUsado === 'ACRONIS_PDF') {
+          conformidadeDetalhe = `Não Conforme: Relatório Acronis apresentou ${contadores.error} falha(s) nos planos de proteção.`
+        } else if (adaptadorUsado === 'VEEAM_HTML') {
+          const vmsFalhas = []
+          for (let vi = 0; vi < detalhesVms.length; vi++) {
+            const st = String(detalhesVms[vi].status || '').toLowerCase()
+            if (st === 'failed' || st === 'error' || st === 'erro' || st === 'falha') {
+              vmsFalhas.push(detalhesVms[vi].nome)
+            }
+          }
+          if (vmsFalhas.length > 0) {
+            const totalV = detalhesVms.length
+            const falhasV = vmsFalhas.length
+            const sucV = totalV - falhasV
+            conformidadeDetalhe = `Não Conforme: Job Veeam "${jobName}" apresentou erro na execução: ${vmsFalhas.join(', ')} (${falhasV} de ${totalV} VMs falharam; ${sucV} com sucesso).`
+          } else {
+            conformidadeDetalhe = `Não Conforme: Job Veeam "${jobName}" apresentou erro na execução (${contadores.error} falha(s)).`
+          }
+        } else {
+          conformidadeDetalhe =
+            'Não Conforme: Comprovante indica falha crítica na execução do trabalho de backup.'
+        }
       } else if (statusDetectado === 'parcial') {
         conformidadeDetalhe =
           adaptadorUsado === 'VEEAM_HTML'

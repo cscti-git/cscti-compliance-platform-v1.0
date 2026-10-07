@@ -419,10 +419,10 @@ routerAdd(
               continue
             }
 
-            // 2. Verificar se o comprovante desta execução cobre este ativo:
-            // a) detalhes_vms contém o nome/item do ativo e não está marcado fora_escopo
-            // b) ou a rotina cobre o ativo
+            // 2. Granularidade por VM / Ativo:
+            // Inspecionar detalhes_vms para saber se o ativo está presente e qual seu status individual
             let cobreAtivoNaExecucao = false
+            let statusIndividualAtivo = null // 'sucesso' | 'erro' | 'aviso'
             const dVms = ex.get('detalhes_vms')
             if (Array.isArray(dVms) && dVms.length > 0) {
               for (let vi = 0; vi < dVms.length; vi++) {
@@ -434,13 +434,29 @@ routerAdd(
                 ) {
                   if (!vm.fora_escopo && vm.status_escopo !== 'fora_escopo') {
                     cobreAtivoNaExecucao = true
+                    const st = String(vm.status || '').toLowerCase()
+                    if (st === 'success' || st === 'sucesso') {
+                      statusIndividualAtivo = 'sucesso'
+                    } else if (st === 'warning' || st === 'aviso') {
+                      statusIndividualAtivo = 'aviso'
+                    } else if (
+                      st === 'error' ||
+                      st === 'failed' ||
+                      st === 'erro' ||
+                      st === 'falha'
+                    ) {
+                      statusIndividualAtivo = 'erro'
+                    } else {
+                      statusIndividualAtivo = ex.getString('status') || 'erro'
+                    }
                     break
                   }
                 }
               }
             } else {
-              // Execução da rotina que cobre as fontes vinculadas
+              // Execução da rotina que cobre as fontes vinculadas sem detalhes_vms
               cobreAtivoNaExecucao = true
+              statusIndividualAtivo = ex.getString('status') || 'sucesso'
             }
 
             if (cobreAtivoNaExecucao) {
@@ -448,20 +464,20 @@ routerAdd(
               if (dtIso) {
                 const dtTime = new Date(dtIso).getTime()
 
-                // Rastrear a ÚLTIMA execução cronológica absoluta (seja sucesso, erro ou aviso)
+                // Rastrear a ÚLTIMA execução cronológica absoluta PARA ESTA VM
                 if (dtTime > ultimaExecucaoCronologicaTime) {
                   ultimaExecucaoCronologicaTime = dtTime
                   ultimaExecucaoCronologica = {
                     dataIso: dtIso,
                     execucaoId: ex.id,
-                    status: ex.getString('status') || 'desconhecido',
+                    status: statusIndividualAtivo,
                     observacao: ex.getString('observacao') || '',
                     candidato: cand,
                   }
                 }
 
-                // Apenas execuções com status === 'sucesso' contam como comprovação válida
-                if (ex.getString('status') === 'sucesso') {
+                // O sucesso do item da VM prevalece como comprovação válida para esta VM
+                if (statusIndividualAtivo === 'sucesso') {
                   if (dtTime > melhorDataTime) {
                     melhorDataTime = dtTime
                     melhorComprovacao = {
@@ -591,6 +607,9 @@ routerAdd(
       // - PARCIAL: algumas modalidades atendidas dentro do RPO
       // - NAO_PROTEGIDO: possui fonte cadastrada mas nenhuma modalidade comprovada dentro do RPO
       // - NAO_CADASTRADO: exige modalidade mas não possui nenhuma fonte cadastrada
+      const modLocal = modalidades.local
+      const modNuvem = modalidades.nuvem
+      const modRepl = modalidades.replicacao
       const temFalhaRecente = [modLocal, modNuvem, modRepl].some(
         (m) => m && (m.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' || m.ultima_execucao_falha),
       )
@@ -679,13 +698,20 @@ routerAdd(
           }
         }
 
-        // Se a execução tem comprovado vazio ou inflado, recalcular confronto honesto
+        // Granularidade por VM na reconciliação:
+        // Se a execução tem detalhes_vms, verificar status individual de cada VM.
+        // Se não tem detalhes_vms, usa status da execução.
+        const dVmsEx = ex.get('detalhes_vms')
+        const temDetalhesVms = Array.isArray(dVmsEx) && dVmsEx.length > 0
+
+        // Se a execução tem comprovado vazio ou inflado, ou precisa de reconciliação granular
         if (
           precisaAtualizar ||
           (confAntigo &&
             confAntigo.comprovado &&
             confAntigo.comprovado.length === 0 &&
-            modalidadeEx === 'local')
+            modalidadeEx === 'local') ||
+          temDetalhesVms
         ) {
           // Reconstruir comprovado e pendencias a partir dos ativos exigidos
           const novoComprovado = []
@@ -696,6 +722,7 @@ routerAdd(
             const aId = a.id
             const aNome = a.getString('name')
             const aTipo = a.getString('tipo')
+            const aNomeNorm = normalizarString(aNome)
             const exLoc = Boolean(a.getBool('exige_backup_local'))
             const exNuv = Boolean(a.getBool('exige_backup_nuvem'))
             const exRep = Boolean(a.getBool('exige_backup_replicacao'))
@@ -705,9 +732,41 @@ routerAdd(
             if (exNuv) mods.push('nuvem')
             if (exRep) mods.push('replicacao')
 
+            // Verificar status desta VM especificamente nesta execução
+            let vmPresente = false
+            let vmComSucesso = false
+            let vmMotivoErro = ''
+
+            if (temDetalhesVms) {
+              for (let vi = 0; vi < dVmsEx.length; vi++) {
+                const vmObj = dVmsEx[vi]
+                const vmNorm = normalizarString(vmObj.nome)
+                if (
+                  vmNorm &&
+                  (vmNorm === aNomeNorm || vmNorm.includes(aNomeNorm) || aNomeNorm.includes(vmNorm))
+                ) {
+                  vmPresente = true
+                  const st = String(vmObj.status || '').toLowerCase()
+                  if (st === 'success' || st === 'sucesso') {
+                    vmComSucesso = true
+                  } else {
+                    vmComSucesso = false
+                    vmMotivoErro = `Item ${vmObj.nome} reportou status "${vmObj.status}" no comprovante.`
+                  }
+                  break
+                }
+              }
+            } else {
+              vmPresente = true
+              vmComSucesso = ex.getString('status') === 'sucesso'
+              if (!vmComSucesso) {
+                vmMotivoErro = `Execução reportou status "${ex.getString('status')}".`
+              }
+            }
+
             for (let mi = 0; mi < mods.length; mi++) {
               const m = mods[mi]
-              if (m === modalidadeEx && ex.getString('status') === 'sucesso') {
+              if (m === modalidadeEx && vmComSucesso) {
                 novoComprovado.push({
                   ativo_id: aId,
                   ativo_nome: aNome,
@@ -725,15 +784,25 @@ routerAdd(
                 })
               } else {
                 const modLabel = m === 'local' ? 'Local' : m === 'nuvem' ? 'Nuvem' : 'Replicação'
+                let motivoPend = `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`
+                if (m === modalidadeEx) {
+                  if (!vmPresente) {
+                    motivoPend = `Ativo não mencionado neste comprovante (pode ser coberto por outra rotina/job).`
+                  } else if (!vmComSucesso) {
+                    motivoPend =
+                      vmMotivoErro ||
+                      `Execução reportou falha para este item. Modalidade não homologada.`
+                  }
+                }
                 novasPendencias.push({
                   ativo_id: aId,
                   ativo_nome: aNome,
                   ativo_tipo: aTipo,
                   modalidade_pendente: m,
-                  ativo_presente_no_comprovante: true,
+                  ativo_presente_no_comprovante: vmPresente,
                   item_comprovante: aNome,
-                  motivo: `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`,
-                  atendivel_por_outra_rotina: true,
+                  motivo: motivoPend,
+                  atendivel_por_outra_rotina: m !== modalidadeEx,
                 })
               }
             }
