@@ -814,18 +814,7 @@ export const BackupGuiaPage: React.FC = () => {
         </Card>
       </section>
 
-      {/* DUMMY REPLACE LINE PARA MATCH */}
-      <div className="hidden">
-                    6
-                  </span>
-                  <span>
-                    Salve a rotina. Em seguida, clique no botão <strong>Fontes &amp; Ativos</strong>{' '}
-                    no card da rotina para associar as fontes protegidas.
-                  </span>
-                </li>
-              </ol>
-            </div>
-
+      {/* DUMMY */}
             {/* Subseção: Fontes da Rotina — o que a rotina protege */}
             <div className="space-y-3 pt-3 border-t border-slate-100">
               <div className="flex items-center gap-2">
