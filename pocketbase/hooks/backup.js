@@ -218,25 +218,42 @@ routerAdd(
         )
       } catch (_) {}
 
-      // Matcher de regras
+      // Matcher de regras flexível e tolerante (Regra de Ouro F)
+      // Normalizar minúsculas, trim e colapsar espaços em branco múltiplos
+      const normalizarParaRegra = (str) => {
+        if (!str) return ''
+        return String(str).toLowerCase().replace(/\s+/g, ' ').trim()
+      }
+
       let regraCasada = null
-      const lowerRemetente = remetente.toLowerCase()
-      const lowerAssunto = assunto.toLowerCase()
-      const lowerConteudo = rawConteudo.toLowerCase()
-      const lowerPdfTexto = pdfExtraidoTexto.toLowerCase()
+      const normRemetente = normalizarParaRegra(remetente)
+      const normAssunto = normalizarParaRegra(assunto)
+      const normConteudo = normalizarParaRegra(rawConteudo)
+      const normPdfTexto = normalizarParaRegra(pdfExtraidoTexto)
 
       for (let i = 0; i < regras.length; i++) {
         const r = regras[i]
-        const filtroRem = (r.getString('remetente_filtro') || '').toLowerCase().trim()
-        const filtroAss = (r.getString('assunto_contem') || '').toLowerCase().trim()
-        const filtroPad = (r.getString('padrao_conteudo') || '').toLowerCase().trim()
+        const filtroRem = normalizarParaRegra(r.getString('remetente_filtro') || '')
+        const filtroAss = normalizarParaRegra(r.getString('assunto_contem') || '')
+        const filtroPad = normalizarParaRegra(r.getString('padrao_conteudo') || '')
 
-        let matchRem = !filtroRem || lowerRemetente.includes(filtroRem)
-        let matchAss = !filtroAss || lowerAssunto.includes(filtroAss)
-        let matchPad =
-          !filtroPad || lowerConteudo.includes(filtroPad) || lowerPdfTexto.includes(filtroPad)
+        const temFiltroRem = Boolean(filtroRem)
+        const temFiltroAss = Boolean(filtroAss)
+        const temFiltroPad = Boolean(filtroPad)
 
-        if (matchRem && matchAss && matchPad) {
+        // Se a regra não tem critério nenhum preenchido, pula
+        if (!temFiltroRem && !temFiltroAss && !temFiltroPad) continue
+
+        const matchRem =
+          temFiltroRem && (normRemetente.includes(filtroRem) || filtroRem.includes(normRemetente))
+        const matchAss =
+          temFiltroAss && (normAssunto.includes(filtroAss) || filtroAss.includes(normAssunto))
+        const matchPad =
+          temFiltroPad && (normConteudo.includes(filtroPad) || normPdfTexto.includes(filtroPad))
+
+        // Regra de Ouro F: Casar por assunto OU remetente OU padrão de conteúdo
+        // Assim remetente com ligeiras variações ou assunto específico casa diretamente a regra
+        if (matchAss || matchPad || matchRem) {
           regraCasada = r
           break
         }
@@ -1855,31 +1872,42 @@ routerAdd(
 
           confrontoEscopo.total_ativos_escopo = ativosEscopo.length
 
-          // Modalidades que ESTA evidência comprova, conforme destino do plano da rotina
-          // Normalização: local -> 'local', nuvem -> 'nuvem', replicacao/externo -> 'replicacao'
+          // Regra de Ouro A & B: MODALIDADE PROVADA SAI DO COMPROVANTE, NUNCA DO PLANO.
+          // Cada execução prova APENAS a modalidade que o conteúdo do comprovante demonstra:
+          // - Job de backup com destino repositório local/NAS / job backup padrão => 'local'
+          // - Backup Copy Job / cloud / Acronis nuvem => 'nuvem'
+          // - Replication Job => 'replicacao'
+          // Se não der para inferir com segurança, a execução NÃO prova modalidade nenhuma.
           const modalidadesComprovadasPorEsta = new Set()
-          if (planoDestinoValores.length > 0) {
-            for (let dI = 0; dI < planoDestinoValores.length; dI++) {
-              const dVal = planoDestinoValores[dI]
-              if (dVal === 'local') modalidadesComprovadasPorEsta.add('local')
-              else if (dVal === 'nuvem') modalidadesComprovadasPorEsta.add('nuvem')
-              else if (dVal === 'replicacao' || dVal === 'externo')
-                modalidadesComprovadasPorEsta.add('replicacao')
-            }
-          } else if (destinoDetectado) {
-            const dDet = destinoDetectado.toLowerCase()
-            if (dDet.includes('nuvem') || dDet.includes('cloud'))
-              modalidadesComprovadasPorEsta.add('nuvem')
-            if (dDet.includes('local') || dDet.includes('disco') || dDet.includes('storage'))
-              modalidadesComprovadasPorEsta.add('local')
-            if (dDet.includes('repli') || dDet.includes('externo') || dDet.includes('copy'))
-              modalidadesComprovadasPorEsta.add('replicacao')
-          }
 
-          // Se nenhuma modalidade foi identificada pelo plano/destino, fallback seguro para o adaptador
-          if (modalidadesComprovadasPorEsta.size === 0) {
-            if (adaptadorUsado === 'ACRONIS_PDF') modalidadesComprovadasPorEsta.add('nuvem')
-            else modalidadesComprovadasPorEsta.add('local')
+          const textoBuscaModalidade =
+            `${jobName} ${jobTipo} ${rotinaNomeReal} ${assunto} ${rawConteudo.slice(0, 1500)} ${destinoDetectado}`.toLowerCase()
+
+          if (
+            jobTipo === 'replication' ||
+            textoBuscaModalidade.includes('replication job') ||
+            textoBuscaModalidade.includes('replication_') ||
+            textoBuscaModalidade.includes('replica')
+          ) {
+            modalidadesComprovadasPorEsta.add('replicacao')
+          } else if (
+            jobTipo === 'backup_copy' ||
+            adaptadorUsado === 'ACRONIS_PDF' ||
+            textoBuscaModalidade.includes('backup copy job') ||
+            textoBuscaModalidade.includes('to cloud') ||
+            textoBuscaModalidade.includes('cloud') ||
+            textoBuscaModalidade.includes('nuvem')
+          ) {
+            modalidadesComprovadasPorEsta.add('nuvem')
+          } else if (
+            jobTipo === 'backup' ||
+            adaptadorUsado === 'VEEAM_HTML' ||
+            textoBuscaModalidade.includes('backup job:') ||
+            textoBuscaModalidade.includes('backup vms') ||
+            textoBuscaModalidade.includes('repository') ||
+            textoBuscaModalidade.includes('local')
+          ) {
+            modalidadesComprovadasPorEsta.add('local')
           }
 
           // Montar mapa de fontes cadastradas que apontam para ativos do inventário
@@ -2015,11 +2043,14 @@ routerAdd(
                 })
               } else {
                 // (c) PENDÊNCIAS
+                // Regra de Ouro E: Nota pedagógica clara quando atendível por outra rotina/job
                 let motivoPendencia = ''
                 if (!ativoComprovadoNestaEvidencia) {
                   motivoPendencia = `Ativo não mencionado neste comprovante (pode ser coberto por outra rotina/job).`
                 } else if (!modalidadeAtendidaPorEstaRotina) {
-                  motivoPendencia = `Modalidade "${mod}" não é coberta por esta rotina (o plano desta rotina cobre: ${Array.from(modalidadesComprovadasPorEsta).join(', ') || 'nenhuma'}). Pode ser atendida por outra rotina/evidência.`
+                  const modLabel =
+                    mod === 'local' ? 'Local' : mod === 'nuvem' ? 'Nuvem' : 'Replicação'
+                  motivoPendencia = `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`
                 } else if (statusDetectado !== 'sucesso') {
                   motivoPendencia = `Execução reportou status "${statusDetectado}". Modalidade não homologada.`
                 }
@@ -2235,6 +2266,15 @@ routerAdd(
       } else if (!regraCasada) {
         conformidadeStatus = 'atencao'
         conformidadeDetalhe = `Atenção: Comprovante processado via ${adaptadorUsado}, mas nenhuma regra de identificação cadastrada correspondeu ao remetente/assunto.`
+      } else if (
+        confrontoEscopo &&
+        confrontoEscopo.total_comprovadas === 0 &&
+        confrontoEscopo.total_exigencias_modalidade > 0
+      ) {
+        // Regra de Ouro E: LAUDO COERENTE.
+        // Se 0 comprovadas de exigências do escopo, o veredito não pode ser CONFORME nem 100%.
+        conformidadeStatus = 'atencao'
+        conformidadeDetalhe = `Atenção: Comprovante processado com sucesso (${tamanhoFormatado || 'cópia realizada'}), porém nenhuma modalidade exigida do escopo foi comprovada por esta rotina específica (${confrontoEscopo.total_pendencias} pendências registradas para outras rotinas/jobs).`
       } else if (adaptadorUsado === 'ACRONIS_PDF' && fontesNaoCobertas.length > 0) {
         conformidadeStatus = 'atencao'
         const naoCobertasNomes = fontesNaoCobertas.map((f) => f.item).join(', ')

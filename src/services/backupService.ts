@@ -489,7 +489,7 @@ export interface ProcessarEvidenciaResponse {
   adaptador?: string
   confronto_escopo?: import('../types/cscti').BackupConfrontoEscopo
   resultado?: Record<string, unknown>
-  laudo_tecnico?: BackupLaudoTecnico
+  laudo_tecnico?: import('../types/cscti').BackupLaudoTecnico
   mensagem?: string
   message?: string
 }
