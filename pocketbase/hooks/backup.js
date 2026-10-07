@@ -2095,6 +2095,7 @@ routerAdd(
                   item_comprovante: itemCasadoNome,
                   fonte_casada: fonteCasadaNome || null,
                   rotina_nome: rotinaNomeReal || null,
+                  job_nome: jobName || rotinaNomeReal || null,
                   plano_nome: planoNomeReal || null,
                   status: 'sucesso',
                   comprovado_em: nowIso,
@@ -2110,7 +2111,7 @@ routerAdd(
                     mod === 'local' ? 'Local' : mod === 'nuvem' ? 'Nuvem' : 'Replicação'
                   motivoPendencia = `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`
                 } else if (!itemVmComSucesso) {
-                  motivoPendencia = `Item ${itemCasadoNome || aNome} reportou falha (${statusIndividualVm}) no comprovante. Modalidade não homologada.`
+                  motivoPendencia = `VM ${itemCasadoNome || aNome} constou com status "${statusIndividualVm}" na execução do job '${jobName || rotinaNomeReal}'. Modalidade não homologada.`
                 }
 
                 confrontoEscopo.pendencias.push({
@@ -2121,6 +2122,7 @@ routerAdd(
                   ativo_presente_no_comprovante: ativoComprovadoNestaEvidencia,
                   item_comprovante: itemCasadoNome || null,
                   motivo: motivoPendencia,
+                  job_nome: jobName || rotinaNomeReal || null,
                   atendivel_por_outra_rotina:
                     !modalidadeAtendidaPorEstaRotina || !ativoComprovadoNestaEvidencia,
                 })
@@ -2128,13 +2130,13 @@ routerAdd(
             }
           }
 
+          confrontoEscopo.job_nome = jobName || rotinaNomeReal || null
           confrontoEscopo.total_comprovadas = confrontoEscopo.comprovado.length
           confrontoEscopo.total_pendencias = confrontoEscopo.pendencias.length
         }
       } catch (errEscopo) {
         // Falha tolerante na montagem do confronto
       }
-
       // Marcar nos detalhesVms se o item está fora do escopo cadastrado
       if (detalhesVms && detalhesVms.length > 0) {
         for (let dvI = 0; dvI < detalhesVms.length; dvI++) {

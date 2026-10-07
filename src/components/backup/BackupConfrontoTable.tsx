@@ -100,23 +100,40 @@ function ModalidadeSelo({
   } = modalidade
 
   if (status_modalidade === 'FALHA_ULTIMA_EXECUCAO' || modalidade.ultima_execucao_falha) {
+    const jobNomeCompleto = modalidade.job_nome || modalidade.rotina_nome || ''
+    const jobNomeExibicao =
+      jobNomeCompleto.length > 30 ? `${jobNomeCompleto.slice(0, 27)}…` : jobNomeCompleto
+
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-red-900 bg-red-100 border border-red-400 shadow-xs cursor-help animate-pulse">
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-red-900 bg-red-100 border border-red-400 shadow-xs cursor-help animate-pulse max-w-full"
+              title={jobNomeCompleto ? `Job: ${jobNomeCompleto}` : undefined}
+            >
               <AlertTriangle className="w-3.5 h-3.5 text-red-700 shrink-0" />
-              {label}: FALHA na última execução (
-              {formatRelativeTime(modalidade.ultima_execucao_data || modalidade.ultima_comprovacao)}
-              )
+              <span className="truncate">
+                {label}: FALHA na última execução
+                {jobNomeExibicao ? ` — ${jobNomeExibicao}` : ''} (
+                {formatRelativeTime(
+                  modalidade.ultima_execucao_data || modalidade.ultima_comprovacao,
+                )}
+                )
+              </span>
             </span>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs text-xs bg-slate-900 text-white">
             <p className="font-bold text-red-300">
-              Falha na última execução do job (
+              Falha na última execução (
               {formatRelativeTime(modalidade.ultima_execucao_data || modalidade.ultima_comprovacao)}
               )
             </p>
+            {jobNomeCompleto && (
+              <p className="mt-1 text-slate-100 font-semibold break-words">
+                Job: &ldquo;{jobNomeCompleto}&rdquo;
+              </p>
+            )}
             <p className="mt-1 text-slate-200">
               {modalidade.ultima_execucao_obs ||
                 'A última execução desta modalidade foi encerrada com erro.'}

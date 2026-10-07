@@ -164,12 +164,108 @@ routerAdd(
     // Helper: normalizar string para matching de caminhos/aliases
     const normalizarString = (str) => {
       if (!str) return ''
-      let s = String(str).trim().toLowerCase()
+      let s = String(str)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
       s = s.replace(/\\/g, '/')
       s = s.replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
       s = s.replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
       s = s.replace(/\s+/g, ' ').trim()
       return s
+    }
+
+    // Helper: extrair array de detalhes_vms de uma execução, com fallback em backup_processamentos
+    const obterDetalhesVmsExecucao = (exRec) => {
+      if (!exRec) return []
+      let dVms = exRec.get('detalhes_vms')
+      if (Array.isArray(dVms) && dVms.length > 0) {
+        return dVms
+      }
+      // Fallback: buscar em backup_processamentos se a execução não tiver persistido
+      const evidenciaId = exRec.getString('evidencia')
+      if (evidenciaId) {
+        try {
+          const procs = $app.findRecordsByFilter(
+            'backup_processamentos',
+            `evidencia = '${evidenciaId}'`,
+            '-created',
+            1,
+            0,
+          )
+          if (procs.length > 0) {
+            const resProc = procs[0].get('resultado')
+            if (resProc && Array.isArray(resProc.vms) && resProc.vms.length > 0) {
+              return resProc.vms
+            }
+          }
+        } catch (_) {}
+      }
+      return []
+    }
+
+    // Helper: extrair nome amigável do Job para exibição (ex.: "Backup VMs to Cloud\Backup VMs GOLD")
+    const extrairNomeJob = (execRec, rotinaRec) => {
+      if (!execRec) return ''
+      let jobNome = ''
+
+      // 1. Tentar extrair da observação (ex.: 'Veeam backup_copy: "Backup VMs to Cloud\Backup VMs GOLD" (...)')
+      const obs = execRec.getString('observacao') || ''
+      if (obs) {
+        const obsMatch = obs.match(/"([^"]+)"/)
+        if (obsMatch && obsMatch[1]) {
+          jobNome = obsMatch[1].trim()
+        }
+      }
+
+      // 2. Se não achou, tentar da avaliação / laudo
+      if (!jobNome) {
+        try {
+          const avals = $app.findRecordsByFilter(
+            'backup_avaliacoes',
+            `execucao = '${execRec.id}'`,
+            '-created',
+            1,
+            0,
+          )
+          if (avals.length > 0) {
+            const itensAv = avals[0].get('itens_avaliados')
+            if (itensAv && typeof itensAv === 'object' && itensAv.job_name) {
+              jobNome = String(itensAv.job_name).trim()
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. Tentar de backup_processamentos
+      if (!jobNome) {
+        const evidenciaId = execRec.getString('evidencia')
+        if (evidenciaId) {
+          try {
+            const procs = $app.findRecordsByFilter(
+              'backup_processamentos',
+              `evidencia = '${evidenciaId}'`,
+              '-created',
+              1,
+              0,
+            )
+            if (procs.length > 0) {
+              const resProc = procs[0].get('resultado')
+              if (resProc && typeof resProc === 'object' && resProc.job_name) {
+                jobNome = String(resProc.job_name).trim()
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 4. Fallback: nome da rotina
+      if (!jobNome && rotinaRec) {
+        jobNome = rotinaRec.getString('nome') || ''
+      }
+
+      return jobNome
     }
 
     // Helper: extrair modalidade comprovada pelo conteúdo REAL do comprovante/execução
@@ -423,15 +519,26 @@ routerAdd(
             // Inspecionar detalhes_vms para saber se o ativo está presente e qual seu status individual
             let cobreAtivoNaExecucao = false
             let statusIndividualAtivo = null // 'sucesso' | 'erro' | 'aviso'
-            const dVms = ex.get('detalhes_vms')
+            let motivoIndividualAtivo = ''
+            const dVms = obterDetalhesVmsExecucao(ex)
+            const assetNomeNorm = normalizarString(assetNome)
+
             if (Array.isArray(dVms) && dVms.length > 0) {
               for (let vi = 0; vi < dVms.length; vi++) {
                 const vm = dVms[vi]
                 const vmNomeNorm = normalizarString(vm.nome)
-                if (
-                  vmNomeNorm &&
-                  (vmNomeNorm === caminhoNorm || vmNomeNorm === normalizarString(assetNome))
-                ) {
+                if (!vmNomeNorm) continue
+
+                // Match tolerante: igualdade exata OU containment em ambos os sentidos
+                const bateu =
+                  vmNomeNorm === assetNomeNorm ||
+                  vmNomeNorm === caminhoNorm ||
+                  (assetNomeNorm && vmNomeNorm.includes(assetNomeNorm)) ||
+                  (assetNomeNorm && assetNomeNorm.includes(vmNomeNorm)) ||
+                  (caminhoNorm && vmNomeNorm.includes(caminhoNorm)) ||
+                  (caminhoNorm && caminhoNorm.includes(vmNomeNorm))
+
+                if (bateu) {
                   if (!vm.fora_escopo && vm.status_escopo !== 'fora_escopo') {
                     cobreAtivoNaExecucao = true
                     const st = String(vm.status || '').toLowerCase()
@@ -446,6 +553,7 @@ routerAdd(
                       st === 'falha'
                     ) {
                       statusIndividualAtivo = 'erro'
+                      motivoIndividualAtivo = `VM ${vm.nome} constou com status "${vm.status}" na execução.`
                     } else {
                       statusIndividualAtivo = ex.getString('status') || 'erro'
                     }
@@ -453,6 +561,8 @@ routerAdd(
                   }
                 }
               }
+              // FAIL-CLOSED: Se a execução tem tabela de VMs (dVms não-vazio) e este ativo NÃO consta na tabela,
+              // ele NÃO é coberto por esta execução! Nem sucesso nem falha dessa execução se aplicam a ele.
             } else {
               // Execução da rotina que cobre as fontes vinculadas sem detalhes_vms
               cobreAtivoNaExecucao = true
@@ -463,6 +573,7 @@ routerAdd(
               const dtIso = extrairDataExecucao(ex)
               if (dtIso) {
                 const dtTime = new Date(dtIso).getTime()
+                const nomeJobExec = extrairNomeJob(ex, cand.rotina)
 
                 // Rastrear a ÚLTIMA execução cronológica absoluta PARA ESTA VM
                 if (dtTime > ultimaExecucaoCronologicaTime) {
@@ -471,7 +582,8 @@ routerAdd(
                     dataIso: dtIso,
                     execucaoId: ex.id,
                     status: statusIndividualAtivo,
-                    observacao: ex.getString('observacao') || '',
+                    observacao: motivoIndividualAtivo || ex.getString('observacao') || '',
+                    jobNome: nomeJobExec,
                     candidato: cand,
                   }
                 }
@@ -483,6 +595,7 @@ routerAdd(
                     melhorComprovacao = {
                       dataIso: dtIso,
                       execucaoId: ex.id,
+                      jobNome: nomeJobExec,
                     }
                     melhorCandidato = cand
                   }
@@ -523,6 +636,7 @@ routerAdd(
             ultima_execucao_data: ultimaExecucaoCronologica.dataIso,
             ultima_execucao_status: ultimaExecucaoCronologica.status,
             ultima_execucao_obs: ultimaExecucaoCronologica.observacao,
+            job_nome: ultimaExecucaoCronologica.jobNome || candReferencia.rotina.getString('nome'),
             ocorrencias_abertas: ocorrenciasAbertas.length,
           }
         }
@@ -569,6 +683,7 @@ routerAdd(
           ultima_execucao_falha: false,
           ultima_execucao_data: melhorComprovacao.dataIso,
           ultima_execucao_status: 'sucesso',
+          job_nome: melhorComprovacao.jobNome || candReferencia.rotina.getString('nome'),
           ocorrencias_abertas: 0,
         }
       }
@@ -701,8 +816,19 @@ routerAdd(
         // Granularidade por VM na reconciliação:
         // Se a execução tem detalhes_vms, verificar status individual de cada VM.
         // Se não tem detalhes_vms, usa status da execução.
-        const dVmsEx = ex.get('detalhes_vms')
+        let dVmsEx = obterDetalhesVmsExecucao(ex)
         const temDetalhesVms = Array.isArray(dVmsEx) && dVmsEx.length > 0
+
+        // Se a execução ainda não tem detalhes_vms gravados diretamente nela, persistir agora
+        const dVmsGravados = ex.get('detalhes_vms')
+        if ((!Array.isArray(dVmsGravados) || dVmsGravados.length === 0) && temDetalhesVms) {
+          try {
+            ex.set('detalhes_vms', dVmsEx)
+            $app.save(ex)
+          } catch (_) {}
+        }
+
+        const nomeJobReconciliado = extrairNomeJob(ex, rotina)
 
         // Se a execução tem comprovado vazio ou inflado, ou precisa de reconciliação granular
         if (
@@ -751,7 +877,7 @@ routerAdd(
                     vmComSucesso = true
                   } else {
                     vmComSucesso = false
-                    vmMotivoErro = `Item ${vmObj.nome} reportou status "${vmObj.status}" no comprovante.`
+                    vmMotivoErro = `VM ${vmObj.nome} constou com status "${vmObj.status}" na execução do job ${nomeJobReconciliado ? "'" + nomeJobReconciliado + "'" : ''}.`
                   }
                   break
                 }
@@ -760,7 +886,7 @@ routerAdd(
               vmPresente = true
               vmComSucesso = ex.getString('status') === 'sucesso'
               if (!vmComSucesso) {
-                vmMotivoErro = `Execução reportou status "${ex.getString('status')}".`
+                vmMotivoErro = `Execução do job ${nomeJobReconciliado ? "'" + nomeJobReconciliado + "'" : ''} reportou status "${ex.getString('status')}".`
               }
             }
 
@@ -775,6 +901,7 @@ routerAdd(
                   item_comprovante: aNome,
                   fonte_casada: aNome,
                   rotina_nome: rotina ? rotina.getString('nome') : null,
+                  job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
                   plano_nome:
                     rotina && planosMap[rotina.getString('plano')]
                       ? planosMap[rotina.getString('plano')].getString('nome')
@@ -802,6 +929,7 @@ routerAdd(
                   ativo_presente_no_comprovante: vmPresente,
                   item_comprovante: aNome,
                   motivo: motivoPend,
+                  job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
                   atendivel_por_outra_rotina: m !== modalidadeEx,
                 })
               }
@@ -813,6 +941,7 @@ routerAdd(
             escopo_nome: confAntigo ? confAntigo.escopo_nome : 'Escopo do Inventário',
             rotina_id: rotinaId,
             rotina_nome: rotina ? rotina.getString('nome') : null,
+            job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
             plano_id: rotina ? rotina.getString('plano') : null,
             plano_nome:
               rotina && planosMap[rotina.getString('plano')]
@@ -827,7 +956,6 @@ routerAdd(
             total_comprovadas: novoComprovado.length,
             total_pendencias: novasPendencias.length,
           }
-
           ex.set('confronto_escopo', novoConfronto)
           $app.save(ex)
           totalExecucoesReconciliadas++

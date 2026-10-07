@@ -715,6 +715,7 @@ export interface ConfrontoModalidadeInfo {
   fonte_nome: string | null
   rotina_id: string | null
   rotina_nome: string | null
+  job_nome?: string | null
   plano_id: string | null
   plano_nome: string | null
   execucao_id: string | null
