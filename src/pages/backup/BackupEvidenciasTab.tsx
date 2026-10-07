@@ -36,6 +36,7 @@ import {
   Clock,
   ShieldCheck,
   Inbox,
+  Info,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -240,7 +241,15 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
       const res = await fetchEvidenciasImap(orgId)
       setLastFetchResult(res)
 
-      if (res.success) {
+      if (res.status === 'ingestao_manual') {
+        toast({
+          title: 'Ingestão de E-mail via Agente Local',
+          description: res.message,
+        })
+        // Atualizar estado do conector
+        const { email } = await getIntegrations(orgId)
+        setEmailConnector(email)
+      } else if (res.success) {
         toast({
           title: 'Busca de e-mail concluída',
           description: `${res.mensagens_verificadas} mensagens verificadas • ${res.evidencias_criadas} nova(s) evidência(s) ingerida(s) • ${res.evidencias_duplicadas} já existente(s).`,
@@ -941,8 +950,8 @@ Lista de atividades (1 dia):
                   Ingestão Automática via E-mail IMAP
                 </span>
                 {emailConnector && emailConnector.enabled ? (
-                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold">
-                    <CheckCircle2 className="w-3 h-3 mr-1" /> Ativo (Job a cada 15 min)
+                  <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
+                    <Info className="w-3 h-3 mr-1" /> Ingestão Local / Manual
                   </Badge>
                 ) : emailConnector ? (
                   <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold">
@@ -970,13 +979,13 @@ Lista de atividades (1 dia):
               <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-600">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  Última verificação:{' '}
+                  Status da integração:{' '}
                   <strong className="text-slate-800">
                     {lastFetchResult?.last_check
                       ? new Date(lastFetchResult.last_check).toLocaleString('pt-BR')
                       : emailConnector?.last_sync
                         ? new Date(emailConnector.last_sync).toLocaleString('pt-BR')
-                        : 'Nunca executada'}
+                        : 'Pendente'}
                   </strong>
                 </span>
                 {(lastFetchResult?.message || emailConnector?.last_sync_message) && (
@@ -999,9 +1008,10 @@ Lista de atividades (1 dia):
                 onClick={handleFetchImap}
                 disabled={fetchingImap}
                 className="h-8 text-xs text-blue-700 hover:text-blue-900 hover:bg-blue-50 px-2.5 font-medium"
+                title="Informações sobre a ingestão de e-mail"
               >
-                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${fetchingImap ? 'animate-spin' : ''}`} />
-                {fetchingImap ? 'Verificando...' : 'Verificar Caixa'}
+                <Mail className="w-3.5 h-3.5 mr-1.5" />
+                {fetchingImap ? 'Consultando...' : 'Status do Conector'}
               </Button>
             )}
           </div>

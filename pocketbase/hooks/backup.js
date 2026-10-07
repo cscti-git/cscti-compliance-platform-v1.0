@@ -863,6 +863,7 @@ routerAdd(
         }
 
         try {
+          // 1. Tabela HTML de Details
           const tableDetailsMatch = rawConteudo.match(/<table[^>]*>([\s\S]*?)<\/table>/gi)
           if (tableDetailsMatch) {
             for (let t = 0; t < tableDetailsMatch.length; t++) {
@@ -909,71 +910,149 @@ routerAdd(
             }
           }
 
-          // Fallback para texto plano colado (ex: "SPCM-REGWIN Success 09:48:39 ... 420 GB 1,2 GB")
-          if (detalhesVms.length === 0) {
-            const lines = (plainText || rawConteudo).split(/\r?\n/)
-            for (let l = 0; l < lines.length; l++) {
-              const line = lines[l].trim()
-              if (!line) continue
-              const vmLineMatch = line.match(
-                /^([A-Za-z0-9_\-\.]+)\s+(Success|Warning|Failed|Error)\s*(.*)$/i,
-              )
-              if (vmLineMatch) {
-                const vName = vmLineMatch[1].trim()
-                const vStatusRaw = vmLineMatch[2].toLowerCase()
-                const rest = vmLineMatch[3] || ''
+          // 2. Parser linha a linha flexível sobre texto plano (com ou sem bloco Details)
+          // NUNCA inventar itens: só captura linhas que contenham um nome de VM/item real seguido por status Veeam
+          const cabecalhosIgnorar = [
+            'name',
+            'vm',
+            'vms',
+            'status',
+            'start time',
+            'end time',
+            'duration',
+            'total size',
+            'backup size',
+            'data read',
+            'transferred',
+            'dedupe',
+            'compression',
+            'success',
+            'warning',
+            'error',
+            'failed',
+            'details',
+            'created by',
+            'backup job',
+            'backup copy job',
+            'replication job',
+            'summary',
+            'action',
+            'type',
+            'result',
+          ]
+
+          const processarLinhaVeeam = (line) => {
+            const trimmed = String(line || '').trim()
+            if (!trimmed) return null
+
+            // Regex 1: "SPCM-REGWIN Success 09:48:39 ... [tamanhos]"
+            // ou "SRV-PRODUCAO-01  Success  08:10:05  08:11:47  620 GB  3,5 GB"
+            const m = trimmed.match(
+              /^([A-Za-z0-9_\-\.\:\/\\]+)\s+(Success|Warning|Failed|Error)\b(.*)$/i,
+            )
+            if (m) {
+              const rawName = m[1].trim()
+              const lowerName = rawName.toLowerCase()
+              if (cabecalhosIgnorar.includes(lowerName)) return null
+              if (lowerName.startsWith('job') || lowerName.startsWith('http')) return null
+
+              const statusRaw = m[2].toLowerCase()
+              const rest = m[3] || ''
+              const statusVm =
+                statusRaw === 'success' ? 'success' : statusRaw === 'warning' ? 'warning' : 'failed'
+
+              const timeMatches = rest.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || []
+              const sizeMatches = rest.match(/\d+(?:[.,]\d+)?\s*(?:TB|GB|MB|KB|B)/gi) || []
+
+              return {
+                nome: rawName,
+                status: statusVm,
+                duracao: timeMatches[2] || timeMatches[0] || '',
+                start_time: timeMatches[0] || '',
+                end_time: timeMatches[1] || '',
+                tamanho_total: sizeMatches[0] || '',
+                dados_lidos: sizeMatches[1] || '',
+                transferido: sizeMatches[2] || '',
+              }
+            }
+
+            // Regex 2: Formato com colunas separadas por tabulação ou 2+ espaços
+            // ex: "SPCM-TDePJ \t Success \t 09:42:50"
+            const parts = trimmed
+              .split(/\t+|\s{2,}/)
+              .map((p) => p.trim())
+              .filter(Boolean)
+            if (parts.length >= 2) {
+              const p0 = parts[0]
+              const p1 = parts[1]
+              const lowerP0 = p0.toLowerCase()
+              if (
+                !cabecalhosIgnorar.includes(lowerP0) &&
+                /^(Success|Warning|Failed|Error)$/i.test(p1)
+              ) {
                 const statusVm =
-                  vStatusRaw === 'success'
+                  p1.toLowerCase() === 'success'
                     ? 'success'
-                    : vStatusRaw === 'warning'
+                    : p1.toLowerCase() === 'warning'
                       ? 'warning'
                       : 'failed'
-
-                const sizeMatches = rest.match(/\d+(?:[.,]\d+)?\s*(?:GB|MB|KB|TB|B)/gi) || []
-                const totalSize = sizeMatches[0] || ''
-                const dataRead = sizeMatches[1] || ''
-                const transferred = sizeMatches[2] || ''
-
-                detalhesVms.push({
-                  nome: vName,
+                const restStr = parts.slice(2).join(' ')
+                const sizeMatches = restStr.match(/\d+(?:[.,]\d+)?\s*(?:TB|GB|MB|KB|B)/gi) || []
+                return {
+                  nome: p0,
                   status: statusVm,
-                  duracao: '',
-                  tamanho_total: totalSize,
-                  dados_lidos: dataRead,
-                  transferido: transferred,
-                })
+                  duracao: parts[2] || '',
+                  tamanho_total: sizeMatches[0] || '',
+                  dados_lidos: sizeMatches[1] || '',
+                  transferido: sizeMatches[2] || '',
+                }
+              }
+            }
+
+            return null
+          }
+
+          if (detalhesVms.length === 0) {
+            const rawLines = (plainText || rawConteudo).split(/\r?\n/)
+            // Se houver marcador "Details", priorizar as linhas após ele
+            let searchLines = rawLines
+            const idxDetails = rawLines.findIndex(
+              (l) => /^\s*Details\s*$/i.test(l) || /Details/i.test(l),
+            )
+            if (idxDetails >= 0 && idxDetails < rawLines.length - 1) {
+              const afterDetails = rawLines.slice(idxDetails + 1)
+              const candidatas = []
+              for (let i = 0; i < afterDetails.length; i++) {
+                const parsed = processarLinhaVeeam(afterDetails[i])
+                if (
+                  parsed &&
+                  !candidatas.some((c) => c.nome.toLowerCase() === parsed.nome.toLowerCase())
+                ) {
+                  candidatas.push(parsed)
+                }
+              }
+              if (candidatas.length > 0) {
+                for (let k = 0; k < candidatas.length; k++) {
+                  detalhesVms.push(candidatas[k])
+                }
+              }
+            }
+
+            // Se ainda não encontrou via bloco Details, varre o texto completo
+            if (detalhesVms.length === 0) {
+              for (let i = 0; i < rawLines.length; i++) {
+                const parsed = processarLinhaVeeam(rawLines[i])
+                if (
+                  parsed &&
+                  !detalhesVms.some((c) => c.nome.toLowerCase() === parsed.nome.toLowerCase())
+                ) {
+                  detalhesVms.push(parsed)
+                }
               }
             }
           }
         } catch (errDet) {
-          avisosParsing.push(`Falha no parse da tabela HTML de Details: ${String(errDet)}`)
-        }
-
-        if (detalhesVms.length === 0 && plainText.includes('Details')) {
-          try {
-            const detailsPart = plainText.split(/Details/i)[1] || ''
-            const lines = detailsPart.split('\n')
-            for (let l = 0; l < lines.length; l++) {
-              const line = lines[l].trim()
-              if (!line) continue
-              const vmStatusMatch = line.match(
-                /^([A-Za-z0-9_\-\.]+)\s+(Success|Warning|Failed|Error)\s+(\d{1,2}:\d{2}:\d{2})\s+(\d{1,2}:\d{2}:\d{2})\s+([\d.,]+\s*[TGMK]?B)/i,
-              )
-              if (vmStatusMatch) {
-                detalhesVms.push({
-                  nome: vmStatusMatch[1],
-                  status: vmStatusMatch[2],
-                  start_time: vmStatusMatch[3],
-                  end_time: vmStatusMatch[4],
-                  size: vmStatusMatch[5],
-                  read: '',
-                  transferred: '',
-                  duration: '',
-                  details: '',
-                })
-              }
-            }
-          } catch (_) {}
+          avisosParsing.push(`Falha no parse da tabela/linhas Veeam: ${String(errDet)}`)
         }
 
         if (detalhesVms.length === 0) {
@@ -1096,9 +1175,6 @@ routerAdd(
       procRec.set('versao_adaptador', versaoAdaptador)
       procRec.set('resultado', resultadoProcessado)
       $app.save(procRec)
-
-      evidenciaRec.set('status_processamento', 'processada')
-      $app.save(evidenciaRec)
 
       // -------------------------------------------------------------
       // VINCULAÇÃO DE ROTINA E FONTE (VÍNCULO RIGOROSO POR ALIAS / NOME INLINE)
@@ -1345,6 +1421,45 @@ routerAdd(
       if (fonteFinalId && !evidenciaRec.getString('fonte')) {
         evidenciaRec.set('fonte', fonteFinalId)
         $app.save(evidenciaRec)
+      }
+
+      // Verificação de extração de dados: se nada foi extraído e não há itens identificados
+      const temDadosExtraidos =
+        detalhesVms.length > 0 ||
+        contadores.total_vms > 0 ||
+        contadores.success > 0 ||
+        tamanhoBytes > 0 ||
+        Boolean(dataInicioDetectada)
+
+      if (!temDadosExtraidos && !jobName) {
+        evidenciaRec.set('status_processamento', 'sem_dados_extraidos')
+        $app.save(evidenciaRec)
+
+        try {
+          const ocCol = $app.findCollectionByNameOrId('backup_ocorrencias')
+          const oc = new Record(ocCol)
+          oc.set('organization', organizationId)
+          oc.set('tipo', 'erro_de_processamento')
+          oc.set('severidade', 'media')
+          oc.set('status', 'aberta')
+          oc.set('titulo', 'Comprovante recebido sem dados extraíveis')
+          oc.set(
+            'descricao',
+            `O comprovante recebido via ${adaptadorUsado} não contém itens, VMs, contadores ou métricas identificáveis pelo parser. Status gravado como sem_dados_extraidos.`,
+          )
+          oc.set('evidencia', evidenciaRec.id)
+          $app.save(oc)
+        } catch (_) {}
+
+        return e.json(200, {
+          success: false,
+          idempotent: !isNovaEvidencia,
+          evidencia_id: evidenciaRec.id,
+          processamento_id: procRec.id,
+          status: 'sem_dados_extraidos',
+          message:
+            'Comprovante recebido e registrado, porém o conteúdo não continha itens de backup, VMs ou métricas passíveis de extração.',
+        })
       }
 
       // -------------------------------------------------------------
@@ -1741,6 +1856,10 @@ routerAdd(
       avalRec.set('laudo_tecnico', laudoTecnico)
       $app.save(avalRec)
 
+      // Agora que execução e avaliação foram persistidas com sucesso, atualizar evidência
+      evidenciaRec.set('status_processamento', 'processada')
+      $app.save(evidenciaRec)
+
       // Ocorrência se erro ou parcial
       if (statusDetectado === 'erro' || statusDetectado === 'parcial') {
         try {
@@ -1809,13 +1928,42 @@ routerAdd(
           : `Evidência já existente reconhecida e reprocessada via ${adaptadorUsado}.`,
       })
     } catch (procErr) {
-      const errStr = String(
-        procErr && procErr.message ? procErr.message : procErr || 'Erro interno',
-      )
+      const rawErrMsg =
+        procErr && procErr.message
+          ? String(procErr.message)
+          : String(procErr || 'Erro interno desconhecido')
+      // Sanitizar para evitar vazar segredos ou tokens
+      const sanitizedErr = rawErrMsg
+        .replace(/token=[^&\s]+/gi, 'token=***')
+        .replace(/password=[^&\s]+/gi, 'password=***')
+        .replace(/bearer\s+[A-Za-z0-9_\-\.]+/gi, 'Bearer ***')
+        .slice(0, 300)
+
+      // Registrar ocorrência para auditoria e visibilidade
+      try {
+        const bodyObj = (e.requestInfo && e.requestInfo().body) || {}
+        const authObj = e.auth
+        const orgIdFallback = (authObj && authObj.getString('organization')) || ''
+        if (orgIdFallback) {
+          const ocCol = $app.findCollectionByNameOrId('backup_ocorrencias')
+          const oc = new Record(ocCol)
+          oc.set('organization', orgIdFallback)
+          oc.set('tipo', 'erro_de_processamento')
+          oc.set('severidade', 'alta')
+          oc.set('status', 'aberta')
+          oc.set('titulo', 'Falha crítica no processamento da evidência')
+          oc.set(
+            'descricao',
+            `Ocorreu uma exceção não tratada durante o processamento da evidência: ${sanitizedErr}.`,
+          )
+          $app.save(oc)
+        }
+      } catch (_) {}
+
       return e.json(200, {
         success: false,
         status: 'erro_processamento',
-        message: `Não foi possível processar o comprovante de backup: ${errStr}. Verifique os campos e o formato da evidência.`,
+        message: `Não foi possível processar o comprovante de backup: ${sanitizedErr}. Verifique os campos e o formato da evidência.`,
       })
     }
   },
@@ -1942,9 +2090,10 @@ routerAdd(
       syncStatusFinal = 'erro'
       syncMsgFinal = `Falha na verificação IMAP: porta TCP inválida (${port}).`
     } else {
-      // Conexão e parâmetros validados com o servidor host:port na pasta folder
-      syncStatusFinal = 'sucesso'
-      syncMsgFinal = `Caixa postal IMAP (${user}@${host}:${port}/${folder}) verificada com sucesso. Nenhuma mensagem pendente de processamento na pasta ${folder}.`
+      // Retorno honesto: não há cliente IMAP direto no JSVM do PocketBase nesta hospedagem.
+      // A ingestão automática via IMAP será executada pelo agente local na VM do cliente.
+      syncStatusFinal = 'ingestao_manual'
+      syncMsgFinal = `Parâmetros do conector válidos (${user}@${host}:${port}/${folder}). A ingestão automática via IMAP será executada pelo agente local na VM do cliente. Nesta hospedagem, utilize a opção "Registrar Evidência / Anexo PDF" para processar comprovantes em tempo real.`
     }
 
     emailRecord.set('last_sync', nowIso)
@@ -1966,7 +2115,7 @@ routerAdd(
       auditRec.set('entity', 'Backup e Continuidade')
       auditRec.set(
         'detail',
-        `Busca de comprovantes via e-mail IMAP executada pelo operador: ${user}@${host}:${port} (${folder}). Status: ${syncStatusFinal}.`,
+        `Consulta de conector de e-mail IMAP solicitada pelo operador: ${user}@${host}:${port} (${folder}). Status: ${syncStatusFinal}.`,
       )
       auditRec.set('metadata', {
         host: host,
@@ -1974,18 +2123,18 @@ routerAdd(
         user: user,
         folder: folder,
         status: syncStatusFinal,
-        mensagens_verificadas: imapMensagensVerificadas,
+        mensagens_verificadas: 0,
       })
       $app.save(auditRec)
     } catch (_) {}
 
     return e.json(200, {
-      success: syncStatusFinal === 'sucesso',
+      success: syncStatusFinal !== 'erro',
       configured: true,
       enabled: true,
-      mensagens_verificadas: imapMensagensVerificadas,
-      evidencias_criadas: imapEvidenciasCriadas,
-      evidencias_duplicadas: imapEvidenciasDuplicadas,
+      mensagens_verificadas: 0,
+      evidencias_criadas: 0,
+      evidencias_duplicadas: 0,
       erros: syncStatusFinal === 'erro' ? 1 : 0,
       status: syncStatusFinal,
       message: syncMsgFinal,
@@ -2028,13 +2177,13 @@ cronAdd('backup_imap_fetch_cron', '*/15 * * * *', () => {
       continue
     }
 
-    // Apenas registra status de verificação da cron; nunca fabrica evidências no banco
+    // Registra status neutro honesto: conector ativo aguardando agente local
     try {
       con.set('last_sync', nowIso)
-      con.set('last_sync_status', 'sucesso')
+      con.set('last_sync_status', 'agente_local_pendente')
       con.set(
         'last_sync_message',
-        'Cron periódica (15m): monitoramento de conector ativo. Ingestão manual via Registrar Comprovante.',
+        'Conector configurado. A ingestão automática via IMAP será executada pelo agente local na VM do cliente. Nesta hospedagem, utilize "Registrar Evidência" para processamento manual.',
       )
       $app.save(con)
     } catch (_) {}

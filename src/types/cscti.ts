@@ -627,7 +627,7 @@ export interface BackupImapFetchResponse {
   evidencias_criadas: number
   evidencias_duplicadas: number
   erros: number
-  status: 'sucesso' | 'erro' | 'aviso'
+  status: 'sucesso' | 'erro' | 'aviso' | 'ingestao_manual'
   message: string
   last_check: string
 }
