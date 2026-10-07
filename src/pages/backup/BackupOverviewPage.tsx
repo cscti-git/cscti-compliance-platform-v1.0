@@ -396,7 +396,7 @@ export const BackupOverviewPage: React.FC = () => {
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Taxa de Sucesso
+                    Execuções com Sucesso
                   </p>
                   <p
                     className={`text-2xl font-bold mt-0.5 ${
@@ -409,11 +409,21 @@ export const BackupOverviewPage: React.FC = () => {
                             : 'text-red-600'
                     }`}
                   >
-                    {taxaSucesso !== null ? `${taxaSucesso}%` : '—'}
+                    {execucoes.length > 0 ? (
+                      <>
+                        {execucoesSucesso}
+                        <span className="text-sm font-normal text-slate-500">
+                          {' '}
+                          / {execucoes.length}
+                        </span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
                   </p>
                   <p className="text-[10px] text-slate-500 mt-0.5">
-                    {taxaSucesso !== null
-                      ? `${execucoesSucesso} de ${execucoes.length} com sucesso`
+                    {execucoes.length > 0
+                      ? 'Refere-se a execuções de job — não mede a proteção dos ativos'
                       : 'Nenhuma execução registrada'}
                   </p>
                 </div>
