@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T13:05:19.986Z",
+  "generatedAt": "2026-10-07T13:22:46.485Z",
   "collections": [
     {
       "name": "users",
@@ -1757,7 +1757,13 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["pendente", "processada", "erro", "nao_reconhecida"]
+          "selectValues": [
+            "pendente",
+            "processada",
+            "erro",
+            "nao_reconhecida",
+            "sem_dados_extraidos"
+          ]
         },
         {
           "name": "created",
