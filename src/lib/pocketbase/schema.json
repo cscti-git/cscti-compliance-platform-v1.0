@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T17:46:46.775Z",
+  "generatedAt": "2026-10-07T17:54:46.077Z",
   "collections": [
     {
       "name": "users",
@@ -1977,6 +1977,12 @@
           "type": "json",
           "required": false,
           "system": false
+        },
+        {
+          "name": "confronto_escopo",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -2044,6 +2050,12 @@
         },
         {
           "name": "laudo_tecnico",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "confronto_escopo",
           "type": "json",
           "required": false,
           "system": false
