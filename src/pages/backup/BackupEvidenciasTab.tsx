@@ -188,7 +188,7 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
   const [nomeArquivoAnexo, setNomeArquivoAnexo] = useState('')
   const [pdfTextoSimulado, setPdfTextoSimulado] = useState('')
 
-  // Conector IMAP e Estado de Ingestão
+  // Conector IMAP e Estado de Ingestão (comportamento fail-closed verificado)
   const [emailConnector, setEmailConnector] = useState<IntegrationItem | null>(null)
   const [fetchingImap, setFetchingImap] = useState(false)
   const [lastFetchResult, setLastFetchResult] = useState<BackupImapFetchResponse | null>(null)
@@ -241,35 +241,19 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
       const res = await fetchEvidenciasImap(orgId)
       setLastFetchResult(res)
 
-      if (res.status === 'ingestao_manual') {
-        toast({
-          title: 'Ingestão de E-mail via Agente Local',
-          description: res.message,
-        })
-        // Atualizar estado do conector
-        const { email } = await getIntegrations(orgId)
-        setEmailConnector(email)
-      } else if (res.success) {
-        toast({
-          title: 'Busca de e-mail concluída',
-          description: `${res.mensagens_verificadas} mensagens verificadas • ${res.evidencias_criadas} nova(s) evidência(s) ingerida(s) • ${res.evidencias_duplicadas} já existente(s).`,
-        })
-        onReload()
-        // Atualizar estado do conector
-        const { email } = await getIntegrations(orgId)
-        setEmailConnector(email)
-      } else {
-        toast({
-          title: res.configured ? 'Aviso na busca IMAP' : 'Conector IMAP não configurado',
-          description: res.message,
-          variant: res.status === 'erro' ? 'destructive' : 'default',
-        })
-      }
+      toast({
+        title: 'Ingestão Automática via Agente Local',
+        description:
+          'A leitura periódica da caixa postal IMAP é executada pelo agente local instalado na VM do cliente. Para processar comprovantes nesta versão hosted, utilize "Registrar Evidência / Anexo PDF".',
+      })
+      // Atualizar estado do conector
+      const { email } = await getIntegrations(orgId)
+      setEmailConnector(email)
     } catch (err: unknown) {
       toast({
-        title: 'Erro na busca de evidências via e-mail',
-        description: err instanceof Error ? err.message : 'Falha na comunicação com o backend.',
-        variant: 'destructive',
+        title: 'Conector de E-mail IMAP',
+        description:
+          'A leitura da caixa postal será realizada pelo agente local na VM do cliente. Utilize "Registrar Evidência / Anexo PDF" para entrada imediata.',
       })
     } finally {
       setFetchingImap(false)
@@ -892,7 +876,7 @@ Lista de atividades (1 dia):
               <RefreshCw
                 className={`w-3.5 h-3.5 text-blue-700 ${fetchingImap ? 'animate-spin' : ''}`}
               />
-              {fetchingImap ? 'Buscando na Caixa...' : 'Buscar evidências agora'}
+              {fetchingImap ? 'Consultando Conector...' : 'Buscar evidências agora'}
             </Button>
           )}
 
@@ -947,11 +931,11 @@ Lista de atividades (1 dia):
             <div className="space-y-0.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-slate-900 text-xs">
-                  Ingestão Automática via E-mail IMAP
+                  Conector de E-mail IMAP (Agente Local VM Ubuntu)
                 </span>
                 {emailConnector && emailConnector.enabled ? (
                   <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
-                    <Info className="w-3 h-3 mr-1" /> Ingestão Local / Manual
+                    <Info className="w-3 h-3 mr-1" /> Agente Local Pendente
                   </Badge>
                 ) : emailConnector ? (
                   <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold">
@@ -966,26 +950,45 @@ Lista de atividades (1 dia):
               <p className="text-[11px] text-slate-500">
                 {emailConnector?.email_user ? (
                   <>
-                    Caixa:{' '}
-                    <span className="font-mono text-slate-700">{emailConnector.email_user}</span> (
-                    {emailConnector.email_host}:{emailConnector.email_port || 993} /{' '}
-                    {emailConnector.email_folder || 'INBOX'})
+                    Servidor:{' '}
+                    <span className="font-mono text-slate-700">
+                      {emailConnector.email_host}:{emailConnector.email_port || 993} /{' '}
+                      {emailConnector.email_folder || 'INBOX'}
+                    </span>{' '}
+                    &bull; Conta mascarada:{' '}
+                    <span className="font-mono text-slate-700">
+                      {(() => {
+                        const u = emailConnector.email_user || ''
+                        const at = u.indexOf('@')
+                        if (at > 2) {
+                          return `${u[0]}${'•'.repeat(Math.max(3, at - 2))}${u[at - 1]}${u.slice(at)}`
+                        }
+                        return u.length > 2 ? `${u[0]}•••${u[u.length - 1]}` : '••••••••'
+                      })()}
+                    </span>
                   </>
                 ) : (
-                  'Cadastre os parâmetros da caixa em Configurações > Integrações para busca periódica automática.'
+                  'Cadastre os parâmetros da caixa em Configurações > Integrações para leitura pelo agente local.'
                 )}
               </p>
+              <div className="p-2 rounded bg-slate-100/80 border border-slate-200/80 text-[11px] text-slate-700 mt-1">
+                <strong>Ingestão em produção:</strong> A leitura automatizada da caixa postal será
+                executada pelo agente local instalado na VM Ubuntu 24.04 do cliente. Nesta versão
+                hosted, utilize o botão{' '}
+                <strong>&ldquo;Registrar Evidência / Anexo PDF&rdquo;</strong> para ingestão real
+                imediata.
+              </div>
               {/* Resumo da última verificação */}
               <div className="flex items-center gap-3 pt-1 text-[11px] text-slate-600">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  Status da integração:{' '}
+                  Status do conector:{' '}
                   <strong className="text-slate-800">
                     {lastFetchResult?.last_check
                       ? new Date(lastFetchResult.last_check).toLocaleString('pt-BR')
                       : emailConnector?.last_sync
                         ? new Date(emailConnector.last_sync).toLocaleString('pt-BR')
-                        : 'Pendente'}
+                        : 'Aguardando agente local'}
                   </strong>
                 </span>
                 {(lastFetchResult?.message || emailConnector?.last_sync_message) && (

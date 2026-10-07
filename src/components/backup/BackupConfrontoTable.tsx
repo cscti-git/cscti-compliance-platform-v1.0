@@ -99,6 +99,37 @@ function ModalidadeSelo({
     rotina_nome,
   } = modalidade
 
+  if (status_modalidade === 'FALHA_ULTIMA_EXECUCAO' || modalidade.ultima_execucao_falha) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-red-900 bg-red-100 border border-red-400 shadow-xs cursor-help animate-pulse">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-700 shrink-0" />
+              {label}: FALHA na última execução (
+              {formatRelativeTime(modalidade.ultima_execucao_data || modalidade.ultima_comprovacao)}
+              )
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs bg-slate-900 text-white">
+            <p className="font-bold text-red-300">
+              Falha na última execução do job (
+              {formatRelativeTime(modalidade.ultima_execucao_data || modalidade.ultima_comprovacao)}
+              )
+            </p>
+            <p className="mt-1 text-slate-200">
+              {modalidade.ultima_execucao_obs ||
+                'A última execução desta modalidade foi encerrada com erro.'}
+            </p>
+            <p className="mt-1 text-[10px] text-amber-300">
+              A proteção desta regra está suspensa até nova execução bem-sucedida comprovada.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
   if (status_modalidade === 'NUNCA_COMPROVADA') {
     return (
       <TooltipProvider>
@@ -352,19 +383,49 @@ export const BackupConfrontoTable: React.FC<BackupConfrontoTableProps> = ({
                   <th className="py-3 px-4">Ativo do Inventário</th>
                   <th className="py-3 px-4">Tipo / Criticidade</th>
                   <th className="py-3 px-4">Comprovação das Modalidades Exigidas</th>
+                  <th className="py-3 px-4 text-center">Ocorrências</th>
                   <th className="py-3 px-4 text-center">Status Consolidado</th>
                   <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {ativos.map((item: ConfrontoAtivoItem) => {
+                  const hasFailure =
+                    item.tem_falha_recente ||
+                    item.modalidades?.local?.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' ||
+                    item.modalidades?.nuvem?.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' ||
+                    item.modalidades?.replicacao?.status_modalidade === 'FALHA_ULTIMA_EXECUCAO'
+
+                  const ocorrenciasCount =
+                    item.ocorrencias_abertas_count ||
+                    (item.modalidades?.local?.ocorrencias_abertas || 0) +
+                      (item.modalidades?.nuvem?.ocorrencias_abertas || 0) +
+                      (item.modalidades?.replicacao?.ocorrencias_abertas || 0)
+
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={item.id}
+                      className={`transition-colors ${
+                        hasFailure ? 'bg-red-50/40 hover:bg-red-50/60' : 'hover:bg-slate-50/70'
+                      }`}
+                    >
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900">{item.nome}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">{item.nome}</span>
+                          {hasFailure && (
+                            <Badge className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0 h-4">
+                              ALERTA DE FALHA
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
                           {item.total_atendidas} de {item.exigencias.total_exigidas} modalidades
                           atendidas no RPO
+                          {hasFailure && (
+                            <span className="text-red-700 font-semibold ml-1">
+                              • Proteção suspensa
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -410,6 +471,17 @@ export const BackupConfrontoTable: React.FC<BackupConfrontoTableProps> = ({
                             />
                           )}
                         </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        {ocorrenciasCount > 0 ? (
+                          <Badge className="bg-red-100 text-red-800 border-red-300 font-bold text-[10px]">
+                            <AlertTriangle className="w-3 h-3 mr-1 text-red-600" />
+                            {ocorrenciasCount} aberta{ocorrenciasCount > 1 ? 's' : ''}
+                          </Badge>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">—</span>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4 text-center">

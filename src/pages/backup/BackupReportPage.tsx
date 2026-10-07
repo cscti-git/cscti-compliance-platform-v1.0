@@ -24,7 +24,9 @@ import {
   listBackupEvidencias,
   listBackupOcorrencias,
   listBackupTestes,
+  getBackupConfronto,
 } from '@/services/backupService'
+import type { BackupConfrontoResponse, ConfrontoAtivoItem } from '@/types/cscti'
 import { getOrganizationById } from '@/services/csctiService'
 import type {
   BackupEscopoItem,
@@ -53,6 +55,7 @@ export const BackupReportPage: React.FC = () => {
   const [evidencias, setEvidencias] = useState<BackupEvidenciaItem[]>([])
   const [ocorrencias, setOcorrencias] = useState<BackupOcorrenciaItem[]>([])
   const [testes, setTestes] = useState<BackupTesteRecuperacaoItem[]>([])
+  const [confronto, setConfronto] = useState<BackupConfrontoResponse | null>(null)
 
   const dataEmissao = new Date()
 
@@ -65,18 +68,29 @@ export const BackupReportPage: React.FC = () => {
         const fullOrg = await getOrganizationById(orgId)
         if (fullOrg) setOrg(fullOrg)
 
-        const [escData, plaData, reqData, rotData, fonData, exeData, eviData, ocoData, tesData] =
-          await Promise.all([
-            listBackupEscopos(orgId),
-            listBackupPlanos(orgId),
-            listBackupPlanoRequisitos(orgId),
-            listBackupRotinas(orgId),
-            listBackupFontes(orgId),
-            listBackupExecucoes(orgId),
-            listBackupEvidencias(orgId),
-            listBackupOcorrencias(orgId),
-            listBackupTestes(orgId),
-          ])
+        const [
+          escData,
+          plaData,
+          reqData,
+          rotData,
+          fonData,
+          exeData,
+          eviData,
+          ocoData,
+          tesData,
+          confData,
+        ] = await Promise.all([
+          listBackupEscopos(orgId),
+          listBackupPlanos(orgId),
+          listBackupPlanoRequisitos(orgId),
+          listBackupRotinas(orgId),
+          listBackupFontes(orgId),
+          listBackupExecucoes(orgId),
+          listBackupEvidencias(orgId),
+          listBackupOcorrencias(orgId),
+          listBackupTestes(orgId),
+          getBackupConfronto(orgId).catch(() => null),
+        ])
 
         setEscopos(escData)
         setPlanos(plaData)
@@ -87,6 +101,7 @@ export const BackupReportPage: React.FC = () => {
         setEvidencias(eviData)
         setOcorrencias(ocoData)
         setTestes(tesData)
+        setConfronto(confData)
       } catch (err) {
         console.error('Erro ao carregar dados do relatório de backup:', err)
       } finally {
@@ -208,22 +223,36 @@ export const BackupReportPage: React.FC = () => {
           </p>
         </div>
 
-        {/* 1. Resumo Executivo das Métricas */}
+        {/* 1. Resumo Executivo das Métricas com Confronto Honesto */}
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1 mb-2">
-            1. Resumo Executivo do Parque de Proteção
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1 mb-2 flex items-center justify-between">
+            <span>1. Resumo Executivo do Parque de Proteção</span>
+            {confronto?.totais && (
+              <span className="text-[10px] font-bold text-slate-700">
+                Conformidade Global de Proteção: {confronto.totais.percentual_protegido}%
+              </span>
+            )}
           </h3>
           <div className="grid grid-cols-4 gap-2 text-center text-xs">
+            <div className="p-2 border rounded bg-slate-50">
+              <span className="text-[10px] text-slate-500 block uppercase">
+                Ativos 100% Protegidos
+              </span>
+              <strong
+                className={`text-sm ${
+                  (confronto?.totais?.percentual_protegido ?? 100) === 100
+                    ? 'text-emerald-700'
+                    : 'text-amber-700'
+                }`}
+              >
+                {confronto?.totais?.total_protegidos ?? '—'} /{' '}
+                {confronto?.totais?.total_ativos_exigidos ?? '—'}
+              </strong>
+            </div>
             <div className="p-2 border rounded bg-slate-50">
               <span className="text-[10px] text-slate-500 block uppercase">Planos / Rotinas</span>
               <strong className="text-sm text-slate-900">
                 {planos.length} planos / {rotinas.length} rotinas
-              </strong>
-            </div>
-            <div className="p-2 border rounded bg-slate-50">
-              <span className="text-[10px] text-slate-500 block uppercase">Taxa de Sucesso</span>
-              <strong className="text-sm text-emerald-700">
-                {totalExecucoes > 0 ? Math.round((execucoesSucesso / totalExecucoes) * 100) : 100}%
               </strong>
             </div>
             <div className="p-2 border rounded bg-slate-50">
@@ -234,12 +263,91 @@ export const BackupReportPage: React.FC = () => {
             </div>
             <div className="p-2 border rounded bg-slate-50">
               <span className="text-[10px] text-slate-500 block uppercase">
-                Testes de Restauração
+                Ocorrências Abertas
               </span>
-              <strong className="text-sm text-emerald-700">{testes.length} homologados</strong>
+              <strong
+                className={`text-sm ${ocorrenciasAbertas > 0 ? 'text-red-700 font-extrabold' : 'text-slate-900'}`}
+              >
+                {ocorrenciasAbertas}
+              </strong>
             </div>
           </div>
         </div>
+
+        {/* 1.1 Quadro de Confronto por Ativo e Estado da Última Execução */}
+        {confronto && confronto.confronto && confronto.confronto.length > 0 && (
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-1 mb-2">
+              1.1 Estado de Proteção por Ativo e Modalidade (Validação Centrada no Ativo)
+            </h3>
+            <table className="w-full text-left text-xs border border-slate-200">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase text-[9px]">
+                <tr>
+                  <th className="p-2">Ativo</th>
+                  <th className="p-2">Local</th>
+                  <th className="p-2">Nuvem</th>
+                  <th className="p-2">Replicação</th>
+                  <th className="p-2 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-[10px]">
+                {confronto.confronto.map((item: ConfrontoAtivoItem) => {
+                  const renderMod = (
+                    mod?: import('@/types/cscti').ConfrontoModalidadeInfo,
+                    exigida?: boolean,
+                  ) => {
+                    if (!exigida) return <span className="text-slate-400">Não exigida</span>
+                    if (!mod || mod.status_modalidade === 'SEM_FONTE')
+                      return <span className="text-slate-500 font-semibold">Sem fonte</span>
+                    if (
+                      mod.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' ||
+                      mod.ultima_execucao_falha
+                    ) {
+                      return (
+                        <span className="font-bold text-red-700 bg-red-100 px-1 py-0.5 rounded">
+                          FALHA ÚLTIMA EXECUÇÃO
+                        </span>
+                      )
+                    }
+                    if (mod.status_modalidade === 'NUNCA_COMPROVADA')
+                      return <span className="text-red-600">Nunca comprovada</span>
+                    if (mod.status_modalidade === 'FORA_RPO')
+                      return <span className="text-amber-700">Fora do RPO</span>
+                    return <span className="text-emerald-700 font-semibold">Atendida no RPO</span>
+                  }
+
+                  return (
+                    <tr key={item.id}>
+                      <td className="p-2 font-bold text-slate-900">{item.nome}</td>
+                      <td className="p-2">
+                        {renderMod(item.modalidades?.local, item.exigencias.local)}
+                      </td>
+                      <td className="p-2">
+                        {renderMod(item.modalidades?.nuvem, item.exigencias.nuvem)}
+                      </td>
+                      <td className="p-2">
+                        {renderMod(item.modalidades?.replicacao, item.exigencias.replicacao)}
+                      </td>
+                      <td className="p-2 text-center">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                            item.status_consolidado === 'PROTEGIDO'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : item.status_consolidado === 'PARCIAL'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {item.status_consolidado}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* 2. Escopo e Políticas dos Planos */}
         <div>

@@ -373,7 +373,7 @@ routerAdd(
             ultima_comprovacao: null,
             dentro_do_rpo: false,
             horas_desde_ultima: null,
-            rpo_horas_configurado: null,
+            rpo_horas_configurado: 24,
             fonte_id: null,
             fonte_nome: null,
             rotina_id: null,
@@ -381,15 +381,24 @@ routerAdd(
             plano_id: null,
             plano_nome: null,
             execucao_id: null,
-            status_modalidade: 'SEM_FONTE', // SEM_FONTE, NUNCA_COMPROVADA, FORA_RPO, ATENDIDA
+            status_modalidade: 'SEM_FONTE',
+            ultima_execucao_falha: false,
+            ultima_execucao_data: null,
+            ultima_execucao_status: null,
+            ocorrencias_abertas: 0,
           }
         }
 
-        // Fontes cadastradas existem na cadeia. Agora buscar última comprovação real
-        // OBRIGATÓRIO: A execução deve PROVAR especificamente esta modalidade (modalidadeNome)
+        // Fontes cadastradas existem na cadeia. Agora inspecionar execuções reais com FAIL-CLOSED estrito.
+        // OBRIGATÓRIO: A execução deve corresponder especificamente a esta modalidade (modalidadeNome).
+        // Se a ÚLTIMA execução comprovada ou tentada para esta modalidade falhou (status !== 'sucesso'),
+        // a modalidade entra em FALHA_ULTIMA_EXECUCAO, derrubando a conformidade do ativo.
         let melhorComprovacao = null
         let melhorDataTime = 0
         let melhorCandidato = fontesCandidatas[0]
+
+        let ultimaExecucaoCronologica = null
+        let ultimaExecucaoCronologicaTime = 0
 
         for (let ci = 0; ci < fontesCandidatas.length; ci++) {
           const cand = fontesCandidatas[ci]
@@ -406,13 +415,13 @@ routerAdd(
             // 1. INFERÊNCIA ESTRITA DA MODALIDADE DO COMPROVANTE
             const modalidadeProvadaPelaExecucao = inferirModalidadeComprovante(ex, cand.rotina)
             if (modalidadeProvadaPelaExecucao !== modalidadeNome) {
-              // Esta execução NÃO prova a modalidade avaliada
+              // Esta execução NÃO se aplica à modalidade avaliada
               continue
             }
 
             // 2. Verificar se o comprovante desta execução cobre este ativo:
             // a) detalhes_vms contém o nome/item do ativo e não está marcado fora_escopo
-            // b) ou a rotina cobre o ativo (execução com sucesso geral)
+            // b) ou a rotina cobre o ativo
             let cobreAtivoNaExecucao = false
             const dVms = ex.get('detalhes_vms')
             if (Array.isArray(dVms) && dVms.length > 0) {
@@ -438,20 +447,69 @@ routerAdd(
               const dtIso = extrairDataExecucao(ex)
               if (dtIso) {
                 const dtTime = new Date(dtIso).getTime()
-                if (dtTime > melhorDataTime) {
-                  melhorDataTime = dtTime
-                  melhorComprovacao = {
+
+                // Rastrear a ÚLTIMA execução cronológica absoluta (seja sucesso, erro ou aviso)
+                if (dtTime > ultimaExecucaoCronologicaTime) {
+                  ultimaExecucaoCronologicaTime = dtTime
+                  ultimaExecucaoCronologica = {
                     dataIso: dtIso,
                     execucaoId: ex.id,
+                    status: ex.getString('status') || 'desconhecido',
+                    observacao: ex.getString('observacao') || '',
+                    candidato: cand,
                   }
-                  melhorCandidato = cand
+                }
+
+                // Apenas execuções com status === 'sucesso' contam como comprovação válida
+                if (ex.getString('status') === 'sucesso') {
+                  if (dtTime > melhorDataTime) {
+                    melhorDataTime = dtTime
+                    melhorComprovacao = {
+                      dataIso: dtIso,
+                      execucaoId: ex.id,
+                    }
+                    melhorCandidato = cand
+                  }
                 }
               }
             }
           }
         }
 
-        const rpoHoras = melhorCandidato.plano.getInt('rpo_horas') || 24
+        const candReferencia =
+          (ultimaExecucaoCronologica && ultimaExecucaoCronologica.candidato) || melhorCandidato
+        const rpoHoras = candReferencia.plano.getInt('rpo_horas') || 24
+
+        // FAIL-CLOSED: Se a última execução cronológica foi de erro/falha,
+        // a modalidade está compulsoriamente em falha, NÃO protegida!
+        const ultimaFalhou =
+          ultimaExecucaoCronologica &&
+          ultimaExecucaoCronologica.status !== 'sucesso' &&
+          ultimaExecucaoCronologicaTime >= melhorDataTime
+
+        if (ultimaFalhou) {
+          const horasDesdeFalha = (nowTime - ultimaExecucaoCronologicaTime) / (1000 * 60 * 60)
+          return {
+            cadastrada: true,
+            ultima_comprovacao: melhorComprovacao ? melhorComprovacao.dataIso : null,
+            dentro_do_rpo: false,
+            horas_desde_ultima: Math.round(horasDesdeFalha * 10) / 10,
+            rpo_horas_configurado: rpoHoras,
+            fonte_id: candReferencia.fonte.id,
+            fonte_nome: candReferencia.fonte.getString('caminho_identificacao') || assetNome,
+            rotina_id: candReferencia.rotina.id,
+            rotina_nome: candReferencia.rotina.getString('nome'),
+            plano_id: candReferencia.plano.id,
+            plano_nome: candReferencia.plano.getString('nome'),
+            execucao_id: ultimaExecucaoCronologica.execucaoId,
+            status_modalidade: 'FALHA_ULTIMA_EXECUCAO',
+            ultima_execucao_falha: true,
+            ultima_execucao_data: ultimaExecucaoCronologica.dataIso,
+            ultima_execucao_status: ultimaExecucaoCronologica.status,
+            ultima_execucao_obs: ultimaExecucaoCronologica.observacao,
+            ocorrencias_abertas: ocorrenciasAbertas.length,
+          }
+        }
 
         if (!melhorComprovacao) {
           return {
@@ -460,14 +518,18 @@ routerAdd(
             dentro_do_rpo: false,
             horas_desde_ultima: null,
             rpo_horas_configurado: rpoHoras,
-            fonte_id: melhorCandidato.fonte.id,
-            fonte_nome: melhorCandidato.fonte.getString('caminho_identificacao') || assetNome,
-            rotina_id: melhorCandidato.rotina.id,
-            rotina_nome: melhorCandidato.rotina.getString('nome'),
-            plano_id: melhorCandidato.plano.id,
-            plano_nome: melhorCandidato.plano.getString('nome'),
+            fonte_id: candReferencia.fonte.id,
+            fonte_nome: candReferencia.fonte.getString('caminho_identificacao') || assetNome,
+            rotina_id: candReferencia.rotina.id,
+            rotina_nome: candReferencia.rotina.getString('nome'),
+            plano_id: candReferencia.plano.id,
+            plano_nome: candReferencia.plano.getString('nome'),
             execucao_id: null,
             status_modalidade: 'NUNCA_COMPROVADA',
+            ultima_execucao_falha: false,
+            ultima_execucao_data: null,
+            ultima_execucao_status: null,
+            ocorrencias_abertas: ocorrenciasAbertas.length,
           }
         }
 
@@ -480,14 +542,18 @@ routerAdd(
           dentro_do_rpo: dentroRpo,
           horas_desde_ultima: Math.round(horasDesde * 10) / 10,
           rpo_horas_configurado: rpoHoras,
-          fonte_id: melhorCandidato.fonte.id,
-          fonte_nome: melhorCandidato.fonte.getString('caminho_identificacao') || assetNome,
-          rotina_id: melhorCandidato.rotina.id,
-          rotina_nome: melhorCandidato.rotina.getString('nome'),
-          plano_id: melhorCandidato.plano.id,
-          plano_nome: melhorCandidato.plano.getString('nome'),
+          fonte_id: candReferencia.fonte.id,
+          fonte_nome: candReferencia.fonte.getString('caminho_identificacao') || assetNome,
+          rotina_id: candReferencia.rotina.id,
+          rotina_nome: candReferencia.rotina.getString('nome'),
+          plano_id: candReferencia.plano.id,
+          plano_nome: candReferencia.plano.getString('nome'),
           execucao_id: melhorComprovacao.execucaoId,
           status_modalidade: dentroRpo ? 'ATENDIDA' : 'FORA_RPO',
+          ultima_execucao_falha: false,
+          ultima_execucao_data: melhorComprovacao.dataIso,
+          ultima_execucao_status: 'sucesso',
+          ocorrencias_abertas: 0,
         }
       }
 
@@ -525,8 +591,20 @@ routerAdd(
       // - PARCIAL: algumas modalidades atendidas dentro do RPO
       // - NAO_PROTEGIDO: possui fonte cadastrada mas nenhuma modalidade comprovada dentro do RPO
       // - NAO_CADASTRADO: exige modalidade mas não possui nenhuma fonte cadastrada
+      const temFalhaRecente = [modLocal, modNuvem, modRepl].some(
+        (m) => m && (m.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' || m.ultima_execucao_falha),
+      )
+
       let statusConsolidado = 'NAO_PROTEGIDO'
-      if (totalExigidas > 0 && totalAtendidas === totalExigidas) {
+      if (temFalhaRecente) {
+        if (totalAtendidas > 0) {
+          statusConsolidado = 'PARCIAL'
+          totalParcial++
+        } else {
+          statusConsolidado = 'NAO_PROTEGIDO'
+          totalNaoProtegido++
+        }
+      } else if (totalExigidas > 0 && totalAtendidas === totalExigidas) {
         statusConsolidado = 'PROTEGIDO'
         totalProtegidos++
       } else if (totalAtendidas > 0) {

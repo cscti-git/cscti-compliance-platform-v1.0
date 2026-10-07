@@ -324,6 +324,66 @@ export const BackupOverviewPage: React.FC = () => {
 
         {/* 1. VISÃO GERAL */}
         <TabsContent value="visao_geral" className="space-y-6">
+          {/* Banner de Alerta Crítico quando houver falha de backup na última execução */}
+          {(() => {
+            const ativosComFalha = (confrontoData?.confronto || []).filter(
+              (item) =>
+                item.tem_falha_recente ||
+                item.modalidades?.local?.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' ||
+                item.modalidades?.nuvem?.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' ||
+                item.modalidades?.replicacao?.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' ||
+                item.modalidades?.local?.ultima_execucao_falha ||
+                item.modalidades?.nuvem?.ultima_execucao_falha ||
+                item.modalidades?.replicacao?.ultima_execucao_falha,
+            )
+
+            const alertaGlobal = confrontoData?.alerta_falha_recente?.tem_falha
+            const temFalha = ativosComFalha.length > 0 || Boolean(alertaGlobal)
+            const countFalhas = Math.max(ativosComFalha.length, alertaGlobal ? 1 : 0)
+
+            if (!temFalha) return null
+
+            return (
+              <div className="p-4 rounded-xl border-2 border-red-500 bg-red-50/95 text-red-950 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-in fade-in duration-300">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-lg bg-red-600 text-white shrink-0 mt-0.5">
+                    <AlertTriangle className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-extrabold text-red-950 uppercase tracking-wide">
+                        Backup com falha detectado
+                      </h3>
+                      <Badge className="bg-red-700 text-white font-bold text-[10px]">
+                        NÃO 100% PROTEGIDO
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-red-900 mt-1 leading-relaxed">
+                      <strong>Atenção:</strong> {countFalhas} ativo(s) com uma das regras de backup
+                      falhadas na última execução. A proteção foi suspensa até nova execução
+                      bem-sucedida.
+                    </p>
+                    <p className="text-[11px] text-red-800/80 mt-0.5">
+                      Conformidade e cobertura RPO recalculadas para baixo de forma honesta
+                      (fail-closed).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    onClick={() => setSearchParams({ tab: 'ocorrencias' })}
+                    size="sm"
+                    className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs gap-1.5 shadow-sm"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Ver Ocorrências Abertas ({ocorrenciasAbertas})
+                  </Button>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Métricas Principais em Cards com métrica honesta do confronto */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {/* Métrica Honesta 1: Protegidos no Confronto */}

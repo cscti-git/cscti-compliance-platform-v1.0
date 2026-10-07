@@ -2648,19 +2648,22 @@ routerAdd(
     let syncStatusFinal = 'sucesso'
     let syncMsgFinal = ''
 
-    // Validar formato de conta/usuário e porta
+    // Validar formato de conta/usuário e porta (sem vazar e-mail nos retornos)
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user)
+    const atIdx = user.indexOf('@')
+    const maskedUser = atIdx > 2 ? `${user[0]}••••${user.slice(atIdx)}` : '••••••••'
+
     if (!validEmail) {
       syncStatusFinal = 'erro'
-      syncMsgFinal = `Falha na verificação IMAP: formato de usuário/conta inválido (${user}).`
+      syncMsgFinal = `Falha na verificação IMAP: formato de conta de e-mail inválido.`
     } else if (port < 1 || port > 65535) {
       syncStatusFinal = 'erro'
       syncMsgFinal = `Falha na verificação IMAP: porta TCP inválida (${port}).`
     } else {
       // Retorno honesto: não há cliente IMAP direto no JSVM do PocketBase nesta hospedagem.
       // A ingestão automática via IMAP será executada pelo agente local na VM do cliente.
-      syncStatusFinal = 'ingestao_manual'
-      syncMsgFinal = `Parâmetros do conector válidos (${user}@${host}:${port}/${folder}). A ingestão automática via IMAP será executada pelo agente local na VM do cliente. Nesta hospedagem, utilize a opção "Registrar Evidência / Anexo PDF" para processar comprovantes em tempo real.`
+      syncStatusFinal = 'agente_local_pendente'
+      syncMsgFinal = `Conector configurado (${host}:${port}/${folder}). A ingestão automática por IMAP será executada pelo agente local na VM Ubuntu 24.04 do cliente. Nesta versão hosted, utilize "Registrar Evidência / Anexo PDF" para processar comprovantes em tempo real.`
     }
 
     emailRecord.set('last_sync', nowIso)
@@ -2670,7 +2673,7 @@ routerAdd(
       $app.save(emailRecord)
     } catch (_) {}
 
-    // Auditoria append-only (sem segredos)
+    // Auditoria append-only (sem segredos nem e-mail cru exposto)
     try {
       const auditCol = $app.findCollectionByNameOrId('audit_log')
       const auditRec = new Record(auditCol)
@@ -2682,12 +2685,12 @@ routerAdd(
       auditRec.set('entity', 'Backup e Continuidade')
       auditRec.set(
         'detail',
-        `Consulta de conector de e-mail IMAP solicitada pelo operador: ${user}@${host}:${port} (${folder}). Status: ${syncStatusFinal}.`,
+        `Consulta de conector IMAP solicitada pelo operador: ${maskedUser}@${host}:${port} (${folder}). Status: ${syncStatusFinal}.`,
       )
       auditRec.set('metadata', {
         host: host,
         port: port,
-        user: user,
+        masked_user: maskedUser,
         folder: folder,
         status: syncStatusFinal,
         mensagens_verificadas: 0,
@@ -2750,13 +2753,12 @@ cronAdd('backup_imap_fetch_cron', '*/15 * * * *', () => {
       con.set('last_sync_status', 'agente_local_pendente')
       con.set(
         'last_sync_message',
-        'Conector configurado. A ingestão automática via IMAP será executada pelo agente local na VM do cliente. Nesta hospedagem, utilize "Registrar Evidência" para processamento manual.',
+        'Conector configurado. A ingestão automática via IMAP será executada pelo agente local na VM Ubuntu 24.04 do cliente. Nesta versão hosted, utilize "Registrar Evidência / Anexo PDF" para processamento manual.',
       )
       $app.save(con)
     } catch (_) {}
   }
 })
-
 // -------------------------------------------------------------------
 // 4. Exclusão controlada de evidência individual com confirmação e motivo
 // -------------------------------------------------------------------
