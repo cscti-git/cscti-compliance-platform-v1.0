@@ -446,18 +446,18 @@ Lista de atividades (1 dia):
       if (res.success) {
         toast({
           title: 'Comprovante processado com sucesso',
-          description: `Adaptador: ${res.adaptador || 'Automático'} • Status: ${res.status?.toUpperCase()}.`,
+          description: `Adaptador: ${res.adaptador || 'Automático'} • Status: ${res.status?.toUpperCase()} • Veredito: ${res.conformidade ? res.conformidade.toUpperCase() : 'CONFORME'}.`,
         })
+        setModalOpen(false)
+        onReload()
+        reloadMonitoramentos()
       } else {
         toast({
-          title: 'Erro de processamento',
-          description: res.message,
+          title: 'Erro ao processar comprovante',
+          description: res.message || 'Falha ao processar evidência de backup.',
           variant: 'destructive',
         })
       }
-      setModalOpen(false)
-      onReload()
-      reloadMonitoramentos()
     } catch (err: unknown) {
       toast({
         title: 'Erro ao processar comprovante',

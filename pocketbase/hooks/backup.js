@@ -208,11 +208,15 @@ routerAdd(
           lowerConteudo.includes('backup copy job:') ||
           lowerConteudo.includes('replication job:') ||
           lowerConteudo.includes('veeam backup') ||
+          lowerConteudo.includes('veem backup') ||
+          lowerAssunto.includes('backup vms') ||
           (lowerConteudo.includes('vms processed') && lowerConteudo.includes('details')) ||
           (lowerConteudo.includes('start time') &&
             lowerConteudo.includes('data read') &&
-            lowerConteudo.includes('transferred')))
-
+            lowerConteudo.includes('transferred')) ||
+          lowerConteudo.includes('spch-regwin') ||
+          lowerConteudo.includes('spcm-tdepj') ||
+          lowerConteudo.includes('spcm-regwin'))
       const isGenericBackup =
         isAcronisDetected ||
         isNocDetected ||
@@ -392,7 +396,7 @@ routerAdd(
 
         // Se ainda vazio, não injetar cliente fallback default fictício
         if (clientesStatus.length === 0) {
-          avisosParsing.push('Nenhum status de cliente identificado no comprovante do NOC.')
+          // Nenhum status de cliente identificado no comprovante do NOC
         }
 
         // Extração de linhas de evidências/jobs mencionados em texto
@@ -764,7 +768,6 @@ routerAdd(
           }
           avisosParsing.push('Cabeçalho de job do Veeam extraído via fallback de assunto')
         }
-
         const lowerAss = assunto.toLowerCase()
         if (
           lowerAss.includes('[failed]') ||
@@ -853,51 +856,92 @@ routerAdd(
         if (compMatch) metricasVeeam.compression = compMatch[1].trim()
 
         const verMatch =
-          rawConteudo.match(/Veeam\s+Backup\s*(?:&|and)\s*Replication\s*([0-9.]+)/i) ||
-          plainText.match(/Veeam\s+Backup\s*(?:&|and)\s*Replication\s*([0-9.]+)/i)
+          rawConteudo.match(/Vee?am\s+Backup\s*(?:&|and)\s*Replication\s*([0-9.]+)/i) ||
+          plainText.match(/Vee?am\s+Backup\s*(?:&|and)\s*Replication\s*([0-9.]+)/i)
         if (verMatch) {
           veeamVersion = `Veeam Backup & Replication ${verMatch[1]}`
         }
 
         try {
-          const tableDetailsMatch = rawConteudo.match(
-            /Details[\s\S]*?<table[\s\S]*?>([\s\S]*?)<\/table>/i,
-          )
+          const tableDetailsMatch = rawConteudo.match(/<table[^>]*>([\s\S]*?)<\/table>/gi)
           if (tableDetailsMatch) {
-            const tableContent = tableDetailsMatch[1]
-            const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
-            let rMatch
-            while ((rMatch = rowRegex.exec(tableContent)) !== null) {
-              const rowHtml = rMatch[1]
-              const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi
-              const cells = []
-              let cMatch
-              while ((cMatch = cellRegex.exec(rowHtml)) !== null) {
-                cells.push(stripHtml(cMatch[1]))
+            for (let t = 0; t < tableDetailsMatch.length; t++) {
+              const tableHtml = tableDetailsMatch[t]
+              if (
+                !tableHtml.toLowerCase().includes('success') &&
+                !tableHtml.toLowerCase().includes('warning') &&
+                !tableHtml.toLowerCase().includes('failed')
+              ) {
+                continue
               }
-              if (cells.length >= 2) {
-                const col0 = cells[0].trim()
-                const col1 = cells[1].trim()
-                if (
-                  col0.toLowerCase() === 'name' ||
-                  col0.toLowerCase() === 'vm' ||
-                  col0.toLowerCase() === 'objeto'
-                ) {
-                  continue
-                }
-                if (col0 && col1) {
+              const rowMatches = tableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || []
+              for (let r = 0; r < rowMatches.length; r++) {
+                const row = rowMatches[r]
+                const cellMatches = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []
+                if (cellMatches.length >= 2) {
+                  const c0 = stripHtml(cellMatches[0]).trim()
+                  const c1 = stripHtml(cellMatches[1]).trim()
+                  if (!c0 || c0.toLowerCase() === 'name' || c0.toLowerCase() === 'vm') continue
+
+                  const statusVm = /success/i.test(row)
+                    ? 'success'
+                    : /warning/i.test(row)
+                      ? 'warning'
+                      : /failed|error/i.test(row)
+                        ? 'failed'
+                        : 'success'
+
+                  const totalSize = cellMatches.length >= 5 ? stripHtml(cellMatches[4]).trim() : ''
+                  const dataRead = cellMatches.length >= 6 ? stripHtml(cellMatches[5]).trim() : ''
+                  const transferred =
+                    cellMatches.length >= 7 ? stripHtml(cellMatches[6]).trim() : ''
+
                   detalhesVms.push({
-                    nome: col0,
-                    status: col1,
-                    start_time: cells[2] || '',
-                    end_time: cells[3] || '',
-                    size: cells[4] || '',
-                    read: cells[5] || '',
-                    transferred: cells[6] || '',
-                    duration: cells[7] || '',
-                    details: cells[8] || '',
+                    nome: c0,
+                    status: statusVm,
+                    duracao: c1,
+                    tamanho_total: totalSize,
+                    dados_lidos: dataRead,
+                    transferido: transferred,
                   })
                 }
+              }
+            }
+          }
+
+          // Fallback para texto plano colado (ex: "SPCM-REGWIN Success 09:48:39 ... 420 GB 1,2 GB")
+          if (detalhesVms.length === 0) {
+            const lines = (plainText || rawConteudo).split(/\r?\n/)
+            for (let l = 0; l < lines.length; l++) {
+              const line = lines[l].trim()
+              if (!line) continue
+              const vmLineMatch = line.match(
+                /^([A-Za-z0-9_\-\.]+)\s+(Success|Warning|Failed|Error)\s*(.*)$/i,
+              )
+              if (vmLineMatch) {
+                const vName = vmLineMatch[1].trim()
+                const vStatusRaw = vmLineMatch[2].toLowerCase()
+                const rest = vmLineMatch[3] || ''
+                const statusVm =
+                  vStatusRaw === 'success'
+                    ? 'success'
+                    : vStatusRaw === 'warning'
+                      ? 'warning'
+                      : 'failed'
+
+                const sizeMatches = rest.match(/\d+(?:[.,]\d+)?\s*(?:GB|MB|KB|TB|B)/gi) || []
+                const totalSize = sizeMatches[0] || ''
+                const dataRead = sizeMatches[1] || ''
+                const transferred = sizeMatches[2] || ''
+
+                detalhesVms.push({
+                  nome: vName,
+                  status: statusVm,
+                  duracao: '',
+                  tamanho_total: totalSize,
+                  dados_lidos: dataRead,
+                  transferido: transferred,
+                })
               }
             }
           }
