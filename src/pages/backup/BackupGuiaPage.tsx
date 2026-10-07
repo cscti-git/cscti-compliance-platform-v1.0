@@ -503,9 +503,9 @@ export const BackupGuiaPage: React.FC = () => {
                   retenção de 90 dias e destino Nuvem.
                 </li>
                 <li>
-                  <strong>Plano 3 (Mídia Externa Físico):</strong> ex.:{' '}
-                  <em>&quot;Cópia semanal cofre off-site&quot;</em> com periodicidade semanal e
-                  destino Externo.
+                  <strong>Plano 3 (Replicação / Cópia Externa):</strong> ex.:{' '}
+                  <em>&quot;Cópia semanal / replicação off-site&quot;</em> com periodicidade semanal
+                  e destino Replicação.
                 </li>
               </ul>
             </div>
@@ -563,7 +563,7 @@ export const BackupGuiaPage: React.FC = () => {
                   <span>
                     Marque os <strong>Destinos de Mídia</strong> (multi-checkbox):{' '}
                     <em>Local (NAS/Storage interno)</em>, <em>Nuvem (Cloud/Wasabi/Azure/AWS)</em>{' '}
-                    e/ou <em>Externo (Fita/HD off-site)</em>.
+                    e/ou <em>Replicação (cópia externa / off-site)</em>.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">

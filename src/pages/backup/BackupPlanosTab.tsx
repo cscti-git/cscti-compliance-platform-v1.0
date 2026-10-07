@@ -127,7 +127,21 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
   >('rpo')
 
   const toggleDestino = (dest: BackupPlanoDestino) => {
-    setDestinos((prev) => (prev.includes(dest) ? prev.filter((d) => d !== dest) : [...prev, dest]))
+    // Normalizar 'externo' para 'replicacao'
+    const target = dest === 'externo' ? 'replicacao' : dest
+    setDestinos((prev) => {
+      const normalized = prev.map((d) => (d === 'externo' ? 'replicacao' : d))
+      return normalized.includes(target)
+        ? normalized.filter((d) => d !== target)
+        : [...normalized, target]
+    })
+  }
+
+  const formatDestinoLabel = (d: string) => {
+    if (d === 'local') return 'Local'
+    if (d === 'nuvem') return 'Nuvem'
+    if (d === 'replicacao' || d === 'externo') return 'Replicação'
+    return d
   }
 
   const openNewPlano = () => {
@@ -160,7 +174,10 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
     setPeriodicidade(p.periodicidade || '')
     setIntervaloMinutos(p.intervalo_minutos && p.intervalo_minutos >= 5 ? p.intervalo_minutos : 30)
     setJanelaHorario(p.janela_horario || (p.periodicidade === 'intervalo_minutos' ? '' : '23:00'))
-    setDestinos(Array.isArray(p.destino) ? p.destino : [])
+    const normDest = Array.isArray(p.destino)
+      ? p.destino.map((d: string) => (d === 'externo' ? 'replicacao' : d))
+      : []
+    setDestinos(normDest as BackupPlanoDestino[])
     setModalOpen(true)
   }
 
@@ -498,9 +515,9 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
                         {Array.isArray(plano.destino) && plano.destino.length > 0 && (
                           <Badge
                             variant="secondary"
-                            className="bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0 font-medium capitalize"
+                            className="bg-purple-50 text-purple-900 border border-purple-200 px-1.5 py-0 font-medium"
                           >
-                            Destino: {plano.destino.join(', ')}
+                            Destino: {plano.destino.map(formatDestinoLabel).join(', ')}
                           </Badge>
                         )}
                       </div>
@@ -891,7 +908,7 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
                   </div>
                 )}
 
-                {/* Destino: Checkboxes Local / Nuvem / Externo */}
+                {/* Destino: Checkboxes Local / Nuvem / Replicação */}
                 <div>
                   <label className="font-semibold text-slate-700 block text-[11px] mb-1.5">
                     Destino da Cópia (estratégia de armazenamento)
@@ -929,17 +946,17 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
 
                     <label
                       className={`flex items-center gap-2 p-2 rounded border cursor-pointer text-xs transition ${
-                        destinos.includes('externo')
-                          ? 'bg-amber-50/70 border-amber-300 text-amber-900 font-semibold'
+                        destinos.includes('replicacao') || destinos.includes('externo')
+                          ? 'bg-purple-50/70 border-purple-300 text-purple-900 font-semibold'
                           : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <Checkbox
-                        checked={destinos.includes('externo')}
-                        onCheckedChange={() => toggleDestino('externo')}
+                        checked={destinos.includes('replicacao') || destinos.includes('externo')}
+                        onCheckedChange={() => toggleDestino('replicacao')}
                       />
-                      <ExternalLink className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span>Externo</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span>Replicação</span>
                     </label>
                   </div>
                 </div>

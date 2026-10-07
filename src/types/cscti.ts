@@ -255,7 +255,7 @@ export interface BackupEscopoItem {
 }
 
 export type BackupPlanoPeriodicidade = 'intervalo_minutos' | 'diaria' | 'semanal' | 'mensal'
-export type BackupPlanoDestino = 'local' | 'nuvem' | 'externo'
+export type BackupPlanoDestino = 'local' | 'nuvem' | 'replicacao' | 'externo'
 
 export interface BackupPlanoItem {
   id: string

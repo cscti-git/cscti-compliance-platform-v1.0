@@ -297,8 +297,16 @@ export const BackupReportPage: React.FC = () => {
                           </span>
                         )}
                         {Array.isArray(p.destino) && p.destino.length > 0 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-medium capitalize">
-                            <strong>Destino:</strong>&nbsp;{p.destino.join(', ')}
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-200 font-medium">
+                            <strong>Destino:</strong>&nbsp;
+                            {p.destino
+                              .map((d: string) => {
+                                if (d === 'local') return 'Local'
+                                if (d === 'nuvem') return 'Nuvem'
+                                if (d === 'replicacao' || d === 'externo') return 'Replicação'
+                                return d
+                              })
+                              .join(', ')}
                           </span>
                         )}
                       </div>

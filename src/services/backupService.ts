@@ -176,7 +176,13 @@ export async function saveBackupPlano(
     requisitosResumoParts.push(`Periodicidade: ${perStr}`)
   }
   if (Array.isArray(payload.destino) && payload.destino.length > 0) {
-    requisitosResumoParts.push(`Destino: ${payload.destino.join(', ')}`)
+    const destinosLabel = payload.destino.map((d: string) => {
+      if (d === 'local') return 'Local'
+      if (d === 'nuvem') return 'Nuvem'
+      if (d === 'replicacao' || d === 'externo') return 'Replicação'
+      return d
+    })
+    requisitosResumoParts.push(`Destino: ${destinosLabel.join(', ')}`)
   }
   const requisitosTexto =
     requisitosResumoParts.length > 0 ? ` [${requisitosResumoParts.join(' · ')}]` : ''
