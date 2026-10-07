@@ -231,6 +231,11 @@ routerAdd(
       const normConteudo = normalizarParaRegra(rawConteudo)
       const normPdfTexto = normalizarParaRegra(pdfExtraidoTexto)
 
+      const lowerRemetente = String(remetente || '').toLowerCase()
+      const lowerAssunto = String(assunto || '').toLowerCase()
+      const lowerConteudo = String(rawConteudo || '').toLowerCase()
+      const lowerPdfTexto = String(pdfExtraidoTexto || '').toLowerCase()
+
       for (let i = 0; i < regras.length; i++) {
         const r = regras[i]
         const filtroRem = normalizarParaRegra(r.getString('remetente_filtro') || '')
@@ -2465,6 +2470,13 @@ routerAdd(
           : `Evidência já existente reconhecida e reprocessada via ${adaptadorUsado}.`,
       })
     } catch (procErr) {
+      const isInternalError =
+        procErr instanceof ReferenceError ||
+        procErr instanceof TypeError ||
+        (procErr &&
+          typeof procErr.name === 'string' &&
+          (procErr.name === 'ReferenceError' || procErr.name === 'TypeError'))
+
       const rawErrMsg =
         procErr && procErr.message
           ? String(procErr.message)
@@ -2475,6 +2487,13 @@ routerAdd(
         .replace(/password=[^&\s]+/gi, 'password=***')
         .replace(/bearer\s+[A-Za-z0-9_\-\.]+/gi, 'Bearer ***')
         .slice(0, 300)
+
+      if (isInternalError) {
+        console.error(
+          '[ERRO_INTERNO_PROCESSAR_BACKUP]',
+          (procErr && (procErr.stack || procErr.message)) || sanitizedErr,
+        )
+      }
 
       // Registrar ocorrência para auditoria e visibilidade
       try {
@@ -2488,19 +2507,30 @@ routerAdd(
           oc.set('tipo', 'erro_de_processamento')
           oc.set('severidade', 'alta')
           oc.set('status', 'aberta')
-          oc.set('titulo', 'Falha crítica no processamento da evidência')
+          oc.set(
+            'titulo',
+            isInternalError
+              ? 'Erro interno de processamento no servidor'
+              : 'Falha crítica no processamento da evidência',
+          )
           oc.set(
             'descricao',
-            `Ocorreu uma exceção não tratada durante o processamento da evidência: ${sanitizedErr}.`,
+            isInternalError
+              ? `Ocorreu um erro interno de execução no servidor (ReferenceError/TypeError): ${sanitizedErr}.`
+              : `Ocorreu uma exceção não tratada durante o processamento da evidência: ${sanitizedErr}.`,
           )
           $app.save(oc)
         }
       } catch (_) {}
 
+      const userMessage = isInternalError
+        ? 'Ocorreu um erro interno de processamento no servidor. O incidente foi registrado.'
+        : `Não foi possível processar o comprovante de backup: ${sanitizedErr}. Verifique os campos e o formato da evidência.`
+
       return e.json(200, {
         success: false,
-        status: 'erro_processamento',
-        message: `Não foi possível processar o comprovante de backup: ${sanitizedErr}. Verifique os campos e o formato da evidência.`,
+        status: isInternalError ? 'erro_interno_servidor' : 'erro_processamento',
+        message: userMessage,
       })
     }
   },
