@@ -24,6 +24,7 @@ import {
   listBackupEvidencias,
   listBackupOcorrencias,
   listBackupEscopos,
+  getBackupConfronto,
 } from '@/services/backupService'
 import type {
   InventoryAssetItem,
@@ -33,6 +34,7 @@ import type {
   BackupEvidenciaItem,
   BackupOcorrenciaItem,
   BackupEscopoItem,
+  BackupConfrontoResponse,
   SystemRole,
 } from '@/types/cscti'
 
@@ -94,6 +96,7 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
   const [evidencias, setEvidencias] = useState<BackupEvidenciaItem[]>([])
   const [ocorrencias, setOcorrencias] = useState<BackupOcorrenciaItem[]>([])
   const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])
+  const [confrontoData, setConfrontoData] = useState<BackupConfrontoResponse | null>(null)
 
   const isOperator = userRole === 'admin' || userRole === 'suporte'
 
@@ -127,6 +130,13 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
       setEvidencias(evidenciasData)
       setOcorrencias(ocorrenciasData)
       setEscopos(escoposData)
+
+      try {
+        const conf = await getBackupConfronto(organizationId)
+        setConfrontoData(conf)
+      } catch (cErr) {
+        console.warn('Confronto por ativo não disponível:', cErr)
+      }
     } catch (err) {
       console.error('Erro ao carregar métricas de Proteção e Continuidade:', err)
       setError('Não foi possível carregar os dados de proteção e continuidade.')
@@ -223,26 +233,34 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
   const totalMonitorados = monitoredAssets.length
   const totalComBackup = coveredAssets.length
 
-  // Percentual de proteção
-  const percentualProtegido =
-    totalMonitorados > 0 ? Math.round((totalComBackup / totalMonitorados) * 100) : 0
+  // MÉTRICA HONESTA DO CONFRONTO POR ATIVO (ESTILO VEEAM ONE)
+  // Substitui o percentual inflado de mero cadastro pelo número honesto de prova recente dentro do RPO
+  const totalExigidosConfronto = confrontoData?.totais?.total_ativos_exigidos ?? 0
+  const totalProtegidosConfronto = confrontoData?.totais?.total_protegidos ?? 0
+  const percentualConfronto = confrontoData?.totais?.percentual_protegido ?? 0
+  const temDadosConfronto = confrontoData !== null && totalExigidosConfronto > 0
 
-  // Cor semântica do percentual: verde >= 80%, âmbar 1-79%, vermelho 0%
+  // Ativos 100% protegidos pelas regras da serventia vs exigidos
+  const honestoProtegidos = temDadosConfronto ? totalProtegidosConfronto : 0
+  const honestoExigidos = temDadosConfronto ? totalExigidosConfronto : totalMonitorados
+  const honestoPercentual = temDadosConfronto ? percentualConfronto : 0
+
+  // Cor semântica do percentual honesto: verde 100%, âmbar > 0%, vermelho 0%
   const percentualColorClass =
-    totalMonitorados === 0
+    honestoExigidos === 0
       ? 'text-slate-400'
-      : percentualProtegido >= 80
+      : honestoPercentual === 100
         ? 'text-emerald-600'
-        : percentualProtegido > 0
+        : honestoPercentual > 0
           ? 'text-amber-600'
           : 'text-red-600'
 
   const percentualBadgeClass =
-    totalMonitorados === 0
+    honestoExigidos === 0
       ? 'bg-slate-100 text-slate-600 border-slate-200'
-      : percentualProtegido >= 80
+      : honestoPercentual === 100
         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-        : percentualProtegido > 0
+        : honestoPercentual > 0
           ? 'bg-amber-50 text-amber-700 border-amber-200'
           : 'bg-red-50 text-red-700 border-red-200'
 
@@ -381,47 +399,50 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
                 </p>
               </Link>
 
-              {/* Métrica 2: Ativos com backup */}
+              {/* Métrica 2: Ativos com backup (Substituído pela validação honesta do confronto) */}
               <Link
-                to="/backup?aba=rotinas"
+                to="/backup"
                 className="group p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition block"
-                title="Ver rotinas e fontes de backup"
+                title="Protegido = todas as modalidades exigidas comprovadas dentro do RPO"
               >
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
                   <span className="font-semibold uppercase tracking-wider text-[11px]">
-                    Com Backup
+                    Protegidos no RPO
                   </span>
                   <HardDriveDownload className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                 </div>
-                <div className="text-2xl font-bold text-[#0B2545]">{totalComBackup}</div>
+                <div className="text-2xl font-bold text-[#0B2545]">{honestoProtegidos}</div>
                 <p className="text-[11px] text-slate-500 mt-0.5 group-hover:text-indigo-700 inline-flex items-center">
-                  Fontes ativas ligadas{' '}
+                  de {honestoExigidos} ativos exigidos{' '}
                   <ArrowRight className="w-3 h-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </p>
               </Link>
 
-              {/* Métrica 3: Percentual Protegidos (destaque visual) */}
-              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-white shadow-2xs flex flex-col justify-between">
+              {/* Métrica 3: Percentual Protegidos (destaque visual honesto estilo Veeam ONE) */}
+              <div
+                className="p-3.5 rounded-xl border border-slate-200/80 bg-white shadow-2xs flex flex-col justify-between"
+                title="Confronto honesto: protege = prova recente dentro do RPO. Sem prova recente = desprotegido."
+              >
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
                   <span className="font-semibold uppercase tracking-wider text-[11px]">
-                    Protegidos
+                    Conformidade
                   </span>
                   <Badge
                     variant="outline"
                     className={`text-[10px] px-1.5 py-0 font-bold ${percentualBadgeClass}`}
                   >
-                    {percentualProtegido >= 80
-                      ? 'Seguro'
-                      : percentualProtegido > 0
-                        ? 'Atenção'
+                    {honestoPercentual === 100
+                      ? '100% Protegido'
+                      : honestoPercentual > 0
+                        ? 'Parcial'
                         : 'Crítico'}
                   </Badge>
                 </div>
                 <div className={`text-3xl font-extrabold tracking-tight ${percentualColorClass}`}>
-                  {totalMonitorados > 0 ? `${percentualProtegido}%` : '—'}
+                  {honestoExigidos > 0 ? `${honestoPercentual}%` : '—'}
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  {totalComBackup} de {totalMonitorados} ativos cobertos
+                  {honestoProtegidos} de {honestoExigidos} protegidos no RPO
                 </p>
               </div>
 

@@ -36,7 +36,10 @@ import {
   listBackupExecucoes,
   listBackupOcorrencias,
   listBackupTestes,
+  getBackupConfronto,
 } from '@/services/backupService'
+import { BackupConfrontoTable } from '@/components/backup/BackupConfrontoTable'
+import type { BackupConfrontoResponse } from '@/types/cscti'
 import { listInventoryAssets } from '@/services/csctiService'
 import type {
   BackupEscopoItem,
@@ -81,6 +84,21 @@ export const BackupOverviewPage: React.FC = () => {
   const [ocorrencias, setOcorrencias] = useState<BackupOcorrenciaItem[]>([])
   const [testes, setTestes] = useState<BackupTesteRecuperacaoItem[]>([])
   const [assets, setAssets] = useState<InventoryAssetItem[]>([])
+  const [confrontoData, setConfrontoData] = useState<BackupConfrontoResponse | null>(null)
+  const [loadingConfronto, setLoadingConfronto] = useState<boolean>(false)
+
+  const loadConfronto = async () => {
+    if (!orgId) return
+    setLoadingConfronto(true)
+    try {
+      const conf = await getBackupConfronto(orgId)
+      setConfrontoData(conf)
+    } catch (err) {
+      console.error('Erro ao carregar confronto por ativo:', err)
+    } finally {
+      setLoadingConfronto(false)
+    }
+  }
 
   const loadAllData = async () => {
     if (!orgId) return
@@ -119,6 +137,8 @@ export const BackupOverviewPage: React.FC = () => {
       setOcorrencias(ocoData)
       setTestes(tesData)
       setAssets(assData)
+      // Carregar confronto em conjunto
+      loadConfronto()
     } catch (err) {
       console.error('Erro ao carregar dados de backup:', err)
     } finally {
@@ -148,6 +168,12 @@ export const BackupOverviewPage: React.FC = () => {
   // Taxa de sucesso das execuções
   const taxaSucesso =
     execucoes.length > 0 ? Math.round((execucoesSucesso / execucoes.length) * 100) : 100
+
+  // Métricas do confronto centrado no ativo (número honesto)
+  const confrontoTotais = confrontoData?.totais
+  const totalExigidosConfronto = confrontoTotais?.total_ativos_exigidos ?? ativosExigemBackupCount
+  const totalProtegidosConfronto = confrontoTotais?.total_protegidos ?? 0
+  const percentualProtegidoConfronto = confrontoTotais?.percentual_protegido ?? 0
 
   return (
     <div className="space-y-6">
@@ -298,8 +324,55 @@ export const BackupOverviewPage: React.FC = () => {
 
         {/* 1. VISÃO GERAL */}
         <TabsContent value="visao_geral" className="space-y-6">
-          {/* Métricas Principais em Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Métricas Principais em Cards com métrica honesta do confronto */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {/* Métrica Honesta 1: Protegidos no Confronto */}
+            <Card className="border-slate-200 shadow-2xs bg-gradient-to-br from-white to-blue-50/40">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                    Ativos Protegidos
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1 py-0.2 rounded">
+                      RPO
+                    </span>
+                  </p>
+                  <p className="text-2xl font-bold mt-0.5 text-slate-900">
+                    <span
+                      className={
+                        percentualProtegidoConfronto === 100
+                          ? 'text-emerald-700'
+                          : percentualProtegidoConfronto > 0
+                            ? 'text-amber-600'
+                            : 'text-red-600'
+                      }
+                    >
+                      {totalProtegidosConfronto}
+                    </span>
+                    <span className="text-xs font-normal text-slate-500">
+                      {' '}
+                      / {totalExigidosConfronto} exigidos
+                    </span>
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    {totalExigidosConfronto > 0
+                      ? `${percentualProtegidoConfronto}% atendem 100% no RPO`
+                      : 'Sem exigências marcadas'}
+                  </p>
+                </div>
+                <div
+                  className={`p-2.5 rounded-lg ${
+                    percentualProtegidoConfronto === 100
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : percentualProtegidoConfronto > 0
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-red-50 text-red-700'
+                  }`}
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="border-slate-200 shadow-2xs">
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
@@ -367,6 +440,17 @@ export const BackupOverviewPage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* NOVA SEÇÃO: CONFRONTO POR ATIVO (ESTILO VEEAM ONE) */}
+          <BackupConfrontoTable
+            confrontoData={confrontoData}
+            loading={loadingConfronto}
+            onRefresh={loadConfronto}
+            onNavigateToEscopo={() => setSearchParams({ tab: 'escopo' })}
+            onNavigateToRotinas={(ativoId) => {
+              setSearchParams({ tab: 'rotinas', ...(ativoId ? { ativo: ativoId } : {}) })
+            }}
+          />
 
           {/* Banner de Status do Último Teste de Recuperação */}
           <div className="p-4 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-850 to-[#0B2545] text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">

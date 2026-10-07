@@ -867,3 +867,19 @@ export async function excluirBackupExecucoes(payload: {
     removidos,
   }
 }
+
+/**
+ * Consulta o motor de confronto por ativo no backend.
+ * Avalia exigências (local, nuvem, replicação) vs. fontes cadastradas vs. comprovações reais dentro do RPO.
+ */
+export async function getBackupConfronto(
+  organizationId?: string,
+): Promise<import('@/types/cscti').BackupConfrontoResponse> {
+  const query = organizationId ? `?organization=${encodeURIComponent(organizationId)}` : ''
+  return pb.send<import('@/types/cscti').BackupConfrontoResponse>(
+    `/backend/v1/backup/confronto${query}`,
+    {
+      method: 'GET',
+    },
+  )
+}

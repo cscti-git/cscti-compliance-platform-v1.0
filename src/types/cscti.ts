@@ -639,6 +639,66 @@ export interface BackupImapFetchResponse {
   last_check: string
 }
 
+export type ConfrontoStatusModalidade = 'ATENDIDA' | 'FORA_RPO' | 'NUNCA_COMPROVADA' | 'SEM_FONTE'
+export type ConfrontoStatusConsolidado =
+  | 'PROTEGIDO'
+  | 'PARCIAL'
+  | 'NAO_PROTEGIDO'
+  | 'NAO_CADASTRADO'
+
+export interface ConfrontoModalidadeInfo {
+  cadastrada: boolean
+  ultima_comprovacao: string | null
+  dentro_do_rpo: boolean
+  horas_desde_ultima: number | null
+  rpo_horas_configurado: number | null
+  fonte_id: string | null
+  fonte_nome: string | null
+  rotina_id: string | null
+  rotina_nome: string | null
+  plano_id: string | null
+  plano_nome: string | null
+  execucao_id: string | null
+  status_modalidade: ConfrontoStatusModalidade
+}
+
+export interface ConfrontoAtivoItem {
+  id: string
+  nome: string
+  tipo: string
+  criticidade: string
+  exigencias: {
+    local: boolean
+    nuvem: boolean
+    replicacao: boolean
+    total_exigidas: number
+  }
+  modalidades: {
+    local?: ConfrontoModalidadeInfo
+    nuvem?: ConfrontoModalidadeInfo
+    replicacao?: ConfrontoModalidadeInfo
+  }
+  status_consolidado: ConfrontoStatusConsolidado
+  total_atendidas: number
+}
+
+export interface BackupConfrontoResponse {
+  ok: boolean
+  data_analise: string
+  organization: string
+  totais: {
+    total_ativos_inventario: number
+    total_ativos_exigidos: number
+    total_protegidos: number
+    total_parcial: number
+    total_nao_protegido: number
+    total_nao_cadastrado: number
+    percentual_protegido: number
+  }
+  confronto: ConfrontoAtivoItem[]
+  message?: string
+}
+
 export interface BackupTesteRecuperacaoItem {
   id: string
   organization: string
