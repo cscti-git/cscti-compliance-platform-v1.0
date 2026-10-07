@@ -65,7 +65,7 @@ const navSections: NavSection[] = [
   {
     title: 'Inventário e Ativos',
     items: [
-      { title: 'Ativos do Cartório', href: '/ativos', icon: Server },
+      { title: 'Inventário de Ativos', href: '/ativos', icon: Server },
       { title: 'Sincronização GLPI', href: '/ativos?tab=glpi', icon: RefreshCw },
       { title: 'Infraestrutura', href: '/infraestrutura', icon: Building2 },
     ],

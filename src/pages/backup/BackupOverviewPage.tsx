@@ -265,7 +265,7 @@ export const BackupOverviewPage: React.FC = () => {
             value="escopo"
             className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
           >
-            <Layers className="w-3.5 h-3.5 mr-1.5" /> Inventário de Ativos (
+            <Layers className="w-3.5 h-3.5 mr-1.5" /> Escopo (
             {ativosExigemBackupCount > 0 ? `${ativosExigemBackupCount} ativos` : escopos.length})
           </TabsTrigger>
           <TabsTrigger
@@ -514,7 +514,7 @@ export const BackupOverviewPage: React.FC = () => {
                 >
                   <Layers className="w-4 h-4 text-blue-600 mb-1.5" />
                   <p className="text-xs font-bold text-slate-800 group-hover:text-blue-700">
-                    1. Inventário de Ativos
+                    1. Escopo
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     {ativosExigemBackupCount > 0

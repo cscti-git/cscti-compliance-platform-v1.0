@@ -84,7 +84,7 @@ export const BackupGuiaPage: React.FC = () => {
     {
       id: 'etapa-1-escopo',
       num: '1',
-      title: 'Inventário de Ativos',
+      title: 'Escopo',
       subtitle: 'Exigências e Escopo',
       icon: Layers,
       tab: 'escopo',
@@ -269,7 +269,7 @@ export const BackupGuiaPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-lg font-bold text-slate-900">
-                      Etapa 1 — Inventário de Ativos &amp; Escopo de Proteção
+                      Etapa 1 — Escopo de Proteção &amp; Exigências de Salvaguarda
                     </CardTitle>
                     <Badge
                       variant="outline"
@@ -290,7 +290,7 @@ export const BackupGuiaPage: React.FC = () => {
                   variant="outline"
                   className="text-xs font-semibold text-blue-700 border-blue-200 hover:bg-blue-50 gap-1"
                 >
-                  Configurar Inventário de Ativos <ArrowRight className="w-3.5 h-3.5" />
+                  Configurar Escopo <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
             </div>
@@ -301,7 +301,7 @@ export const BackupGuiaPage: React.FC = () => {
             <div className="p-4 rounded-xl border-2 border-blue-200 bg-blue-50/70 text-blue-950 space-y-1.5 shadow-2xs">
               <span className="font-bold text-xs uppercase tracking-wide text-blue-900 flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-blue-700" />
-                Conceito Central: Inventário de Ativos &amp; Encadeamento Hereditário
+                Conceito Central: Ativos, Exigências &amp; Escopo de Proteção
               </span>
               <p className="text-xs leading-relaxed text-blue-950 font-medium">
                 Todo ativo importado do GLPI (ou cadastrado no Inventário de Ativos) aparece aqui
@@ -321,10 +321,10 @@ export const BackupGuiaPage: React.FC = () => {
             <div className="space-y-1">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">O que é</h4>
               <p className="leading-relaxed">
-                A etapa de <strong>Inventário de Ativos</strong> une o parque tecnológico em tempo
-                real à governança de salvaguarda. Ela permite selecionar em lote as exigências
-                técnicas de cada máquina ou banco de dados e agrupá-los formalmente em escopos
-                sistêmicos contra os quais tudo é confrontado nas auditorias.
+                A etapa de <strong>Escopo</strong> une o parque tecnológico em tempo real à
+                governança de salvaguarda. Ela permite selecionar em lote as exigências técnicas de
+                cada máquina ou banco de dados e agrupá-los formalmente em escopos sistêmicos contra
+                os quais tudo é confrontado nas auditorias.
               </p>
             </div>
 
@@ -352,8 +352,8 @@ export const BackupGuiaPage: React.FC = () => {
                     1
                   </span>
                   <span>
-                    Acesse a aba <strong>1. Inventário de Ativos</strong>. No topo, a tabela lista
-                    todos os ativos importados do GLPI ou cadastrados no inventário.
+                    Acesse a aba <strong>1. Escopo</strong>. No topo, a tabela lista todos os ativos
+                    importados do GLPI ou cadastrados no inventário.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">

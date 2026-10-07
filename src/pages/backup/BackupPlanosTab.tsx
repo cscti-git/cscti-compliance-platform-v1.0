@@ -623,7 +623,7 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
                         {escopoAssets.length === 0 ? (
                           <p className="text-[11px] text-slate-500 italic bg-white p-2 rounded border border-slate-200">
                             Nenhum ativo vinculado a este escopo ainda. Você pode vincular ativos na
-                            aba 1. Inventário de Ativos.
+                            aba 1. Escopo.
                           </p>
                         ) : (
                           <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">

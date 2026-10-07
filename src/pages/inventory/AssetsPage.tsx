@@ -275,7 +275,7 @@ export const AssetsPage: React.FC = () => {
             value="ativos"
             className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
           >
-            <Server className="w-3.5 h-3.5 mr-1.5" /> Ativos do Cartório ({totalAssets})
+            <Server className="w-3.5 h-3.5 mr-1.5" /> Inventário de Ativos ({totalAssets})
           </TabsTrigger>
           <TabsTrigger
             value="glpi"

@@ -49,7 +49,7 @@ export const BackupCicloStepper: React.FC<BackupCicloStepperProps> = ({
   onSelectTab,
   counts,
 }) => {
-  const step1Title = '1. Inventário de Ativos'
+  const step1Title = '1. Escopo'
   const step1Subtitle =
     typeof counts.ativosExigemBackup === 'number' && counts.ativosExigemBackup > 0
       ? `${counts.ativosExigemBackup} ${counts.ativosExigemBackup === 1 ? 'ativo exige backup' : 'ativos exigem backup'}`
@@ -66,7 +66,7 @@ export const BackupCicloStepper: React.FC<BackupCicloStepperProps> = ({
       id: 'escopo',
       tab: 'escopo',
       title: step1Title,
-      shortTitle: 'Inventário de Ativos',
+      shortTitle: 'Escopo',
       subtitle: step1Subtitle,
       count:
         typeof counts.ativosExigemBackup === 'number' && counts.ativosExigemBackup > 0
