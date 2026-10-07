@@ -1873,41 +1873,32 @@ routerAdd(
           confrontoEscopo.total_ativos_escopo = ativosEscopo.length
 
           // Regra de Ouro A & B: MODALIDADE PROVADA SAI DO COMPROVANTE, NUNCA DO PLANO.
-          // Cada execução prova APENAS a modalidade que o conteúdo do comprovante demonstra:
-          // - Job de backup com destino repositório local/NAS / job backup padrão => 'local'
-          // - Backup Copy Job / cloud / Acronis nuvem => 'nuvem'
-          // - Replication Job => 'replicacao'
-          // Se não der para inferir com segurança, a execução NÃO prova modalidade nenhuma.
+          // Regra de Negócio A: Considerar SOMENTE a identidade do job da própria evidência
+          // (assunto da evidência e/ou nome do job/rotina vinculada), NUNCA o corpo do texto
+          // nem o nome da ferramenta (ex.: "Veeam Backup & Replication" JAMAIS deve inferir 'replicacao').
+          // - assunto/job contém "backup copy job:" -> 'nuvem'
+          // - assunto/job contém "replication job:" -> 'replicacao'
+          // - assunto/job contém "backup job:" (sem copy/replication) -> 'local'
+          // - adaptador ACRONIS_PDF -> 'nuvem'
+          // - ambíguo -> null (não comprova nada)
           const modalidadesComprovadasPorEsta = new Set()
 
-          const textoBuscaModalidade =
-            `${jobName} ${jobTipo} ${rotinaNomeReal} ${assunto} ${rawConteudo.slice(0, 1500)} ${destinoDetectado}`.toLowerCase()
-
-          if (
-            jobTipo === 'replication' ||
-            textoBuscaModalidade.includes('replication job') ||
-            textoBuscaModalidade.includes('replication_') ||
-            textoBuscaModalidade.includes('replica')
-          ) {
-            modalidadesComprovadasPorEsta.add('replicacao')
-          } else if (
-            jobTipo === 'backup_copy' ||
-            adaptadorUsado === 'ACRONIS_PDF' ||
-            textoBuscaModalidade.includes('backup copy job') ||
-            textoBuscaModalidade.includes('to cloud') ||
-            textoBuscaModalidade.includes('cloud') ||
-            textoBuscaModalidade.includes('nuvem')
-          ) {
+          if (adaptadorUsado === 'ACRONIS_PDF') {
             modalidadesComprovadasPorEsta.add('nuvem')
-          } else if (
-            jobTipo === 'backup' ||
-            adaptadorUsado === 'VEEAM_HTML' ||
-            textoBuscaModalidade.includes('backup job:') ||
-            textoBuscaModalidade.includes('backup vms') ||
-            textoBuscaModalidade.includes('repository') ||
-            textoBuscaModalidade.includes('local')
-          ) {
-            modalidadesComprovadasPorEsta.add('local')
+          } else {
+            const textoIdentidade = `${assunto} ${jobName} ${rotinaNomeReal}`.toLowerCase()
+
+            if (textoIdentidade.includes('backup copy job:')) {
+              modalidadesComprovadasPorEsta.add('nuvem')
+            } else if (textoIdentidade.includes('replication job:')) {
+              modalidadesComprovadasPorEsta.add('replicacao')
+            } else if (
+              textoIdentidade.includes('backup job:') &&
+              !textoIdentidade.includes('copy') &&
+              !textoIdentidade.includes('replication')
+            ) {
+              modalidadesComprovadasPorEsta.add('local')
+            }
           }
 
           // Montar mapa de fontes cadastradas que apontam para ativos do inventário
@@ -2103,15 +2094,25 @@ routerAdd(
       const checklist = []
 
       // 1. Identificação (Regra)
-      const identificacaoPass = Boolean(regraCasada)
+      // Regra de Negócio B: Se nenhuma regra casar, MAS a evidência tem rotina vinculada (rotinaFinalId),
+      // a verificação é CONFORME com nota "Vinculado por alias da rotina cadastrada".
+      // Só NÃO CONFORME se a evidência ficou sem rotina (órfã).
+      const identificacaoPass = Boolean(regraCasada || rotinaFinalId)
+      let identificacaoDetalhes = ''
+      if (regraCasada) {
+        identificacaoDetalhes = `Regra "${regraCasada.getString('nome') || 'Regra ativa'}" casada com sucesso (remetente: "${remetente || 'detectado'}", assunto: "${assunto || 'detectado'}").`
+      } else if (rotinaFinalId) {
+        identificacaoDetalhes = `Vinculado por alias da rotina cadastrada "${rotinaNomeReal}".`
+      } else {
+        identificacaoDetalhes = `Nenhuma regra de identificação cadastrada correspondeu ao comprovante (remetente: "${remetente || 'desconhecido'}", assunto: "${assunto || 'não informado'}").`
+      }
+
       checklist.push({
         item: 'identificacao',
         titulo: 'Identificação pela Regra',
         status: identificacaoPass ? 'conforme' : 'nao_conforme',
         passou: identificacaoPass,
-        detalhes: identificacaoPass
-          ? `Regra "${regraCasada.getString('nome') || 'Regra ativa'}" casada com sucesso (remetente: "${remetente || 'detectado'}", assunto: "${assunto || 'detectado'}").`
-          : `Nenhuma regra de identificação cadastrada correspondeu ao comprovante (remetente: "${remetente || 'desconhecido'}", assunto: "${assunto || 'não informado'}").`,
+        detalhes: identificacaoDetalhes,
       })
 
       // 2. Extração (Adaptador)
@@ -2245,12 +2246,28 @@ routerAdd(
             : `Falha na execução impede a atualização do ponto de recuperação. RPO do plano (${planoRpoHoras}h) em risco.`,
       })
 
-      // Veredito final em linguagem clara e coerência de conformidade
+      // Regra de Negócio C: VEREDITO ÚNICO DO LAUDO
+      // Derivar da pior verificação do checklist:
+      // - tem nao_conforme -> 'nao_conforme'
+      // - senão tem atencao -> 'atencao'
+      // - senão -> 'conforme'
+      const temNaoConforme = checklist.some(
+        (chk) => chk.status === 'nao_conforme' || chk.passou === false,
+      )
+      const temAtencao = checklist.some((chk) => chk.status === 'atencao')
+
+      if (temNaoConforme) {
+        conformidadeStatus = 'nao_conforme'
+      } else if (temAtencao) {
+        conformidadeStatus = 'atencao'
+      } else {
+        conformidadeStatus = 'conforme'
+      }
+
+      // Mensagem explicativa do veredito técnico condizente com conformidadeStatus
       if (!rotinaFinalId) {
-        conformidadeStatus = 'nao_conforme'
-        conformidadeDetalhe = `NÃO Conforme: ${motivoVinculoRigoroso || `Nenhuma rotina corresponde ao job '${jobName}' — cadastre o alias em Rotinas & Fontes`}`
-      } else if (statusDetectado === 'erro' || (!regraCasada && statusDetectado === 'erro')) {
-        conformidadeStatus = 'nao_conforme'
+        conformidadeDetalhe = `Não Conforme: ${motivoVinculoRigoroso || `Nenhuma rotina corresponde ao job '${jobName}' — cadastre o alias em Rotinas & Fontes.`}`
+      } else if (statusDetectado === 'erro') {
         conformidadeDetalhe =
           adaptadorUsado === 'ACRONIS_PDF'
             ? `Não Conforme: Relatório Acronis apresentou ${contadores.error} falha(s) nos planos de proteção.`
@@ -2258,30 +2275,19 @@ routerAdd(
               ? `Não Conforme: Job Veeam "${jobName}" apresentou erro na execução (${contadores.error} falha(s)).`
               : 'Não Conforme: Comprovante indica falha crítica na execução do trabalho de backup.'
       } else if (statusDetectado === 'parcial') {
-        conformidadeStatus = 'atencao'
         conformidadeDetalhe =
           adaptadorUsado === 'VEEAM_HTML'
             ? `Atenção: Job Veeam "${jobName}" concluído com ${contadores.warning} alerta(s)/warning(s).`
             : 'Atenção: Trabalho concluído com avisos/pendências ou cópia parcial.'
-      } else if (!regraCasada) {
-        conformidadeStatus = 'atencao'
-        conformidadeDetalhe = `Atenção: Comprovante processado via ${adaptadorUsado}, mas nenhuma regra de identificação cadastrada correspondeu ao remetente/assunto.`
-      } else if (
-        confrontoEscopo &&
-        confrontoEscopo.total_comprovadas === 0 &&
-        confrontoEscopo.total_exigencias_modalidade > 0
-      ) {
-        // Regra de Ouro E: LAUDO COERENTE.
-        // Se 0 comprovadas de exigências do escopo, o veredito não pode ser CONFORME nem 100%.
-        conformidadeStatus = 'atencao'
-        conformidadeDetalhe = `Atenção: Comprovante processado com sucesso (${tamanhoFormatado || 'cópia realizada'}), porém nenhuma modalidade exigida do escopo foi comprovada por esta rotina específica (${confrontoEscopo.total_pendencias} pendências registradas para outras rotinas/jobs).`
+      } else if (!regraCasada && !rotinaFinalId) {
+        conformidadeDetalhe = `Não Conforme: Comprovante processado via ${adaptadorUsado}, mas nenhuma regra de identificação cadastrada correspondeu ao remetente/assunto e nenhuma rotina vinculada.`
       } else if (adaptadorUsado === 'ACRONIS_PDF' && fontesNaoCobertas.length > 0) {
-        conformidadeStatus = 'atencao'
         const naoCobertasNomes = fontesNaoCobertas.map((f) => f.item).join(', ')
-        conformidadeDetalhe = `Atenção: ${fontesCobertas.length} de ${fontesCobertas.length} planos do escopo atendidos com sucesso, mas o comprovante contém ${fontesNaoCobertas.length} máquina não cadastrada (${naoCobertasNomes}). Cadastre a fonte/alias correspondente em Rotinas & Fontes ou revise o escopo contratado.`
+        conformidadeDetalhe = `Atenção: ${fontesCobertas.length} plano(s) do escopo atendido(s) com sucesso, mas o comprovante contém ${fontesNaoCobertas.length} máquina não cadastrada (${naoCobertasNomes}). Cadastre a fonte/alias correspondente em Rotinas & Fontes ou revise o escopo contratado.`
       } else if (fontesNaoCobertas.length > 0) {
-        conformidadeStatus = 'atencao'
         conformidadeDetalhe = `Atenção: Cópia executada com sucesso, mas há ${fontesNaoCobertas.length} item(ns) sem fonte cadastrada na rotina "${rotinaNomeReal}".`
+      } else if (conformidadeStatus === 'atencao') {
+        conformidadeDetalhe = `Atenção: Comprovante processado com sucesso (${tamanhoFormatado || 'cópia realizada'}), com observações técnicas nas verificações automatizadas.`
       } else if (rotinaPeriodicidade === 'intervalo_minutos' && rotinaIntervaloMin > 0) {
         conformidadeDetalhe = `Conforme: cópia executada com sucesso dentro do intervalo de ${rotinaIntervaloMin} min declarado pela rotina "${rotinaNomeReal || jobName}".`
       } else if (adaptadorUsado === 'ACRONIS_PDF') {

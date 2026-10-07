@@ -161,23 +161,23 @@ routerAdd(
     }
 
     // Helper: extrair modalidade comprovada pelo conteúdo REAL do comprovante/execução
-    // Regra de Ouro A: A modalidade provada sai do COMPROVANTE, NUNCA do plano.
-    // O plano declara intenção; o comprovante é prova.
-    // - Backup Copy Job / Cloud / Acronis nuvem => Nuvem
-    // - Replication Job / replica => Replicação
-    // - Job de backup com destino repositório local/NAS / backup job padrão => Local
-    // - Se não der para inferir com segurança => NENHUMA modalidade comprovada.
+    // Regra de Negócio A: Considerar SOMENTE a identidade do job da própria evidência
+    // (assunto da evidência e/ou nome do job/rotina vinculada), NUNCA o corpo do texto
+    // nem o nome da ferramenta (ex.: "Veeam Backup & Replication" JAMAIS deve inferir 'replicacao').
+    // - assunto/job contém "backup copy job:" -> 'nuvem'
+    // - assunto/job contém "replication job:" -> 'replicacao'
+    // - assunto/job contém "backup job:" (sem copy/replication) -> 'local'
+    // - adaptador ACRONIS_PDF -> 'nuvem'
+    // - ambíguo -> null (não comprova nada)
     const inferirModalidadeComprovante = (execRec, rotinaRec) => {
       if (!execRec) return null
 
-      // Obter textos relevantes da execução e da rotina vinculada
-      const obs = (execRec.getString('observacao') || '').toLowerCase()
-      const dest = (execRec.getString('destino') || '').toLowerCase()
-      const rotinaNome = (rotinaRec ? rotinaRec.getString('nome') : '').toLowerCase()
-
-      // Tentar ler também do laudo gravado na avaliação vinculada, se houver
+      let assuntoEvidencia = ''
+      let adaptadorCodigo = ''
       let jobNameLaudo = ''
-      let adaptadorLaudo = ''
+
+      // 1. Buscar dados da avaliação técnica vinculada (laudo / adaptador / job_name)
+      let evidenciaId = ''
       try {
         const avals = $app.findRecordsByFilter(
           'backup_avaliacoes',
@@ -189,49 +189,102 @@ routerAdd(
         if (avals.length > 0) {
           const itensAv = avals[0].get('itens_avaliados')
           if (itensAv && typeof itensAv === 'object') {
-            jobNameLaudo = String(itensAv.job_name || '').toLowerCase()
-            adaptadorLaudo = String(itensAv.adaptador || '').toLowerCase()
+            jobNameLaudo = String(itensAv.job_name || '')
+            adaptadorCodigo = String(itensAv.adaptador || '')
+          }
+          const laudoObj = avals[0].get('laudo_tecnico')
+          if (laudoObj && typeof laudoObj === 'object') {
+            if (
+              !assuntoEvidencia &&
+              laudoObj.fonte_comprovante &&
+              laudoObj.fonte_comprovante.assunto
+            ) {
+              assuntoEvidencia = String(laudoObj.fonte_comprovante.assunto || '')
+            }
+            if (!adaptadorCodigo && laudoObj.adaptador && laudoObj.adaptador.codigo) {
+              adaptadorCodigo = String(laudoObj.adaptador.codigo || '')
+            }
           }
         }
       } catch (_) {}
 
-      const textoCompleto = `${obs} ${dest} ${rotinaNome} ${jobNameLaudo} ${adaptadorLaudo}`
+      // 2. Se temos evidencia vinculada na execução ou através de backup_ocorrencias / backup_processamentos
+      try {
+        const procs = $app.findRecordsByFilter(
+          'backup_processamentos',
+          `execucao = '${execRec.id}'`,
+          '-created',
+          1,
+          0,
+        )
+        if (procs.length > 0) {
+          evidenciaId = procs[0].getString('evidencia')
+          if (!adaptadorCodigo) {
+            adaptadorCodigo = procs[0].getString('adaptador_usado') || ''
+          }
+          const resProc = procs[0].get('resultado')
+          if (resProc && typeof resProc === 'object' && resProc.job_name) {
+            if (!jobNameLaudo) jobNameLaudo = String(resProc.job_name || '')
+          }
+        }
+      } catch (_) {}
 
-      // 1. Replicação: cópia offsite / replication job
-      if (
-        textoCompleto.includes('replication job') ||
-        textoCompleto.includes('replication_') ||
-        textoCompleto.includes('replication') ||
-        textoCompleto.includes('replica')
-      ) {
-        return 'replicacao'
+      if (evidenciaId && !assuntoEvidencia) {
+        try {
+          const evRec = $app.findRecordById('backup_evidencias', evidenciaId)
+          if (evRec) {
+            assuntoEvidencia = evRec.getString('assunto') || ''
+          }
+        } catch (_) {}
       }
 
-      // 2. Nuvem: backup copy job, envio para nuvem/cloud, Acronis Cloud
-      if (
-        textoCompleto.includes('backup copy job') ||
-        textoCompleto.includes('copy job') ||
-        textoCompleto.includes('to cloud') ||
-        textoCompleto.includes('nuvem') ||
-        textoCompleto.includes('cloud') ||
-        adaptadorLaudo.includes('acronis')
-      ) {
+      // Se ainda não temos assunto, buscar qualquer evidência com mesma rotina
+      if (!assuntoEvidencia && rotinaRec) {
+        try {
+          const evList = $app.findRecordsByFilter(
+            'backup_evidencias',
+            `rotina = '${rotinaRec.id}'`,
+            '-created',
+            1,
+            0,
+          )
+          if (evList.length > 0) {
+            assuntoEvidencia = evList[0].getString('assunto') || ''
+          }
+        } catch (_) {}
+      }
+
+      const rotinaNome = rotinaRec ? rotinaRec.getString('nome') : ''
+
+      // Adaptador ACRONIS_PDF comprova nuvem diretamente
+      if (adaptadorCodigo && adaptadorCodigo.toUpperCase() === 'ACRONIS_PDF') {
         return 'nuvem'
       }
 
-      // 3. Local: backup job comum, repositório local/NAS
+      // Construir string de identidade do job contendo SOMENTE assunto da evidência e nomes de job/rotina
+      const textoIdentidade = `${assuntoEvidencia} ${jobNameLaudo} ${rotinaNome}`.toLowerCase()
+
+      // Ordem rigorosa:
+      // 1. "backup copy job:" -> 'nuvem'
+      if (textoIdentidade.includes('backup copy job:')) {
+        return 'nuvem'
+      }
+
+      // 2. "replication job:" -> 'replicacao'
+      if (textoIdentidade.includes('replication job:')) {
+        return 'replicacao'
+      }
+
+      // 3. "backup job:" -> 'local' (garantindo ausência de copy/replication)
       if (
-        textoCompleto.includes('backup job:') ||
-        textoCompleto.includes('backup vms') ||
-        textoCompleto.includes('local') ||
-        textoCompleto.includes('repository') ||
-        textoCompleto.includes('veeam backup') ||
-        textoCompleto.includes('veeam')
+        textoIdentidade.includes('backup job:') &&
+        !textoIdentidade.includes('copy') &&
+        !textoIdentidade.includes('replication')
       ) {
         return 'local'
       }
 
-      // Caso não seja possível inferir com segurança, nunca presumir conformidade
+      // Ambíguo ou não identificado com precisão -> null (não comprova nada)
       return null
     }
 

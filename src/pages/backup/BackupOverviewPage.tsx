@@ -165,9 +165,9 @@ export const BackupOverviewPage: React.FC = () => {
     ).length
   }, [assets])
 
-  // Taxa de sucesso das execuções
+  // Taxa de sucesso das execuções (Regra D: somente execuções sucesso / total execuções; total 0 -> null)
   const taxaSucesso =
-    execucoes.length > 0 ? Math.round((execucoesSucesso / execucoes.length) * 100) : 100
+    execucoes.length > 0 ? Math.round((execucoesSucesso / execucoes.length) * 100) : null
 
   // Métricas do confronto centrado no ativo (número honesto)
   const confrontoTotais = confrontoData?.totais
@@ -398,9 +398,34 @@ export const BackupOverviewPage: React.FC = () => {
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Taxa de Sucesso
                   </p>
-                  <p className="text-2xl font-bold text-emerald-700 mt-0.5">{taxaSucesso}%</p>
+                  <p
+                    className={`text-2xl font-bold mt-0.5 ${
+                      taxaSucesso === null
+                        ? 'text-slate-400'
+                        : taxaSucesso >= 90
+                          ? 'text-emerald-700'
+                          : taxaSucesso >= 70
+                            ? 'text-amber-600'
+                            : 'text-red-600'
+                    }`}
+                  >
+                    {taxaSucesso !== null ? `${taxaSucesso}%` : '—'}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    {taxaSucesso !== null
+                      ? `${execucoesSucesso} de ${execucoes.length} com sucesso`
+                      : 'Nenhuma execução registrada'}
+                  </p>
                 </div>
-                <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-700">
+                <div
+                  className={`p-2.5 rounded-lg ${
+                    taxaSucesso !== null && taxaSucesso >= 90
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : taxaSucesso !== null
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
               </CardContent>

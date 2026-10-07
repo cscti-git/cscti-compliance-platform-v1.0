@@ -1477,19 +1477,39 @@ Lista de atividades (1 dia):
                       <ShieldCheck className="w-4 h-4 text-[#0B2545]" />
                       Laudo de Avaliação de Conformidade
                     </span>
-                    {selectedAvaliacao?.resultado_conformidade && (
-                      <Badge
-                        className={`text-[10px] font-bold uppercase ${
-                          selectedAvaliacao.resultado_conformidade === 'conforme'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : selectedAvaliacao.resultado_conformidade === 'atencao'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {selectedAvaliacao.resultado_conformidade}
-                      </Badge>
-                    )}
+                    {(() => {
+                      // Regra de Negócio C: Veredito único derivado da pior verificação
+                      const checks = selectedAvaliacao?.laudo_tecnico?.verificacoes || []
+                      const temNaoConforme = checks.some(
+                        (chk: any) => chk.status === 'nao_conforme' || chk.passou === false,
+                      )
+                      const temAtencao = checks.some((chk: any) => chk.status === 'atencao')
+                      const vereditoUnico = temNaoConforme
+                        ? 'nao_conforme'
+                        : temAtencao
+                          ? 'atencao'
+                          : selectedAvaliacao?.laudo_tecnico?.resultado ||
+                            selectedAvaliacao?.resultado_conformidade ||
+                            'conforme'
+
+                      return (
+                        <Badge
+                          className={`text-[10px] font-bold uppercase ${
+                            vereditoUnico === 'conforme'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : vereditoUnico === 'atencao'
+                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                : 'bg-red-100 text-red-800 border-red-300'
+                          }`}
+                        >
+                          {vereditoUnico === 'conforme'
+                            ? 'Conforme'
+                            : vereditoUnico === 'atencao'
+                              ? 'Atenção'
+                              : 'Não Conforme'}
+                        </Badge>
+                      )
+                    })()}
                   </div>
                   {procLoading ? (
                     <p className="text-slate-400 italic p-3 border rounded bg-slate-50">

@@ -59,9 +59,24 @@ export function BackupLaudoCard({
     )
   }
 
-  const resultado = laudo.resultado || 'conforme'
-  const isConforme = resultado === 'conforme'
-  const isAtencao = resultado === 'atencao'
+  const verificacoes: BackupVerificacaoItem[] = Array.isArray(laudo.verificacoes)
+    ? laudo.verificacoes
+    : []
+
+  // Regra de Negócio C: Veredito único derivado da pior verificação
+  const temNaoConforme = verificacoes.some(
+    (chk) => chk.status === 'nao_conforme' || chk.passou === false,
+  )
+  const temAtencao = verificacoes.some((chk) => chk.status === 'atencao')
+
+  const resultadoEfetivo: 'conforme' | 'atencao' | 'nao_conforme' = temNaoConforme
+    ? 'nao_conforme'
+    : temAtencao
+      ? 'atencao'
+      : (laudo.resultado as 'conforme' | 'atencao' | 'nao_conforme') || 'conforme'
+
+  const isConforme = resultadoEfetivo === 'conforme'
+  const isAtencao = resultadoEfetivo === 'atencao'
 
   const vereditoBoxStyles = isConforme
     ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
@@ -74,10 +89,6 @@ export function BackupLaudoCard({
     : isAtencao
       ? 'bg-amber-600 hover:bg-amber-700 text-white'
       : 'bg-red-600 hover:bg-red-700 text-white'
-
-  const verificacoes: BackupVerificacaoItem[] = Array.isArray(laudo.verificacoes)
-    ? laudo.verificacoes
-    : []
 
   const fontesNaoCobertas = laudo.cobertura?.fontes_nao_cobertas || []
 
@@ -101,9 +112,9 @@ export function BackupLaudoCard({
             <Badge
               className={`text-[10px] uppercase font-bold tracking-wider ${vereditoBadgeStyles}`}
             >
-              {resultado === 'conforme'
+              {resultadoEfetivo === 'conforme'
                 ? 'Conforme'
-                : resultado === 'atencao'
+                : resultadoEfetivo === 'atencao'
                   ? 'Atenção'
                   : 'Não Conforme'}
             </Badge>
