@@ -692,7 +692,13 @@ export interface BackupImapFetchResponse {
   last_check: string
 }
 
-export type ConfrontoStatusModalidade = 'ATENDIDA' | 'FORA_RPO' | 'NUNCA_COMPROVADA' | 'SEM_FONTE'
+export type ConfrontoStatusModalidade =
+  | 'ATENDIDA'
+  | 'FORA_RPO'
+  | 'NUNCA_COMPROVADA'
+  | 'SEM_FONTE'
+  | 'FALHA_ULTIMA_EXECUCAO'
+
 export type ConfrontoStatusConsolidado =
   | 'PROTEGIDO'
   | 'PARCIAL'
@@ -713,6 +719,11 @@ export interface ConfrontoModalidadeInfo {
   plano_nome: string | null
   execucao_id: string | null
   status_modalidade: ConfrontoStatusModalidade
+  ultima_execucao_falha?: boolean
+  ultima_execucao_data?: string | null
+  ultima_execucao_status?: string | null
+  ultima_execucao_obs?: string | null
+  ocorrencias_abertas?: number
 }
 
 export interface ConfrontoAtivoItem {
@@ -733,6 +744,9 @@ export interface ConfrontoAtivoItem {
   }
   status_consolidado: ConfrontoStatusConsolidado
   total_atendidas: number
+  tem_falha_recente?: boolean
+  falha_detalhe?: string | null
+  ocorrencias_abertas_count?: number
 }
 
 export interface BackupConfrontoResponse {
@@ -749,6 +763,14 @@ export interface BackupConfrontoResponse {
     percentual_protegido: number
   }
   confronto: ConfrontoAtivoItem[]
+  alerta_falha_recente?: {
+    tem_falha: boolean
+    job_nome?: string
+    rotina_nome?: string
+    data?: string
+    mensagem?: string
+    ocorrencias_abertas?: number
+  } | null
   message?: string
 }
 

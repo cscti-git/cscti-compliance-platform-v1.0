@@ -136,15 +136,27 @@ routerAdd(
       }
     } catch (_) {}
 
-    // 5. Carregar execuções de backup com status 'sucesso' (e 'parcial' onde aplicável)
-    // Ordenadas por data_inicio DESC para encontrar a última comprovação mais recente
+    // 5. Carregar TODAS as execuções de backup da organização (incluindo erro/falha)
+    // Ordenadas por data_inicio DESC / created DESC para inspeção cronológica estrita
     let execucoes = []
     try {
       execucoes = $app.findRecordsByFilter(
         'backup_execucoes',
-        `organization = '${targetOrgId}' && (status = 'sucesso' || status = 'parcial')`,
+        `organization = '${targetOrgId}'`,
         '-data_inicio',
         500,
+        0,
+      )
+    } catch (_) {}
+
+    // 6. Carregar ocorrências abertas da organização para enriquecer alerta e ativo
+    let ocorrenciasAbertas = []
+    try {
+      ocorrenciasAbertas = $app.findRecordsByFilter(
+        'backup_ocorrencias',
+        `organization = '${targetOrgId}' && status = 'aberta'`,
+        '-created',
+        100,
         0,
       )
     } catch (_) {}
