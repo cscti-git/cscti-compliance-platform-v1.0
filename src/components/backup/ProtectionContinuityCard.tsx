@@ -23,6 +23,7 @@ import {
   listBackupFontes,
   listBackupEvidencias,
   listBackupOcorrencias,
+  listBackupEscopos,
 } from '@/services/backupService'
 import type {
   InventoryAssetItem,
@@ -31,6 +32,7 @@ import type {
   BackupFonteItem,
   BackupEvidenciaItem,
   BackupOcorrenciaItem,
+  BackupEscopoItem,
   SystemRole,
 } from '@/types/cscti'
 
@@ -91,6 +93,7 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
   const [fontes, setFontes] = useState<BackupFonteItem[]>([])
   const [evidencias, setEvidencias] = useState<BackupEvidenciaItem[]>([])
   const [ocorrencias, setOcorrencias] = useState<BackupOcorrenciaItem[]>([])
+  const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])
 
   const isOperator = userRole === 'admin' || userRole === 'suporte'
 
@@ -99,15 +102,23 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
     setLoading(true)
     setError(null)
     try {
-      const [assetsData, planosData, rotinasData, fontesData, evidenciasData, ocorrenciasData] =
-        await Promise.all([
-          listInventoryAssets(organizationId),
-          listBackupPlanos(organizationId),
-          listBackupRotinas(organizationId),
-          listBackupFontes(organizationId),
-          listBackupEvidencias(organizationId),
-          listBackupOcorrencias(organizationId),
-        ])
+      const [
+        assetsData,
+        planosData,
+        rotinasData,
+        fontesData,
+        evidenciasData,
+        ocorrenciasData,
+        escoposData,
+      ] = await Promise.all([
+        listInventoryAssets(organizationId),
+        listBackupPlanos(organizationId),
+        listBackupRotinas(organizationId),
+        listBackupFontes(organizationId),
+        listBackupEvidencias(organizationId),
+        listBackupOcorrencias(organizationId),
+        listBackupEscopos(organizationId),
+      ])
 
       setAssets(assetsData)
       setPlanos(planosData)
@@ -115,6 +126,7 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
       setFontes(fontesData)
       setEvidencias(evidenciasData)
       setOcorrencias(ocorrenciasData)
+      setEscopos(escoposData)
     } catch (err) {
       console.error('Erro ao carregar métricas de Proteção e Continuidade:', err)
       setError('Não foi possível carregar os dados de proteção e continuidade.')
@@ -159,12 +171,32 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
     return { coveredAssetIds: ids, coveredAssetNames: names }
   }, [fontesValidas])
 
-  // Ativos monitorados: ativos com status 'ativo' ou todos os cadastrados se nenhum estiver explicitamente inativo
-  const monitoredAssets = useMemo(() => {
-    return assets.filter((a) => a.status !== 'inativo' && a.status !== 'desativado')
-  }, [assets])
+  // IDs de ativos formalmente vinculados a escopos de proteção ativos
+  const escoposAtivosAssetIds = useMemo(() => {
+    const ids = new Set<string>()
+    escopos
+      .filter((e) => e.status !== 'inativo')
+      .forEach((e) => {
+        if (Array.isArray(e.ativos)) {
+          e.ativos.forEach((id) => ids.add(id))
+        }
+      })
+    return ids
+  }, [escopos])
 
-  // Ativos com cobertura confirmada
+  // Ativos monitorados:
+  // Se há escopos de proteção ativos com ativos vinculados, o universo do compromisso é composto
+  // prioritariamente por esses ativos vinculados (visão de conformidade por escopo formal).
+  // Se nenhum escopo tiver ativos ainda, mantém fallback para todos os ativos ativos do inventário.
+  const monitoredAssets = useMemo(() => {
+    const ativosValidos = assets.filter((a) => a.status !== 'inativo' && a.status !== 'desativado')
+    if (escoposAtivosAssetIds.size > 0) {
+      return ativosValidos.filter((a) => escoposAtivosAssetIds.has(a.id))
+    }
+    return ativosValidos
+  }, [assets, escoposAtivosAssetIds])
+
+  // Ativos com cobertura confirmada (vinculados ao escopo com fonte ativa em rotina operacional)
   const { coveredAssets, uncoveredAssets } = useMemo(() => {
     const covered: InventoryAssetItem[] = []
     const uncovered: InventoryAssetItem[] = []
@@ -344,7 +376,7 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
                 </div>
                 <div className="text-2xl font-bold text-slate-900">{totalMonitorados}</div>
                 <p className="text-[11px] text-slate-500 mt-0.5 group-hover:text-blue-700 inline-flex items-center">
-                  Ativos no inventário{' '}
+                  {escoposAtivosAssetIds.size > 0 ? 'No escopo formal' : 'No inventário'}{' '}
                   <ArrowRight className="w-3 h-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </p>
               </Link>

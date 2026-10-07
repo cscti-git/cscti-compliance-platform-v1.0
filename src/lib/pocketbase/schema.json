@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T12:15:51.614Z",
+  "generatedAt": "2026-10-07T12:33:48.701Z",
   "collections": [
     {
       "name": "users",
@@ -1230,6 +1230,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "ativos",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "inventory_assets"
         }
       ],
       "indexes": ["CREATE INDEX idx_bkescopo_org_status ON backup_escopo (organization, status)"]

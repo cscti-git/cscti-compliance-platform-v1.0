@@ -330,7 +330,7 @@ export const BackupGuiaPage: React.FC = () => {
                   </span>
                   <span>
                     No menu lateral ou no topo, acerte na aba <strong>1. Escopo</strong> e clique em{' '}
-                    <strong>+ Novo Item de Escopo</strong>.
+                    <strong>+ Novo Escopo</strong>.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -338,9 +338,10 @@ export const BackupGuiaPage: React.FC = () => {
                     2
                   </span>
                   <span>
-                    Informe o <strong>Nome do Item</strong> (ex.:{' '}
-                    <em>Banco de Dados do Sistema de Protesto</em>,{' '}
-                    <em>Servidor de Aplicação Orion</em> ou <em>Imagens de Livros Digitalizados</em>
+                    Informe o <strong>Nome do Escopo</strong> (ex.:{' '}
+                    <em>Base Central de Atos e Documentos Notariais</em>,{' '}
+                    <em>Servidor de Aplicação Principal</em> ou{' '}
+                    <em>Imagens de Livros Digitalizados</em>
                     ).
                   </span>
                 </li>
@@ -349,8 +350,8 @@ export const BackupGuiaPage: React.FC = () => {
                     3
                   </span>
                   <span>
-                    Selecione a <strong>Criticidade</strong> (Crítica, Alta, Média ou Baixa) e
-                    descreva brevemente o impacto em caso de perda.
+                    Selecione a <strong>Criticidade</strong> (Alta, Média ou Baixa) e o status de
+                    vigência (Ativo, Em Revisão ou Inativo).
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -358,8 +359,12 @@ export const BackupGuiaPage: React.FC = () => {
                     4
                   </span>
                   <span>
-                    Opcionalmente vincule ao <strong>Ativo do Inventário</strong> previamente
-                    cadastrado em <em>Ambiente &rarr; Ativos</em> para integridade cruzada.
+                    <strong>
+                      Selecione os ativos do inventário que exigem backup — este vínculo é a base da
+                      validação por ativo.
+                    </strong>{' '}
+                    O seletor multi-seleção exibe máquinas virtuais, bancos de dados e storages
+                    cadastrados na serventia em <em>Ambiente &rarr; Ativos</em>.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -367,8 +372,8 @@ export const BackupGuiaPage: React.FC = () => {
                     5
                   </span>
                   <span>
-                    Salve o item. Repita para todas as bases de dados e máquinas virtuais essenciais
-                    da serventia.
+                    Descreva os sistemas, impactos e particularidades técnicas do escopo e salve. O
+                    escopo agora é a referência formal para vincular fontes e rotinas.
                   </span>
                 </li>
               </ol>

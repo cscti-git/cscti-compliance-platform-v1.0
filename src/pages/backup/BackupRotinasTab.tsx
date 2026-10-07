@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -51,6 +51,7 @@ import {
   listBackupFontes,
   saveBackupFonte,
   deleteBackupFonte,
+  listBackupEscopos,
 } from '@/services/backupService'
 import { listPeople, listInventoryAssets } from '@/services/csctiService'
 import type {
@@ -62,6 +63,7 @@ import type {
   BackupFonteTipoExecucao,
   PersonItem,
   InventoryAssetItem,
+  BackupEscopoItem,
 } from '@/types/cscti'
 
 interface BackupRotinasTabProps {
@@ -100,6 +102,7 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
   // Pessoas e Ativos para vínculos
   const [people, setPeople] = useState<PersonItem[]>([])
   const [assets, setAssets] = useState<InventoryAssetItem[]>([])
+  const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])
 
   // Modal de Fontes da Rotina
   const [fontesModalOpen, setFontesModalOpen] = useState(false)
@@ -122,8 +125,32 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
     if (orgId) {
       listPeople(orgId).then(setPeople).catch(console.error)
       listInventoryAssets(orgId).then(setAssets).catch(console.error)
+      listBackupEscopos(orgId).then(setEscopos).catch(console.error)
     }
   }, [orgId])
+
+  // Conjunto de IDs de ativos que estão formalmente vinculados a algum escopo de proteção da serventia
+  const escopoAssetIds = useMemo(() => {
+    const ids = new Set<string>()
+    escopos.forEach((esc) => {
+      if (Array.isArray(esc.ativos)) {
+        esc.ativos.forEach((id) => ids.add(id))
+      }
+    })
+    return ids
+  }, [escopos])
+
+  // Ativos ordenados: primeiro os vinculados ao escopo (destaque na cadeia escopo -> ativo -> fonte -> rotina), depois os demais
+  const sortedAssetsForFonte = useMemo(() => {
+    return [...assets].sort((a, b) => {
+      const aInScope = escopoAssetIds.has(a.id) ? 1 : 0
+      const bInScope = escopoAssetIds.has(b.id) ? 1 : 0
+      if (aInScope !== bInScope) {
+        return bInScope - aInScope // vinculados ao escopo primeiro
+      }
+      return a.name.localeCompare(b.name)
+    })
+  }, [assets, escopoAssetIds])
 
   const openNewRotina = () => {
     setEditingItem(null)
@@ -263,7 +290,8 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
         tipo_fonte: novaFonteTipo,
         tipo_execucao: novaFonteTipoExecucao,
         caminho_identificacao: novaFonteCaminho.trim(),
-        ativo_inventario: novaFonteAssetId || undefined,
+        ativo_inventario:
+          novaFonteAssetId && novaFonteAssetId !== 'none' ? novaFonteAssetId : undefined,
         ativo: true,
       })
       setNovaFonteCaminho('')
@@ -851,14 +879,18 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                       <SelectTrigger className="text-xs h-8">
                         <SelectValue placeholder="Selecione um ativo..." />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Nenhum ativo associado</SelectItem>
-                        {assets.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name} (
-                            {a.tipo === 'servidor_virtualizado' ? 'VM / Virtualizado' : a.tipo})
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="max-h-72">
+                        <SelectItem value="none">Nenhum ativo associado</SelectItem>
+                        {sortedAssetsForFonte.map((a) => {
+                          const isInScope = escopoAssetIds.has(a.id)
+                          return (
+                            <SelectItem key={a.id} value={a.id}>
+                              {isInScope ? '⭐ [Escopo] ' : ''}
+                              {a.name} (
+                              {a.tipo === 'servidor_virtualizado' ? 'VM / Virtualizado' : a.tipo})
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                   </div>

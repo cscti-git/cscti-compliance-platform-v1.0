@@ -243,8 +243,12 @@ export interface BackupEscopoItem {
   sistemas_protegidos?: string
   criticidade: 'baixa' | 'media' | 'alta'
   status: 'ativo' | 'inativo' | 'em_revisao'
+  ativos?: string[]
   created?: string
   updated?: string
+  expand?: {
+    ativos?: InventoryAssetItem[]
+  }
 }
 
 export type BackupPlanoPeriodicidade = 'intervalo_minutos' | 'diaria' | 'semanal' | 'mensal'

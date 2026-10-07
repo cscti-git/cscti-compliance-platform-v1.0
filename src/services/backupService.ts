@@ -24,6 +24,7 @@ export async function listBackupEscopos(organizationId: string): Promise<BackupE
   return pb.collection('backup_escopo').getFullList<BackupEscopoItem>({
     filter: `organization = "${organizationId}"`,
     sort: '-created',
+    expand: 'ativos',
   })
 }
 
@@ -31,23 +32,55 @@ export async function saveBackupEscopo(
   data: Partial<BackupEscopoItem> & { organization: string },
 ): Promise<BackupEscopoItem> {
   let result: BackupEscopoItem
+  const payload: Record<string, unknown> = { ...data }
+  if (Array.isArray(payload.ativos)) {
+    // Normalizar lista de IDs (strings válidas e únicas)
+    payload.ativos = Array.from(
+      new Set(payload.ativos.filter((id) => typeof id === 'string' && id.trim().length > 0)),
+    )
+  }
+
+  const ativosCount = Array.isArray(payload.ativos) ? payload.ativos.length : 0
+  const ativosInfo =
+    ativosCount > 0
+      ? ` (${ativosCount} ativo(s) do inventário vinculado(s))`
+      : ' (sem ativos vinculados)'
+
   if (data.id) {
-    result = await pb.collection('backup_escopo').update<BackupEscopoItem>(data.id, data)
+    result = await pb.collection('backup_escopo').update<BackupEscopoItem>(data.id, payload, {
+      expand: 'ativos',
+    })
     await logAudit({
       organizationId: data.organization,
       action: 'BACKUP_ESCOPO_UPDATE',
       entity: 'Backup e Continuidade',
-      detail: `Escopo de proteção atualizado: ${result.nome}`,
-      metadata: { escopo_id: result.id },
+      detail: `Escopo de proteção atualizado: ${result.nome}${ativosInfo}`,
+      metadata: {
+        escopo_id: result.id,
+        nome: result.nome,
+        ativos_count: ativosCount,
+        ativos_ids: payload.ativos || [],
+        criticidade: result.criticidade,
+        status: result.status,
+      },
     })
   } else {
-    result = await pb.collection('backup_escopo').create<BackupEscopoItem>(data)
+    result = await pb.collection('backup_escopo').create<BackupEscopoItem>(payload, {
+      expand: 'ativos',
+    })
     await logAudit({
       organizationId: data.organization,
       action: 'BACKUP_ESCOPO_CREATE',
       entity: 'Backup e Continuidade',
-      detail: `Novo escopo de proteção cadastrado: ${result.nome}`,
-      metadata: { escopo_id: result.id },
+      detail: `Novo escopo de proteção cadastrado: ${result.nome}${ativosInfo}`,
+      metadata: {
+        escopo_id: result.id,
+        nome: result.nome,
+        ativos_count: ativosCount,
+        ativos_ids: payload.ativos || [],
+        criticidade: result.criticidade,
+        status: result.status,
+      },
     })
   }
   return result
