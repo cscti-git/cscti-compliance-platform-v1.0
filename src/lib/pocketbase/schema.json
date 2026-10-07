@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T13:43:50.537Z",
+  "generatedAt": "2026-10-07T14:16:23.725Z",
   "collections": [
     {
       "name": "users",
@@ -1083,6 +1083,24 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "exige_backup_local",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "exige_backup_nuvem",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "exige_backup_replicacao",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

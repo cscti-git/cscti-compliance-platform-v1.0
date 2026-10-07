@@ -40,6 +40,7 @@ interface BackupCicloStepperProps {
     execucoes: number
     ocorrencias: number
     testes: number
+    ativosExigemBackup?: number
   }
 }
 
@@ -48,17 +49,35 @@ export const BackupCicloStepper: React.FC<BackupCicloStepperProps> = ({
   onSelectTab,
   counts,
 }) => {
+  const step1Title =
+    typeof counts.ativosExigemBackup === 'number' && counts.ativosExigemBackup > 0
+      ? '1. Ativos & Escopo'
+      : '1. Ativos & Escopo'
+  const step1Subtitle =
+    typeof counts.ativosExigemBackup === 'number' && counts.ativosExigemBackup > 0
+      ? `${counts.ativosExigemBackup} ${counts.ativosExigemBackup === 1 ? 'ativo exige backup' : 'ativos exigem backup'}`
+      : counts.escopos > 0
+        ? `${counts.escopos} ${counts.escopos === 1 ? 'escopo formal' : 'escopos formais'}`
+        : '0 ativos c/ exigência'
+
+  const step1Complete =
+    (typeof counts.ativosExigemBackup === 'number' && counts.ativosExigemBackup > 0) ||
+    counts.escopos > 0
+
   const steps: BackupCicloStep[] = [
     {
       id: 'escopo',
       tab: 'escopo',
-      title: '1. Escopo',
-      shortTitle: 'Escopo',
-      subtitle: 'O que proteger',
-      count: counts.escopos,
+      title: step1Title,
+      shortTitle: 'Ativos & Escopo',
+      subtitle: step1Subtitle,
+      count:
+        typeof counts.ativosExigemBackup === 'number' && counts.ativosExigemBackup > 0
+          ? counts.ativosExigemBackup
+          : counts.escopos,
       icon: Layers,
-      status: counts.escopos > 0 ? 'complete' : 'empty',
-      emptyHint: 'Pendente de mapeamento',
+      status: step1Complete ? 'complete' : 'empty',
+      emptyHint: 'Pendente de mapeamento de ativos',
     },
     {
       id: 'planos',

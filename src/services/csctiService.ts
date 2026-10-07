@@ -733,6 +733,70 @@ export async function deleteInventoryAsset(
   })
 }
 
+export interface BackupExigenciaUpdateItem {
+  id: string
+  name: string
+  exige_backup_local: boolean
+  exige_backup_nuvem: boolean
+  exige_backup_replicacao: boolean
+}
+
+export async function updateBatchBackupExigencias(
+  orgId: string,
+  updates: BackupExigenciaUpdateItem[],
+): Promise<void> {
+  if (!updates || updates.length === 0) return
+
+  const alteredAssets: Array<{
+    id: string
+    name: string
+    local: boolean
+    nuvem: boolean
+    replicacao: boolean
+  }> = []
+
+  for (const item of updates) {
+    await pb.collection('inventory_assets').update(item.id, {
+      exige_backup_local: !!item.exige_backup_local,
+      exige_backup_nuvem: !!item.exige_backup_nuvem,
+      exige_backup_replicacao: !!item.exige_backup_replicacao,
+    })
+    alteredAssets.push({
+      id: item.id,
+      name: item.name,
+      local: !!item.exige_backup_local,
+      nuvem: !!item.exige_backup_nuvem,
+      replicacao: !!item.exige_backup_replicacao,
+    })
+  }
+
+  const comExigencia = alteredAssets.filter((a) => a.local || a.nuvem || a.replicacao)
+  const localCount = alteredAssets.filter((a) => a.local).length
+  const nuvemCount = alteredAssets.filter((a) => a.nuvem).length
+  const replCount = alteredAssets.filter((a) => a.replicacao).length
+
+  await logAudit({
+    action: 'BACKUP_EXIGENCIAS_ATUALIZADAS',
+    entity: 'Backup e Continuidade',
+    detail: `Exigências de backup atualizadas para ${updates.length} ativo(s): ${comExigencia.length} exigem salvaguarda (${localCount} local, ${nuvemCount} nuvem, ${replCount} replicação).`,
+    organizationId: orgId,
+    metadata: {
+      total_atualizados: updates.length,
+      ativos_com_exigencia: comExigencia.length,
+      local: localCount,
+      nuvem: nuvemCount,
+      replicacao: replCount,
+      ativos_resumo: alteredAssets.map((a) => ({
+        id: a.id,
+        name: a.name,
+        local: a.local,
+        nuvem: a.nuvem,
+        replicacao: a.replicacao,
+      })),
+    },
+  })
+}
+
 // 10. Inventory Sync Runs
 export async function listInventorySyncRuns(
   orgId: string,

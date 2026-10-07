@@ -147,13 +147,19 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
     return ids
   }, [escopos])
 
-  // Ativos ordenados: primeiro os vinculados ao escopo (destaque na cadeia escopo -> ativo -> fonte -> rotina), depois os demais
+  // Ativos ordenados: primeiro os que EXIGEM backup (Local, Nuvem ou Replicação) ou vinculados ao escopo
   const sortedAssetsForFonte = useMemo(() => {
     return [...assets].sort((a, b) => {
-      const aInScope = escopoAssetIds.has(a.id) ? 1 : 0
-      const bInScope = escopoAssetIds.has(b.id) ? 1 : 0
-      if (aInScope !== bInScope) {
-        return bInScope - aInScope // vinculados ao escopo primeiro
+      const aExige = a.exige_backup_local || a.exige_backup_nuvem || a.exige_backup_replicacao
+      const bExige = b.exige_backup_local || b.exige_backup_nuvem || b.exige_backup_replicacao
+      const aInScope = escopoAssetIds.has(a.id)
+      const bInScope = escopoAssetIds.has(b.id)
+
+      const aScore = (aExige ? 2 : 0) + (aInScope ? 1 : 0)
+      const bScore = (bExige ? 2 : 0) + (bInScope ? 1 : 0)
+
+      if (aScore !== bScore) {
+        return bScore - aScore // exigem backup / escopo primeiro
       }
       return a.name.localeCompare(b.name)
     })
@@ -1050,9 +1056,22 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                         <SelectItem value="none">Nenhum ativo associado</SelectItem>
                         {sortedAssetsForFonte.map((a) => {
                           const isInScope = escopoAssetIds.has(a.id)
+                          const tiposExigidos: string[] = []
+                          if (a.exige_backup_local) tiposExigidos.push('Local')
+                          if (a.exige_backup_nuvem) tiposExigidos.push('Nuvem')
+                          if (a.exige_backup_replicacao) tiposExigidos.push('Replicação')
+                          const exige = tiposExigidos.length > 0
+
+                          let selo = ''
+                          if (exige) {
+                            selo = `⭐ [Exige: ${tiposExigidos.join('+')}] `
+                          } else if (isInScope) {
+                            selo = '🔹 [Escopo] '
+                          }
+
                           return (
                             <SelectItem key={a.id} value={a.id}>
-                              {isInScope ? '⭐ [Escopo] ' : ''}
+                              {selo}
                               {a.name} (
                               {a.tipo === 'servidor_virtualizado' ? 'VM / Virtualizado' : a.tipo})
                             </SelectItem>

@@ -84,8 +84,8 @@ export const BackupGuiaPage: React.FC = () => {
     {
       id: 'etapa-1-escopo',
       num: '1',
-      title: 'Escopo',
-      subtitle: 'O que proteger',
+      title: 'Ativos & Escopo',
+      subtitle: 'Exigências e Escopo',
       icon: Layers,
       tab: 'escopo',
     },
@@ -269,17 +269,18 @@ export const BackupGuiaPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-lg font-bold text-slate-900">
-                      Etapa 1 — Escopo de Proteção
+                      Etapa 1 — Ativos &amp; Escopo de Proteção
                     </CardTitle>
                     <Badge
                       variant="outline"
                       className="text-[10px] font-bold text-blue-800 bg-blue-50 border-blue-200"
                     >
-                      Compromisso Formal
+                      Núcleo Centrado no Ativo
                     </Badge>
                   </div>
                   <CardDescription className="text-xs">
-                    Define <strong>O QUE</strong> será protegido no ambiente da serventia.
+                    Define <strong>QUAIS ATIVOS EXIGEM BACKUP</strong> (Local, Nuvem e/ou
+                    Replicação) e organiza o compromisso formal do cartório.
                   </CardDescription>
                 </div>
               </div>
@@ -289,21 +290,40 @@ export const BackupGuiaPage: React.FC = () => {
                   variant="outline"
                   className="text-xs font-semibold text-blue-700 border-blue-200 hover:bg-blue-50 gap-1"
                 >
-                  Configurar Escopo <ArrowRight className="w-3.5 h-3.5" />
+                  Configurar Ativos &amp; Escopo <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
             </div>
           </CardHeader>
 
           <CardContent className="p-5 space-y-4 text-xs sm:text-sm text-slate-700">
+            {/* O novo conceito centrado no ativo */}
+            <div className="p-4 rounded-xl border-2 border-blue-200 bg-blue-50/70 text-blue-950 space-y-1.5 shadow-2xs">
+              <span className="font-bold text-xs uppercase tracking-wide text-blue-900 flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-blue-700" />
+                Conceito Central: Inventário Automático &amp; Seleção de Exigências
+              </span>
+              <p className="text-xs leading-relaxed text-blue-950 font-medium">
+                Todo ativo importado do GLPI (ou cadastrado em Ativos do Cartório) aparece aqui
+                automaticamente. Marque quais exigem backup e de que tipo: <strong>Local</strong>,{' '}
+                <strong>Nuvem</strong> e/ou <strong>Replicação</strong>. Só depois configure escopo,
+                planos, rotinas e fontes.
+              </p>
+              <p className="text-[11px] text-blue-800 leading-snug">
+                Nem todo ativo do cartório precisa de salvaguarda: alguns exigem apenas cópia local,
+                outros apenas nuvem, outros replicação contínua, e ativos sem marcação são neutros
+                (não entram nas exigências de auditoria).
+              </p>
+            </div>
+
             {/* O que é */}
             <div className="space-y-1">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">O que é</h4>
               <p className="leading-relaxed">
-                O Escopo é o compromisso formal da serventia sobre quais sistemas, bases de dados,
-                servidores e documentos entram obrigatoriamente sob a política de backup e
-                recuperação de desastres. Ele funciona como a linha de base e a referência contra a
-                qual tudo é confrontado nas auditorias.
+                A etapa de <strong>Ativos &amp; Escopo</strong> une o inventário tecnológico em
+                tempo real à governança de salvaguarda. Ela permite selecionar em lote as exigências
+                técnicas de cada máquina ou banco de dados e agrupá-los formalmente em escopos
+                sistêmicos contra os quais tudo é confrontado nas auditorias.
               </p>
             </div>
 
@@ -313,9 +333,10 @@ export const BackupGuiaPage: React.FC = () => {
                 Por que existe (o que prova)
               </h4>
               <p className="leading-relaxed">
-                Prova que a gestão da serventia mapeou expressamente todos os seus ativos críticos e
-                assumiu a responsabilidade de protegê-los. Qualquer item encontrado em relatórios
-                sem escopo cadastrado é apontado como desvio de inventário.
+                Prova ao juiz corregedor e a auditorias externas que o cartório sabe com precisão
+                quais ativos existem, quais deles guardam dados notariais e registrais críticos,
+                quais modalidades de cópia (Local, Nuvem, Replicação) são mandatórias para cada um e
+                quais rotinas comprovam essas garantias.
               </p>
             </div>
 
@@ -330,8 +351,9 @@ export const BackupGuiaPage: React.FC = () => {
                     1
                   </span>
                   <span>
-                    No menu lateral ou no topo, acerte na aba <strong>1. Escopo</strong> e clique em{' '}
-                    <strong>+ Novo Escopo</strong>.
+                    Acesse a aba <strong>1. Ativos &amp; Escopo</strong>. No topo, a tabela lista
+                    todos os <strong>Ativos do Cartório</strong> importados do GLPI ou cadastrados
+                    no inventário.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -339,11 +361,11 @@ export const BackupGuiaPage: React.FC = () => {
                     2
                   </span>
                   <span>
-                    Informe o <strong>Nome do Escopo</strong> (ex.:{' '}
-                    <em>Base Central de Atos e Documentos Notariais</em>,{' '}
-                    <em>Servidor de Aplicação Principal</em> ou{' '}
-                    <em>Imagens de Livros Digitalizados</em>
-                    ).
+                    Para cada ativo, ative os toggles das modalidades exigidas:{' '}
+                    <strong>Local</strong> (cópia rápida em storage/disco), <strong>Nuvem</strong>{' '}
+                    (cópia externa fora do cartório) e/ou <strong>Replicação</strong> (máquinas
+                    virtuais contínuas). Ativos sem seleção permanecem como &quot;Não exige
+                    backup&quot;.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -351,8 +373,9 @@ export const BackupGuiaPage: React.FC = () => {
                     3
                   </span>
                   <span>
-                    Selecione a <strong>Criticidade</strong> (Alta, Média ou Baixa) e o status de
-                    vigência (Ativo, Em Revisão ou Inativo).
+                    Clique no botão verde <strong>Salvar exigências</strong>. As alterações são
+                    gravadas em lote e registradas de forma append-only no log de auditoria da
+                    serventia.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -360,12 +383,10 @@ export const BackupGuiaPage: React.FC = () => {
                     4
                   </span>
                   <span>
-                    <strong>
-                      Selecione os ativos do inventário que exigem backup — este vínculo é a base da
-                      validação por ativo.
-                    </strong>{' '}
-                    O seletor multi-seleção exibe máquinas virtuais, bancos de dados e storages
-                    cadastrados na serventia em <em>Ambiente &rarr; Ativos</em>.
+                    Na seção logo abaixo, crie ou ajuste os{' '}
+                    <strong>Agrupadores de Escopo de Proteção</strong> (ex.:{' '}
+                    <em>Base Central de Atos e Documentos Notariais</em> ou{' '}
+                    <em>Servidores Virtuais de Produção</em>) e vincule os ativos correspondentes.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -373,8 +394,9 @@ export const BackupGuiaPage: React.FC = () => {
                     5
                   </span>
                   <span>
-                    Descreva os sistemas, impactos e particularidades técnicas do escopo e salve. O
-                    escopo agora é a referência formal para vincular fontes e rotinas.
+                    Avance para <strong>2. Planos</strong> e{' '}
+                    <strong>3. Rotinas &amp; Fontes</strong>: ao cadastrar as fontes, o sistema já
+                    destaca com ⭐ os ativos que possuem exigência de salvaguarda ativa.
                   </span>
                 </li>
               </ol>

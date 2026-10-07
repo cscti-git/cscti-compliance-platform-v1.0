@@ -52,6 +52,7 @@ import { useToast } from '@/hooks/use-toast'
 import { saveBackupEscopo, deleteBackupEscopo } from '@/services/backupService'
 import { listInventoryAssets } from '@/services/csctiService'
 import type { BackupEscopoItem, InventoryAssetItem, AssetType } from '@/types/cscti'
+import { BackupAtivosExigencias } from '@/components/backup/BackupAtivosExigencias'
 
 interface BackupEscopoTabProps {
   escopos: BackupEscopoItem[]
@@ -132,26 +133,22 @@ export const BackupEscopoTab: React.FC<BackupEscopoTabProps> = ({
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([])
   const [assetSearch, setAssetSearch] = useState('')
 
+  const reloadAssets = async () => {
+    if (!orgId) return
+    setLoadingAssets(true)
+    try {
+      const data = await listInventoryAssets(orgId)
+      setAssets(data)
+    } catch (err) {
+      console.error('Erro ao carregar ativos para escopo de backup:', err)
+    } finally {
+      setLoadingAssets(false)
+    }
+  }
+
   // Carrega ativos do inventário da serventia logada
   useEffect(() => {
-    if (!orgId) return
-    let active = true
-    setLoadingAssets(true)
-    listInventoryAssets(orgId)
-      .then((data) => {
-        if (active) {
-          setAssets(data)
-        }
-      })
-      .catch((err) => {
-        console.error('Erro ao carregar ativos para escopo de backup:', err)
-      })
-      .finally(() => {
-        if (active) setLoadingAssets(false)
-      })
-    return () => {
-      active = false
-    }
+    reloadAssets()
   }, [orgId])
 
   // Mapa rápido de ativo por ID para resolução no card mesmo sem expand
@@ -301,41 +298,52 @@ export const BackupEscopoTab: React.FC<BackupEscopoTabProps> = ({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Cabeçalho padronizado da aba */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-blue-50/20 shadow-2xs">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#0B2545] text-white flex items-center justify-center shrink-0 mt-0.5">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-900">
-                1. Escopos de Proteção da Serventia
-              </h2>
-              <Badge
-                variant="outline"
-                className="text-[10px] font-bold bg-white text-slate-700 border-slate-300"
-              >
-                {escopos.length} {escopos.length === 1 ? 'escopo' : 'escopos'}
-              </Badge>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Define o compromisso formal do que será protegido, vinculando os ativos do inventário
-              para confrontação em auditorias de continuidade.
-            </p>
-          </div>
-        </div>
+    <div className="space-y-6">
+      {/* SEÇÃO 1: NÚCLEO CENTRADO NO ATIVO — EXIGÊNCIAS DE BACKUP (LOCAL / NUVEM / REPLICAÇÃO) */}
+      <BackupAtivosExigencias
+        orgId={orgId}
+        assets={assets}
+        loadingAssets={loadingAssets}
+        canOperate={canOperate}
+        onReloadAssets={reloadAssets}
+      />
 
-        {canOperate && (
-          <Button
-            onClick={openNew}
-            size="sm"
-            className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs shrink-0 self-start sm:self-center"
-          >
-            <Plus className="w-4 h-4" /> Novo Escopo
-          </Button>
-        )}
+      {/* SEÇÃO 2: ESCOPOS FORMAIS DE PROTEÇÃO (AGRUPADORES COM VÍNCULO DE ATIVOS) */}
+      <div className="space-y-4 pt-2 border-t border-slate-200/80">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-blue-50/20 shadow-2xs">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[#0B2545] text-white flex items-center justify-center shrink-0 mt-0.5">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900">
+                  Agrupadores de Escopo de Proteção
+                </h2>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-bold bg-white text-slate-700 border-slate-300"
+                >
+                  {escopos.length} {escopos.length === 1 ? 'escopo' : 'escopos'}
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Organize os ativos com exigência de salvaguarda em agrupadores lógicos de sistemas
+                críticos para associá-los aos planos de contingência e políticas de RTO/RPO.
+              </p>
+            </div>
+          </div>
+
+          {canOperate && (
+            <Button
+              onClick={openNew}
+              size="sm"
+              className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs shrink-0 self-start sm:self-center"
+            >
+              <Plus className="w-4 h-4" /> Novo Escopo
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

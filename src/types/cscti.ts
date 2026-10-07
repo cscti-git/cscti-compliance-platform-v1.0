@@ -197,6 +197,9 @@ export interface InventoryAssetItem {
   external_id?: string
   responsavel?: string
   dados_normalizados?: Record<string, unknown>
+  exige_backup_local?: boolean
+  exige_backup_nuvem?: boolean
+  exige_backup_replicacao?: boolean
   created?: string
   updated?: string
   expand?: {

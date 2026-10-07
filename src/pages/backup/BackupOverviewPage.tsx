@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +24,7 @@ import {
   Database,
   Sliders,
   Sparkles,
+  Server,
 } from 'lucide-react'
 import {
   listBackupEscopos,
@@ -36,6 +37,7 @@ import {
   listBackupOcorrencias,
   listBackupTestes,
 } from '@/services/backupService'
+import { listInventoryAssets } from '@/services/csctiService'
 import type {
   BackupEscopoItem,
   BackupPlanoItem,
@@ -46,6 +48,7 @@ import type {
   BackupExecucaoItem,
   BackupOcorrenciaItem,
   BackupTesteRecuperacaoItem,
+  InventoryAssetItem,
 } from '@/types/cscti'
 
 // Sub-abas
@@ -77,23 +80,35 @@ export const BackupOverviewPage: React.FC = () => {
   const [execucoes, setExecucoes] = useState<BackupExecucaoItem[]>([])
   const [ocorrencias, setOcorrencias] = useState<BackupOcorrenciaItem[]>([])
   const [testes, setTestes] = useState<BackupTesteRecuperacaoItem[]>([])
+  const [assets, setAssets] = useState<InventoryAssetItem[]>([])
 
   const loadAllData = async () => {
     if (!orgId) return
     setLoading(true)
     try {
-      const [escData, plaData, rotData, fonData, regData, eviData, exeData, ocoData, tesData] =
-        await Promise.all([
-          listBackupEscopos(orgId),
-          listBackupPlanos(orgId),
-          listBackupRotinas(orgId),
-          listBackupFontes(orgId),
-          listBackupRegras(orgId),
-          listBackupEvidencias(orgId),
-          listBackupExecucoes(orgId),
-          listBackupOcorrencias(orgId),
-          listBackupTestes(orgId),
-        ])
+      const [
+        escData,
+        plaData,
+        rotData,
+        fonData,
+        regData,
+        eviData,
+        exeData,
+        ocoData,
+        tesData,
+        assData,
+      ] = await Promise.all([
+        listBackupEscopos(orgId),
+        listBackupPlanos(orgId),
+        listBackupRotinas(orgId),
+        listBackupFontes(orgId),
+        listBackupRegras(orgId),
+        listBackupEvidencias(orgId),
+        listBackupExecucoes(orgId),
+        listBackupOcorrencias(orgId),
+        listBackupTestes(orgId),
+        listInventoryAssets(orgId),
+      ])
       setEscopos(escData)
       setPlanos(plaData)
       setRotinas(rotData)
@@ -103,6 +118,7 @@ export const BackupOverviewPage: React.FC = () => {
       setExecucoes(exeData)
       setOcorrencias(ocoData)
       setTestes(tesData)
+      setAssets(assData)
     } catch (err) {
       console.error('Erro ao carregar dados de backup:', err)
     } finally {
@@ -121,6 +137,13 @@ export const BackupOverviewPage: React.FC = () => {
   const ocorrenciasAbertas = ocorrencias.filter((o) => o.status !== 'resolvida').length
   const evidenciasPendentes = evidencias.filter((e) => e.status_processamento === 'pendente').length
   const ultimoTeste = testes.length > 0 ? testes[0] : null
+
+  // Métricas de ativos com exigências de backup
+  const ativosExigemBackupCount = useMemo(() => {
+    return assets.filter(
+      (a) => a.exige_backup_local || a.exige_backup_nuvem || a.exige_backup_replicacao,
+    ).length
+  }, [assets])
 
   // Taxa de sucesso das execuções
   const taxaSucesso =
@@ -194,6 +217,7 @@ export const BackupOverviewPage: React.FC = () => {
             execucoes: execucoes.length,
             ocorrencias: ocorrenciasAbertas,
             testes: testes.length,
+            ativosExigemBackup: ativosExigemBackupCount,
           }}
         />
       </div>
@@ -215,7 +239,8 @@ export const BackupOverviewPage: React.FC = () => {
             value="escopo"
             className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
           >
-            <Layers className="w-3.5 h-3.5 mr-1.5" /> Escopo ({escopos.length})
+            <Layers className="w-3.5 h-3.5 mr-1.5" /> Ativos &amp; Escopo (
+            {ativosExigemBackupCount > 0 ? `${ativosExigemBackupCount} ativos` : escopos.length})
           </TabsTrigger>
           <TabsTrigger
             value="planos"
@@ -405,10 +430,12 @@ export const BackupOverviewPage: React.FC = () => {
                 >
                   <Layers className="w-4 h-4 text-blue-600 mb-1.5" />
                   <p className="text-xs font-bold text-slate-800 group-hover:text-blue-700">
-                    1. Escopo de Proteção
+                    1. Ativos &amp; Escopo
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    {escopos.length} escopos mapeados
+                    {ativosExigemBackupCount > 0
+                      ? `${ativosExigemBackupCount} ativos c/ backup (${escopos.length} escopos)`
+                      : `${escopos.length} escopos mapeados`}
                   </p>
                 </button>
 
