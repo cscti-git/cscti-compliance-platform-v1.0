@@ -45,6 +45,8 @@ import {
   CheckCircle2,
   Info,
   Download,
+  Sliders,
+  Sparkles,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -109,6 +111,9 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
   const [people, setPeople] = useState<PersonItem[]>([])
   const [assets, setAssets] = useState<InventoryAssetItem[]>([])
   const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])
+
+  // Derivação automática de fontes por ativo do escopo herdado
+  const [creatingFonteAssetId, setCreatingFonteAssetId] = useState<string | null>(null)
 
   // Modal de Fontes da Rotina
   const [fontesModalOpen, setFontesModalOpen] = useState(false)
@@ -290,6 +295,57 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
       console.error(err)
     } finally {
       setFontesLoading(false)
+    }
+  }
+
+  // Criação automática de fonte a partir do ativo herdado em 1 clique
+  const handleCriarFonteDeAtivo = async (asset: InventoryAssetItem) => {
+    if (!selectedRotinaForFontes) return
+    setCreatingFonteAssetId(asset.id)
+    try {
+      // Determina o tipo de fonte de acordo com a categoria do ativo
+      let tipoCalculado:
+        | 'banco_de_dados'
+        | 'arquivos'
+        | 'sistema'
+        | 'e_mail'
+        | 'maquina_virtual'
+        | 'outro' = 'maquina_virtual'
+      if (asset.tipo === 'banco_dados') {
+        tipoCalculado = 'banco_de_dados'
+      } else if (asset.tipo === 'servidor_virtualizado' || asset.tipo === 'servidor_aplicacao') {
+        tipoCalculado = 'maquina_virtual'
+      } else if (asset.tipo === 'storage_backup') {
+        tipoCalculado = 'arquivos'
+      } else if (asset.tipo === 'servico_nuvem') {
+        tipoCalculado = 'sistema'
+      }
+
+      await saveBackupFonte({
+        organization: orgId,
+        rotina: selectedRotinaForFontes.id,
+        tipo_fonte: tipoCalculado,
+        tipo_execucao: 'padrao_rotina',
+        caminho_identificacao: asset.name.trim(),
+        ativo_inventario: asset.id,
+        ativo: true,
+      })
+
+      const allFontes = await listBackupFontes(orgId)
+      setFontesList(allFontes.filter((f) => f.rotina === selectedRotinaForFontes.id))
+      toast({
+        title: 'Fonte derivada com sucesso!',
+        description: `Origem "${asset.name}" criada automaticamente e vinculada ao ativo do inventário.`,
+      })
+      onReload()
+    } catch (err: unknown) {
+      toast({
+        title: 'Erro ao derivar fonte do ativo',
+        description: err instanceof Error ? err.message : 'Falha ao salvar.',
+        variant: 'destructive',
+      })
+    } finally {
+      setCreatingFonteAssetId(null)
     }
   }
 
@@ -489,114 +545,161 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
             )}
           </Card>
         ) : (
-          rotinas.map((rotina) => (
-            <Card
-              key={rotina.id}
-              className="border-slate-200 shadow-2xs hover:shadow-xs transition"
-            >
-              <CardHeader className="p-4 pb-3 border-b border-slate-100 flex flex-row items-start justify-between">
-                <div>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] uppercase font-bold mb-1.5 text-blue-700 bg-blue-50 border-blue-200"
-                  >
-                    Plano: {rotina.expand?.plano?.nome || 'Geral'}
-                  </Badge>
-                  <CardTitle className="text-sm font-bold text-slate-900 leading-snug">
-                    {rotina.nome}
-                  </CardTitle>
-                </div>
-                <Badge
-                  variant="secondary"
-                  className={`text-[10px] ${
-                    rotina.status === 'ativo'
-                      ? 'text-emerald-700 bg-emerald-50'
-                      : 'text-slate-500 bg-slate-100'
-                  }`}
-                >
-                  {rotina.status.toUpperCase()}
-                </Badge>
-              </CardHeader>
-              <CardContent className="p-4 text-xs space-y-3">
-                {/* Linha de destaque da periodicidade + tipo de execução */}
-                <div className="flex items-center justify-between bg-blue-50/60 border border-blue-100 px-2.5 py-1.5 rounded text-[11px] text-[#0B2545] font-semibold">
-                  <div className="flex items-center gap-1.5">
-                    {rotina.periodicidade === 'intervalo_minutos' ? (
-                      <Repeat className="w-3.5 h-3.5 text-blue-600" />
-                    ) : (
-                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                    )}
-                    <span>{formatPeriodicidadeLabel(rotina)}</span>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] font-bold uppercase tracking-wider bg-white text-blue-800 border-blue-300"
-                  >
-                    {formatTipoExecucaoLabel(rotina.tipo_execucao)}
-                  </Badge>
-                </div>
+          rotinas.map((rotina) => {
+            const planoObj = planos.find((p) => p.id === rotina.plano) || rotina.expand?.plano
+            const escopoIdDaRotina = planoObj?.escopo
+            const escopoObj =
+              escopos.find((e) => e.id === escopoIdDaRotina) || planoObj?.expand?.escopo
+            const ativosIdsEscopo = Array.isArray(escopoObj?.ativos) ? escopoObj.ativos : []
+            const qtdAtivosEscopo = ativosIdsEscopo.length
 
-                <div className="grid grid-cols-2 gap-2 text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-100">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>
-                      {rotina.periodicidade === 'intervalo_minutos'
-                        ? `Ciclo contínuo (${rotina.intervalo_minutos || 30} min)`
-                        : rotina.horario
-                          ? `${rotina.horario}h`
-                          : 'Horário flexível'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">
-                      Tipo: {formatTipoExecucaoLabel(rotina.tipo_execucao)}
-                    </span>
-                  </div>
-                  <div className="col-span-2 flex items-center gap-1.5 pt-1 border-t border-slate-200/50">
-                    <User className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="truncate">
-                      Resp: {rotina.expand?.responsavel?.name || 'Equipe de TI'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openGerenciarFontes(rotina)}
-                    className="h-8 text-xs text-emerald-800 border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/50"
-                  >
-                    <Server className="w-3.5 h-3.5 mr-1" /> Fontes & Ativos
-                  </Button>
-
-                  {canOperate && (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditRotina(rotina)}
-                        className="h-8 w-8 text-slate-600 hover:text-slate-900"
-                        title="Editar"
+            return (
+              <Card
+                key={rotina.id}
+                className="border-slate-200 shadow-2xs hover:shadow-xs transition"
+              >
+                <CardHeader className="p-4 pb-3 border-b border-slate-100 flex flex-row items-start justify-between">
+                  <div>
+                    {/* Cadeia herdada no topo do card */}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase font-bold text-blue-700 bg-blue-50 border-blue-200"
                       >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeletingItem(rotina)}
-                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                        Plano: {planoObj?.nome || 'Geral'}
+                      </Badge>
+                      {escopoObj && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] font-medium bg-indigo-50 text-indigo-900 border border-indigo-200 flex items-center gap-1"
+                        >
+                          <Layers className="w-3 h-3 text-indigo-600" />
+                          {escopoObj.nome} ({qtdAtivosEscopo}{' '}
+                          {qtdAtivosEscopo === 1 ? 'ativo' : 'ativos'})
+                        </Badge>
+                      )}
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                    <CardTitle className="text-sm font-bold text-slate-900 leading-snug">
+                      {rotina.nome}
+                    </CardTitle>
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className={`text-[10px] ${
+                      rotina.status === 'ativo'
+                        ? 'text-emerald-700 bg-emerald-50'
+                        : 'text-slate-500 bg-slate-100'
+                    }`}
+                  >
+                    {rotina.status.toUpperCase()}
+                  </Badge>
+                </CardHeader>
+                <CardContent className="p-4 text-xs space-y-3">
+                  {/* Linha da cadeia herdada: Escopo → Plano → Rotina */}
+                  <div className="p-2 rounded bg-slate-50 border border-slate-200 text-[11px] text-slate-700 flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-slate-900">Cadeia:</span>
+                    <span
+                      className="text-slate-600 truncate max-w-[120px]"
+                      title={escopoObj?.nome || 'Sem escopo'}
+                    >
+                      {escopoObj?.nome || 'Escopo n/d'}
+                    </span>
+                    <span className="text-slate-400">&rarr;</span>
+                    <span
+                      className="font-semibold text-blue-800 truncate max-w-[130px]"
+                      title={planoObj?.nome || 'Sem plano'}
+                    >
+                      {planoObj?.nome || 'Plano n/d'}
+                    </span>
+                    <span className="text-slate-400">&rarr;</span>
+                    <span className="font-bold text-emerald-800 truncate max-w-[130px]">
+                      {rotina.nome}
+                    </span>
+                    <Badge className="ml-auto bg-white text-slate-700 border-slate-200 text-[10px] font-mono">
+                      {qtdAtivosEscopo} {qtdAtivosEscopo === 1 ? 'ativo' : 'ativos'}
+                    </Badge>
+                  </div>
+
+                  {/* Linha de destaque da periodicidade + tipo de execução */}
+                  <div className="flex items-center justify-between bg-blue-50/60 border border-blue-100 px-2.5 py-1.5 rounded text-[11px] text-[#0B2545] font-semibold">
+                    <div className="flex items-center gap-1.5">
+                      {rotina.periodicidade === 'intervalo_minutos' ? (
+                        <Repeat className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                      )}
+                      <span>{formatPeriodicidadeLabel(rotina)}</span>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-bold uppercase tracking-wider bg-white text-blue-800 border-blue-300"
+                    >
+                      {formatTipoExecucaoLabel(rotina.tipo_execucao)}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>
+                        {rotina.periodicidade === 'intervalo_minutos'
+                          ? `Ciclo contínuo (${rotina.intervalo_minutos || 30} min)`
+                          : rotina.horario
+                            ? `${rotina.horario}h`
+                            : 'Horário flexível'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Layers className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">
+                        Tipo: {formatTipoExecucaoLabel(rotina.tipo_execucao)}
+                      </span>
+                    </div>
+                    <div className="col-span-2 flex items-center gap-1.5 pt-1 border-t border-slate-200/50">
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="truncate">
+                        Resp: {rotina.expand?.responsavel?.name || 'Equipe de TI'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openGerenciarFontes(rotina)}
+                      className="h-8 text-xs text-emerald-800 border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/50"
+                    >
+                      <Server className="w-3.5 h-3.5 mr-1" /> Fontes & Ativos
+                    </Button>
+
+                    {canOperate && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditRotina(rotina)}
+                          className="h-8 w-8 text-slate-600 hover:text-slate-900"
+                          title="Editar"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeletingItem(rotina)}
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })
         )}
       </div>
 
@@ -614,22 +717,104 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
             </DialogHeader>
 
             <div className="space-y-3 py-4 text-xs">
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">
-                  Plano Vinculado <span className="text-red-500">*</span>
-                </label>
+              {/* Encadeamento: Seleção de Plano Vinculado e Breadcrumb da Cadeia */}
+              <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-[#0B2545] text-xs flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-blue-700" />
+                    Plano Vinculado <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-blue-700 font-semibold">Passo 3 do Ciclo</span>
+                </div>
+
                 <Select value={planoId} onValueChange={setPlanoId}>
-                  <SelectTrigger className="text-xs">
-                    <SelectValue placeholder="Selecione o plano" />
+                  <SelectTrigger className="text-xs bg-white h-9">
+                    <SelectValue placeholder="Selecione o plano participante" />
                   </SelectTrigger>
                   <SelectContent>
-                    {planos.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.nome}
-                      </SelectItem>
-                    ))}
+                    {planos.map((p) => {
+                      const pEscopo = escopos.find((e) => e.id === p.escopo) || p.expand?.escopo
+                      return (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nome} {pEscopo ? `[Escopo: ${pEscopo.nome}]` : ''}
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
+
+                {/* Breadcrumb e Ativos Herdados do Plano */}
+                {planoId &&
+                  (() => {
+                    const selPlano = planos.find((p) => p.id === planoId)
+                    const selEscopo =
+                      escopos.find((e) => e.id === selPlano?.escopo) || selPlano?.expand?.escopo
+                    const ativosIds = Array.isArray(selEscopo?.ativos) ? selEscopo.ativos : []
+                    const escopoAssets = assets.filter((a) => ativosIds.includes(a.id))
+
+                    return (
+                      <div className="pt-2 border-t border-blue-200/80 space-y-2">
+                        {/* Breadcrumb da Cadeia de Herança */}
+                        <div className="p-2 rounded bg-white border border-blue-200 flex items-center gap-1.5 flex-wrap text-[11px]">
+                          <span className="font-bold text-slate-800">Cadeia Herdada:</span>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] bg-slate-50 text-slate-800 border-slate-300 flex items-center gap-1"
+                          >
+                            <Layers className="w-3 h-3 text-blue-600" />
+                            Escopo: {selEscopo ? selEscopo.nome : 'Nenhum'}
+                          </Badge>
+                          <span className="text-slate-400 font-bold">&rarr;</span>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] bg-blue-50 text-blue-900 border-blue-300 flex items-center gap-1"
+                          >
+                            <Sliders className="w-3 h-3 text-blue-700" />
+                            Plano: {selPlano?.nome || 'Nenhum'}
+                          </Badge>
+                          <span className="text-slate-400 font-bold">&rarr;</span>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] bg-emerald-50 text-emerald-900 border-emerald-300 flex items-center gap-1"
+                          >
+                            <Calendar className="w-3 h-3 text-emerald-700" />
+                            Rotina: {nome.trim() || 'Nova Rotina'}
+                          </Badge>
+                        </div>
+
+                        {/* Resumo read-only dos ativos do escopo herdado */}
+                        <div className="p-2 rounded bg-white/80 border border-slate-200 text-[11px] space-y-1">
+                          <div className="flex items-center justify-between font-semibold text-slate-800">
+                            <span className="flex items-center gap-1">
+                              <Server className="w-3 h-3 text-blue-600" />
+                              Ativos protegidos via escopo herdado ({escopoAssets.length}):
+                            </span>
+                            <span className="text-[10px] text-slate-400">Somente leitura</span>
+                          </div>
+                          {escopoAssets.length === 0 ? (
+                            <p className="text-[10px] text-slate-500 italic">
+                              O plano selecionado não possui escopo com ativos vinculados.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pt-1">
+                              {escopoAssets.map((ast) => (
+                                <Badge
+                                  key={ast.id}
+                                  variant="secondary"
+                                  className="text-[10px] bg-slate-100 text-slate-800 border border-slate-200"
+                                >
+                                  {ast.name}
+                                  {ast.exige_backup_local && ' · Loc'}
+                                  {ast.exige_backup_nuvem && ' · Nuv'}
+                                  {ast.exige_backup_replicacao && ' · Rep'}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
               </div>
 
               <div>
@@ -835,12 +1020,155 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
+            {/* Seção Central: Derivação Automática de Fontes a partir dos Ativos do Escopo Herdado */}
+            {(() => {
+              const rPlano =
+                planos.find((p) => p.id === selectedRotinaForFontes?.plano) ||
+                selectedRotinaForFontes?.expand?.plano
+              const rEscopo = escopos.find((e) => e.id === rPlano?.escopo) || rPlano?.expand?.escopo
+              const escopoAssetIdsList = Array.isArray(rEscopo?.ativos) ? rEscopo.ativos : []
+              const escopoAssets = assets.filter((a) => escopoAssetIdsList.includes(a.id))
+
+              const fontesCadastradasAssetIds = new Set(
+                fontesList.map((f) => f.ativo_inventario).filter(Boolean),
+              )
+
+              return (
+                <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-md bg-emerald-600 text-white">
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </span>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          Ativos do Escopo Herdado ({escopoAssets.length})
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px]">
+                            1 Clique para Derivar
+                          </Badge>
+                        </h4>
+                        <p className="text-[11px] text-slate-600">
+                          {rEscopo
+                            ? `Escopo: "${rEscopo.nome}" via Plano "${rPlano?.nome || ''}"`
+                            : 'Sem escopo vinculado ao plano'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {escopoAssets.length === 0 ? (
+                    <p className="text-xs text-slate-500 italic bg-white p-2.5 rounded border border-emerald-100">
+                      Nenhum ativo associado ao escopo deste plano. Configure os ativos na aba 1.
+                      Inventário de Ativos &rarr; Escopos de Salvaguarda.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {escopoAssets.map((asset) => {
+                        const jaCriada = fontesCadastradasAssetIds.has(asset.id)
+                        const isCreatingThis = creatingFonteAssetId === asset.id
+
+                        return (
+                          <div
+                            key={asset.id}
+                            className={`p-2.5 rounded-lg border transition flex items-center justify-between gap-3 text-xs ${
+                              jaCriada
+                                ? 'bg-white/90 border-emerald-200 shadow-2xs'
+                                : 'bg-white border-slate-200 hover:border-emerald-300'
+                            }`}
+                          >
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-slate-900 font-mono text-xs">
+                                  {asset.name}
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] text-slate-600 border-slate-300"
+                                >
+                                  {asset.tipo === 'servidor_virtualizado'
+                                    ? 'VM / Virtualizado'
+                                    : asset.tipo === 'banco_dados'
+                                      ? 'Banco de Dados'
+                                      : asset.tipo}
+                                </Badge>
+                                {jaCriada && (
+                                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-semibold gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    Fonte Cadastrada
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                                <span className="text-[10px] font-semibold text-slate-600">
+                                  Exigências:
+                                </span>
+                                {asset.exige_backup_local && (
+                                  <Badge className="text-[9px] bg-blue-100 text-blue-800 border-blue-200 px-1 py-0">
+                                    Local
+                                  </Badge>
+                                )}
+                                {asset.exige_backup_nuvem && (
+                                  <Badge className="text-[9px] bg-sky-100 text-sky-800 border-sky-200 px-1 py-0">
+                                    Nuvem
+                                  </Badge>
+                                )}
+                                {asset.exige_backup_replicacao && (
+                                  <Badge className="text-[9px] bg-purple-100 text-purple-800 border-purple-200 px-1 py-0">
+                                    Replicação
+                                  </Badge>
+                                )}
+                                {!asset.exige_backup_local &&
+                                  !asset.exige_backup_nuvem &&
+                                  !asset.exige_backup_replicacao && (
+                                    <span className="text-[10px] text-slate-400 italic">
+                                      Sem exigências marcadas
+                                    </span>
+                                  )}
+                              </div>
+                            </div>
+
+                            {canOperate && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={isCreatingThis || jaCriada}
+                                onClick={() => handleCriarFonteDeAtivo(asset)}
+                                className={`text-xs h-8 px-3 shrink-0 font-semibold gap-1.5 shadow-xs transition ${
+                                  jaCriada
+                                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed hover:bg-slate-100'
+                                    : 'bg-[#0B2545] hover:bg-[#124E78] text-white'
+                                }`}
+                              >
+                                {jaCriada ? (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    Já adicionada
+                                  </>
+                                ) : isCreatingThis ? (
+                                  'Criando...'
+                                ) : (
+                                  <>
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Criar fonte deste ativo
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
             {/* Seção Fontes Associadas */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-slate-400" />
-                  Fontes Associadas ({fontesList.length})
+                  Fontes Associadas à Rotina ({fontesList.length})
                 </span>
                 {canOperate && (
                   <Button
@@ -863,8 +1191,8 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                 <p className="text-xs text-slate-400 italic py-2">Carregando fontes...</p>
               ) : fontesList.length === 0 ? (
                 <p className="text-xs text-slate-500 italic p-3.5 border border-dashed rounded-lg bg-slate-50 text-center">
-                  Nenhuma fonte vinculada a esta rotina. Adicione abaixo a máquina virtual, banco de
-                  dados ou sistema correspondente ao comprovante.
+                  Nenhuma fonte vinculada a esta rotina. Use o botão acima &ldquo;Criar fonte deste
+                  ativo&rdquo; ou adicione manualmente abaixo.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -887,6 +1215,8 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                         ? `Herda da rotina (${formatTipoExecucaoLabel(selectedRotinaForFontes?.tipo_execucao)})`
                         : formatTipoExecucaoLabel(f.tipo_execucao)
 
+                    const ehDerivadaDeAtivo = Boolean(f.ativo_inventario)
+
                     return (
                       <div
                         key={f.id}
@@ -900,6 +1230,22 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                             >
                               {tipoFonteDisplay}
                             </Badge>
+
+                            {/* Badge destacando fontes derivadas automaticamente do inventário */}
+                            {ehDerivadaDeAtivo ? (
+                              <Badge className="text-[10px] font-bold px-1.5 py-0 bg-emerald-100 text-emerald-800 border-emerald-300 flex items-center gap-1">
+                                <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
+                                Do Inventário
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] text-slate-500 border-slate-300"
+                              >
+                                Manual / Comprovante
+                              </Badge>
+                            )}
+
                             <span className="text-xs font-bold text-slate-900 font-mono tracking-tight break-all">
                               {f.caminho_identificacao}
                             </span>
@@ -912,9 +1258,6 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                             >
                               <Layers className="w-3 h-3 text-slate-400" />
                               Tipo de Execução: {tipoExecucaoFonteDisplay}
-                              <span className="text-[10px] text-slate-400 font-normal">
-                                (usa a periodicidade e o tipo definidos na rotina)
-                              </span>
                             </span>
 
                             {f.expand?.ativo_inventario ? (
@@ -930,9 +1273,11 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                                     ? 'Banco de Dados'
                                     : f.expand.ativo_inventario.tipo}
                                 )
-                                <span className="text-[10px] text-blue-500 font-normal">
-                                  — integridade cruzada com Ativos
-                                </span>
+                              </span>
+                            ) : ehDerivadaDeAtivo ? (
+                              <span className="text-emerald-700 text-[10px] font-medium flex items-center gap-1">
+                                <Server className="w-3 h-3 text-emerald-600" />
+                                Ativo ID: {f.ativo_inventario}
                               </span>
                             ) : (
                               <span className="text-slate-400 text-[10px] italic">
@@ -959,8 +1304,7 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Seção Adicionar Nova Fonte à Rotina */}
+            {/* Seção Adicionar Nova Fonte à Rotina */}{' '}
             {canOperate && (
               <form
                 onSubmit={handleAddFonte}

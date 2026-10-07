@@ -109,6 +109,7 @@ export async function listBackupPlanos(organizationId: string): Promise<BackupPl
   if (!organizationId) return []
   return pb.collection('backup_planos').getFullList<BackupPlanoItem>({
     filter: `organization = "${organizationId}"`,
+    expand: 'escopo',
     sort: '-created',
   })
 }
@@ -186,9 +187,10 @@ export async function saveBackupPlano(
       organizationId: data.organization,
       action: 'BACKUP_PLANO_UPDATE',
       entity: 'Backup e Continuidade',
-      detail: `Plano de backup atualizado: ${result.nome}${requisitosTexto}`,
+      detail: `Plano de backup atualizado: ${result.nome}${requisitosTexto}${payload.escopo ? ` (escopo vinculado: ${payload.escopo})` : ''}`,
       metadata: {
         plano_id: result.id,
+        escopo_id: payload.escopo || null,
         rto_horas: result.rto_horas,
         rpo_horas: result.rpo_horas,
         retencao_dias: result.retencao_dias,
@@ -204,9 +206,10 @@ export async function saveBackupPlano(
       organizationId: data.organization,
       action: 'BACKUP_PLANO_CREATE',
       entity: 'Backup e Continuidade',
-      detail: `Novo plano de backup cadastrado: ${result.nome}${requisitosTexto}`,
+      detail: `Novo plano de backup cadastrado: ${result.nome}${requisitosTexto}${payload.escopo ? ` (escopo vinculado: ${payload.escopo})` : ''}`,
       metadata: {
         plano_id: result.id,
+        escopo_id: payload.escopo || null,
         rto_horas: result.rto_horas,
         rpo_horas: result.rpo_horas,
         retencao_dias: result.retencao_dias,
@@ -279,7 +282,7 @@ export async function listBackupRotinas(organizationId: string): Promise<BackupR
   if (!organizationId) return []
   return pb.collection('backup_rotinas').getFullList<BackupRotinaItem>({
     filter: `organization = "${organizationId}"`,
-    expand: 'plano,responsavel',
+    expand: 'plano,plano.escopo,responsavel',
     sort: '-created',
   })
 }

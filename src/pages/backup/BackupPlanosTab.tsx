@@ -44,21 +44,27 @@ import {
   HardDrive,
   ExternalLink,
   Layers,
+  Server,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   saveBackupPlano,
   deleteBackupPlano,
+  listBackupPlanos,
   listBackupPlanoRequisitos,
   saveBackupPlanoRequisito,
   deleteBackupPlanoRequisito,
+  listBackupEscopos,
 } from '@/services/backupService'
+import { listInventoryAssets } from '@/services/csctiService'
 import type {
   BackupPlanoItem,
   BackupPlanoRequisitoItem,
   BackupPlanoPeriodicidade,
   BackupPlanoDestino,
+  BackupEscopoItem,
+  InventoryAssetItem,
 } from '@/types/cscti'
 
 interface BackupPlanosTabProps {
@@ -85,6 +91,18 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
   const [status, setStatus] = useState<'ativo' | 'inativo'>('ativo')
+  const [escopoId, setEscopoId] = useState<string>('')
+
+  // Lista de escopos e inventário para encadeamento
+  const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])
+  const [assets, setAssets] = useState<InventoryAssetItem[]>([])
+
+  useEffect(() => {
+    if (orgId) {
+      listBackupEscopos(orgId).then(setEscopos).catch(console.error)
+      listInventoryAssets(orgId).then(setAssets).catch(console.error)
+    }
+  }, [orgId])
 
   // Requisitos Técnicos do Plano
   const [rtoHoras, setRtoHoras] = useState<string>('')
@@ -117,6 +135,7 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
     setNome('')
     setDescricao('')
     setStatus('ativo')
+    setEscopoId(escopos.length > 0 ? escopos[0].id : '')
     setRtoHoras('')
     setRpoHoras('')
     setRetencaoDias('')
@@ -132,6 +151,7 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
     setNome(p.nome)
     setDescricao(p.descricao || '')
     setStatus(p.status)
+    setEscopoId(p.escopo || '')
     setRtoHoras(p.rto_horas !== undefined && p.rto_horas !== null ? String(p.rto_horas) : '')
     setRpoHoras(p.rpo_horas !== undefined && p.rpo_horas !== null ? String(p.rpo_horas) : '')
     setRetencaoDias(
@@ -193,6 +213,7 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
         nome: nome.trim(),
         descricao: descricao.trim(),
         status,
+        escopo: escopoId && escopoId !== 'none' ? escopoId : undefined,
         rto_horas: rtoHoras ? Number(rtoHoras) : undefined,
         rpo_horas: rpoHoras ? Number(rpoHoras) : undefined,
         retencao_dias: retencaoDias ? Number(retencaoDias) : undefined,
@@ -355,129 +376,174 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
             )}
           </Card>
         ) : (
-          planos.map((plano) => (
-            <Card key={plano.id} className="border-slate-200 shadow-2xs hover:shadow-xs transition">
-              <CardHeader className="p-4 pb-3 border-b border-slate-100 flex flex-row items-start justify-between">
-                <div>
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] uppercase font-bold mb-1.5 ${
-                      plano.status === 'ativo'
-                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                        : 'text-slate-600 bg-slate-100'
-                    }`}
-                  >
-                    {plano.status.toUpperCase()}
-                  </Badge>
-                  <CardTitle className="text-sm font-bold text-slate-900 leading-snug">
-                    {plano.nome}
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 text-xs space-y-3">
-                {plano.descricao && (
-                  <p className="text-slate-600 line-clamp-3">{plano.descricao}</p>
-                )}
+          planos.map((plano) => {
+            const escopoVinculado =
+              plano.expand?.escopo || escopos.find((e) => e.id === plano.escopo)
+            const ativosIdsEscopo = Array.isArray(escopoVinculado?.ativos)
+              ? escopoVinculado.ativos
+              : []
+            const qtdAtivosEscopo = ativosIdsEscopo.length
 
-                {/* Bloco de Requisitos Técnicos do Plano (quando configurados) */}
-                {((plano.rto_horas !== undefined && plano.rto_horas !== null) ||
-                  (plano.rpo_horas !== undefined && plano.rpo_horas !== null) ||
-                  (plano.retencao_dias !== undefined && plano.retencao_dias !== null) ||
-                  plano.periodicidade ||
-                  (Array.isArray(plano.destino) && plano.destino.length > 0)) && (
-                  <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 space-y-2">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      <Sliders className="w-3 h-3 text-slate-400" />
-                      <span>Requisitos Técnicos</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                      {plano.rpo_horas !== undefined && plano.rpo_horas !== null && (
+            return (
+              <Card
+                key={plano.id}
+                className="border-slate-200 shadow-2xs hover:shadow-xs transition"
+              >
+                <CardHeader className="p-4 pb-3 border-b border-slate-100 flex flex-row items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] uppercase font-bold ${
+                          plano.status === 'ativo'
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                            : 'text-slate-600 bg-slate-100'
+                        }`}
+                      >
+                        {plano.status.toUpperCase()}
+                      </Badge>
+                      {escopoVinculado ? (
                         <Badge
                           variant="secondary"
-                          className="bg-blue-50 text-blue-900 border border-blue-200 px-1.5 py-0 font-medium"
+                          className="text-[10px] font-medium bg-blue-50 text-blue-900 border border-blue-200 flex items-center gap-1"
+                          title={`Escopo: ${escopoVinculado.nome} (${qtdAtivosEscopo} ativos)`}
                         >
-                          RPO: {plano.rpo_horas}h
+                          <Layers className="w-3 h-3 text-blue-600" />
+                          Escopo: {escopoVinculado.nome} ({qtdAtivosEscopo}{' '}
+                          {qtdAtivosEscopo === 1 ? 'ativo' : 'ativos'})
                         </Badge>
-                      )}
-
-                      {plano.rto_horas !== undefined && plano.rto_horas !== null && (
+                      ) : (
                         <Badge
-                          variant="secondary"
-                          className="bg-indigo-50 text-indigo-900 border border-indigo-200 px-1.5 py-0 font-medium"
+                          variant="outline"
+                          className="text-[10px] text-slate-400 border-dashed"
                         >
-                          RTO: {plano.rto_horas}h
-                        </Badge>
-                      )}
-
-                      {plano.retencao_dias !== undefined && plano.retencao_dias !== null && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-1.5 py-0 font-medium"
-                        >
-                          Retenção: {plano.retencao_dias}d
-                        </Badge>
-                      )}
-
-                      {plano.periodicidade && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-purple-50 text-purple-900 border border-purple-200 px-1.5 py-0 font-medium capitalize"
-                        >
-                          {plano.periodicidade === 'intervalo_minutos'
-                            ? `A cada ${plano.intervalo_minutos || 30} min`
-                            : `${plano.periodicidade}${plano.janela_horario ? ` (${plano.janela_horario})` : ''}`}
-                        </Badge>
-                      )}
-
-                      {Array.isArray(plano.destino) && plano.destino.length > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0 font-medium capitalize"
-                        >
-                          Destino: {plano.destino.join(', ')}
+                          Sem escopo vinculado
                         </Badge>
                       )}
                     </div>
+                    <CardTitle className="text-sm font-bold text-slate-900 leading-snug">
+                      {plano.nome}
+                    </CardTitle>
                   </div>
-                )}
-
-                <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openGerenciarRequisitos(plano)}
-                    className="h-8 text-xs text-blue-700 border-blue-200 bg-blue-50/50 hover:bg-blue-100/50"
-                  >
-                    <ListPlus className="w-3.5 h-3.5 mr-1" /> Requisitos Detalhados
-                  </Button>
-
-                  {canOperate && (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditPlano(plano)}
-                        className="h-8 w-8 text-slate-600 hover:text-slate-900"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeletingItem(plano)}
-                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                </CardHeader>
+                <CardContent className="p-4 text-xs space-y-3">
+                  {/* Linha Informativa do Encadeamento Herdado */}
+                  {escopoVinculado && (
+                    <div className="p-2 rounded bg-blue-50/60 border border-blue-100 text-[11px] text-blue-950 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <Layers className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                        <span>{escopoVinculado.nome}</span>
+                      </span>
+                      <Badge className="bg-white text-blue-800 border-blue-200 text-[10px] font-bold">
+                        {qtdAtivosEscopo} {qtdAtivosEscopo === 1 ? 'ativo' : 'ativos'} vinculados
+                      </Badge>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+
+                  {plano.descricao && (
+                    <p className="text-slate-600 line-clamp-3">{plano.descricao}</p>
+                  )}
+
+                  {/* Bloco de Requisitos Técnicos do Plano (quando configurados) */}
+                  {((plano.rto_horas !== undefined && plano.rto_horas !== null) ||
+                    (plano.rpo_horas !== undefined && plano.rpo_horas !== null) ||
+                    (plano.retencao_dias !== undefined && plano.retencao_dias !== null) ||
+                    plano.periodicidade ||
+                    (Array.isArray(plano.destino) && plano.destino.length > 0)) && (
+                    <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <Sliders className="w-3 h-3 text-slate-400" />
+                        <span>Requisitos Técnicos</span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {plano.rpo_horas !== undefined && plano.rpo_horas !== null && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-50 text-blue-900 border border-blue-200 px-1.5 py-0 font-medium"
+                          >
+                            RPO: {plano.rpo_horas}h
+                          </Badge>
+                        )}
+
+                        {plano.rto_horas !== undefined && plano.rto_horas !== null && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-indigo-50 text-indigo-900 border border-indigo-200 px-1.5 py-0 font-medium"
+                          >
+                            RTO: {plano.rto_horas}h
+                          </Badge>
+                        )}
+
+                        {plano.retencao_dias !== undefined && plano.retencao_dias !== null && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-1.5 py-0 font-medium"
+                          >
+                            Retenção: {plano.retencao_dias}d
+                          </Badge>
+                        )}
+
+                        {plano.periodicidade && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-purple-50 text-purple-900 border border-purple-200 px-1.5 py-0 font-medium capitalize"
+                          >
+                            {plano.periodicidade === 'intervalo_minutos'
+                              ? `A cada ${plano.intervalo_minutos || 30} min`
+                              : `${plano.periodicidade}${plano.janela_horario ? ` (${plano.janela_horario})` : ''}`}
+                          </Badge>
+                        )}
+
+                        {Array.isArray(plano.destino) && plano.destino.length > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0 font-medium capitalize"
+                          >
+                            Destino: {plano.destino.join(', ')}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openGerenciarRequisitos(plano)}
+                      className="h-8 text-xs text-blue-700 border-blue-200 bg-blue-50/50 hover:bg-blue-100/50"
+                    >
+                      <ListPlus className="w-3.5 h-3.5 mr-1" /> Requisitos Detalhados
+                    </Button>
+
+                    {canOperate && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditPlano(plano)}
+                          className="h-8 w-8 text-slate-600 hover:text-slate-900"
+                          title="Editar"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeletingItem(plano)}
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })
         )}
       </div>
 
@@ -495,6 +561,130 @@ export const BackupPlanosTab: React.FC<BackupPlanosTabProps> = ({
             </DialogHeader>
 
             <div className="space-y-3 py-4 text-xs">
+              {/* Encadeamento: Seleção de Escopo de Proteção */}
+              <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-[#0B2545] text-xs flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-blue-700" />
+                    Escopo Vinculado{' '}
+                    <span className="text-slate-400 font-normal">
+                      (Encadeamento Escopo &rarr; Planos)
+                    </span>
+                  </label>
+                  <span className="text-[10px] text-blue-700 font-semibold">Passo 2 do Ciclo</span>
+                </div>
+                <Select
+                  value={escopoId || 'none'}
+                  onValueChange={(val) => setEscopoId(val === 'none' ? '' : val)}
+                >
+                  <SelectTrigger className="text-xs bg-white h-9">
+                    <SelectValue placeholder="Selecione o escopo que participará deste plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum escopo vinculado</SelectItem>
+                    {escopos.map((esc) => {
+                      const countAtivos = Array.isArray(esc.ativos) ? esc.ativos.length : 0
+                      return (
+                        <SelectItem key={esc.id} value={esc.id}>
+                          {esc.nome} — ({countAtivos}{' '}
+                          {countAtivos === 1 ? 'ativo vinculado' : 'ativos vinculados'})
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  Ao associar o escopo, este plano passa a proteger formalmente os ativos
+                  inventariados selecionados nele.
+                </p>
+
+                {/* Exibição read-only dos ativos vinculados ao escopo selecionado */}
+                {escopoId &&
+                  escopoId !== 'none' &&
+                  (() => {
+                    const selectedEscopo = escopos.find((e) => e.id === escopoId)
+                    const ativosIds = Array.isArray(selectedEscopo?.ativos)
+                      ? selectedEscopo.ativos
+                      : []
+                    const escopoAssets = assets.filter((a) => ativosIds.includes(a.id))
+
+                    return (
+                      <div className="mt-2.5 pt-2.5 border-t border-blue-200/80 space-y-2">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-slate-800 flex items-center gap-1">
+                            <Server className="w-3.5 h-3.5 text-blue-600" />
+                            Ativos do Escopo Selecionado ({escopoAssets.length}):
+                          </span>
+                          <span className="text-[10px] text-slate-500 italic">
+                            Somente leitura (definido no Inventário)
+                          </span>
+                        </div>
+
+                        {escopoAssets.length === 0 ? (
+                          <p className="text-[11px] text-slate-500 italic bg-white p-2 rounded border border-slate-200">
+                            Nenhum ativo vinculado a este escopo ainda. Você pode vincular ativos na
+                            aba 1. Inventário de Ativos.
+                          </p>
+                        ) : (
+                          <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                            {escopoAssets.map((asset) => {
+                              const hasAny =
+                                asset.exige_backup_local ||
+                                asset.exige_backup_nuvem ||
+                                asset.exige_backup_replicacao
+                              return (
+                                <div
+                                  key={asset.id}
+                                  className="p-2 rounded bg-white border border-slate-200 flex items-center justify-between gap-2 text-xs"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span
+                                        className={`w-2 h-2 rounded-full shrink-0 ${
+                                          hasAny ? 'bg-emerald-500' : 'bg-slate-300'
+                                        }`}
+                                      />
+                                      <span className="font-bold text-slate-900 truncate">
+                                        {asset.name}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 font-mono">
+                                        ({asset.tipo})
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {asset.exige_backup_local && (
+                                      <Badge className="text-[9px] bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 px-1 py-0">
+                                        Local
+                                      </Badge>
+                                    )}
+                                    {asset.exige_backup_nuvem && (
+                                      <Badge className="text-[9px] bg-sky-100 text-sky-800 border-sky-200 hover:bg-sky-100 px-1 py-0">
+                                        Nuvem
+                                      </Badge>
+                                    )}
+                                    {asset.exige_backup_replicacao && (
+                                      <Badge className="text-[9px] bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100 px-1 py-0">
+                                        Replicação
+                                      </Badge>
+                                    )}
+                                    {!hasAny && (
+                                      <span className="text-[10px] text-slate-400 italic">
+                                        Sem exigência
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+              </div>
+
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">
                   Nome do Plano <span className="text-red-500">*</span>

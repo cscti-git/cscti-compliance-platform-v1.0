@@ -260,6 +260,7 @@ export type BackupPlanoDestino = 'local' | 'nuvem' | 'externo'
 export interface BackupPlanoItem {
   id: string
   organization: string
+  escopo?: string
   nome: string
   descricao?: string
   status: 'ativo' | 'inativo'
@@ -272,6 +273,9 @@ export interface BackupPlanoItem {
   destino?: BackupPlanoDestino[]
   created?: string
   updated?: string
+  expand?: {
+    escopo?: BackupEscopoItem
+  }
 }
 
 export interface BackupPlanoRequisitoItem {

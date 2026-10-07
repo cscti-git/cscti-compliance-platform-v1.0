@@ -282,7 +282,7 @@ export const BackupAtivosExigencias: React.FC<BackupAtivosExigenciasProps> = ({
               </span>
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  Ativos do Cartório &amp; Exigências de Salvaguarda
+                  Inventário de Ativos &amp; Exigências de Salvaguarda
                   <Badge
                     variant="outline"
                     className="text-[10px] font-bold bg-white text-slate-700 border-slate-300"
@@ -474,9 +474,9 @@ export const BackupAtivosExigencias: React.FC<BackupAtivosExigenciasProps> = ({
               Nenhum ativo cadastrado nesta serventia
             </p>
             <p className="text-[11px] text-slate-500 max-w-md mx-auto mt-1">
-              Importe os equipamentos via conector GLPI ou cadastre manualmente em{' '}
+              Importe os equipamentos via conector GLPI ou cadastre manualmente no{' '}
               <Link to="/ativos" className="text-blue-700 font-semibold underline">
-                Ativos do Cartório
+                Inventário de Ativos
               </Link>{' '}
               para que apareçam aqui automaticamente.
             </p>
@@ -490,7 +490,7 @@ export const BackupAtivosExigencias: React.FC<BackupAtivosExigenciasProps> = ({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  <th className="py-2.5 px-3">Ativo do Cartório</th>
+                  <th className="py-2.5 px-3">Ativo do Inventário</th>
                   <th className="py-2.5 px-3">Tipo / Plataforma</th>
                   <th className="py-2.5 px-3">IP / Localização</th>
                   <th className="py-2.5 px-3 text-center">

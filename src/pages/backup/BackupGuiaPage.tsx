@@ -84,7 +84,7 @@ export const BackupGuiaPage: React.FC = () => {
     {
       id: 'etapa-1-escopo',
       num: '1',
-      title: 'Ativos & Escopo',
+      title: 'Inventário de Ativos',
       subtitle: 'Exigências e Escopo',
       icon: Layers,
       tab: 'escopo',
@@ -269,7 +269,7 @@ export const BackupGuiaPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-lg font-bold text-slate-900">
-                      Etapa 1 — Ativos &amp; Escopo de Proteção
+                      Etapa 1 — Inventário de Ativos &amp; Escopo de Proteção
                     </CardTitle>
                     <Badge
                       variant="outline"
@@ -280,7 +280,7 @@ export const BackupGuiaPage: React.FC = () => {
                   </div>
                   <CardDescription className="text-xs">
                     Define <strong>QUAIS ATIVOS EXIGEM BACKUP</strong> (Local, Nuvem e/ou
-                    Replicação) e organiza o compromisso formal do cartório.
+                    Replicação) e agrupa os ativos que participarão dos escopos de salvaguarda.
                   </CardDescription>
                 </div>
               </div>
@@ -290,7 +290,7 @@ export const BackupGuiaPage: React.FC = () => {
                   variant="outline"
                   className="text-xs font-semibold text-blue-700 border-blue-200 hover:bg-blue-50 gap-1"
                 >
-                  Configurar Ativos &amp; Escopo <ArrowRight className="w-3.5 h-3.5" />
+                  Configurar Inventário de Ativos <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
             </div>
@@ -301,18 +301,19 @@ export const BackupGuiaPage: React.FC = () => {
             <div className="p-4 rounded-xl border-2 border-blue-200 bg-blue-50/70 text-blue-950 space-y-1.5 shadow-2xs">
               <span className="font-bold text-xs uppercase tracking-wide text-blue-900 flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-blue-700" />
-                Conceito Central: Inventário Automático &amp; Seleção de Exigências
+                Conceito Central: Inventário de Ativos &amp; Encadeamento Hereditário
               </span>
               <p className="text-xs leading-relaxed text-blue-950 font-medium">
-                Todo ativo importado do GLPI (ou cadastrado em Ativos do Cartório) aparece aqui
+                Todo ativo importado do GLPI (ou cadastrado no Inventário de Ativos) aparece aqui
                 automaticamente. Marque quais exigem backup e de que tipo: <strong>Local</strong>,{' '}
-                <strong>Nuvem</strong> e/ou <strong>Replicação</strong>. Só depois configure escopo,
-                planos, rotinas e fontes.
+                <strong>Nuvem</strong> e/ou <strong>Replicação</strong>. Em seguida, crie o Escopo
+                selecionando os ativos que dele participam. O Escopo alimenta os Planos, os Planos
+                alimentam as Rotinas e as Fontes derivam dos Ativos em 1 clique.
               </p>
               <p className="text-[11px] text-blue-800 leading-snug">
-                Nem todo ativo do cartório precisa de salvaguarda: alguns exigem apenas cópia local,
-                outros apenas nuvem, outros replicação contínua, e ativos sem marcação são neutros
-                (não entram nas exigências de auditoria).
+                Nem todo ativo precisa de salvaguarda: alguns exigem apenas cópia local, outros
+                nuvem, outros replicação contínua, e ativos sem marcação são neutros (não entram nas
+                exigências de auditoria).
               </p>
             </div>
 
@@ -320,8 +321,8 @@ export const BackupGuiaPage: React.FC = () => {
             <div className="space-y-1">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">O que é</h4>
               <p className="leading-relaxed">
-                A etapa de <strong>Ativos &amp; Escopo</strong> une o inventário tecnológico em
-                tempo real à governança de salvaguarda. Ela permite selecionar em lote as exigências
+                A etapa de <strong>Inventário de Ativos</strong> une o parque tecnológico em tempo
+                real à governança de salvaguarda. Ela permite selecionar em lote as exigências
                 técnicas de cada máquina ou banco de dados e agrupá-los formalmente em escopos
                 sistêmicos contra os quais tudo é confrontado nas auditorias.
               </p>
@@ -334,9 +335,9 @@ export const BackupGuiaPage: React.FC = () => {
               </h4>
               <p className="leading-relaxed">
                 Prova ao juiz corregedor e a auditorias externas que o cartório sabe com precisão
-                quais ativos existem, quais deles guardam dados notariais e registrais críticos,
-                quais modalidades de cópia (Local, Nuvem, Replicação) são mandatórias para cada um e
-                quais rotinas comprovam essas garantias.
+                quais ativos existem, quais deles guardam dados críticos, quais modalidades de cópia
+                (Local, Nuvem, Replicação) são mandatórias para cada um e quais rotinas comprovam
+                essas garantias.
               </p>
             </div>
 
@@ -351,9 +352,8 @@ export const BackupGuiaPage: React.FC = () => {
                     1
                   </span>
                   <span>
-                    Acesse a aba <strong>1. Ativos &amp; Escopo</strong>. No topo, a tabela lista
-                    todos os <strong>Ativos do Cartório</strong> importados do GLPI ou cadastrados
-                    no inventário.
+                    Acesse a aba <strong>1. Inventário de Ativos</strong>. No topo, a tabela lista
+                    todos os ativos importados do GLPI ou cadastrados no inventário.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -362,10 +362,9 @@ export const BackupGuiaPage: React.FC = () => {
                   </span>
                   <span>
                     Para cada ativo, ative os toggles das modalidades exigidas:{' '}
-                    <strong>Local</strong> (cópia rápida em storage/disco), <strong>Nuvem</strong>{' '}
-                    (cópia externa fora do cartório) e/ou <strong>Replicação</strong> (máquinas
-                    virtuais contínuas). Ativos sem seleção permanecem como &quot;Não exige
-                    backup&quot;.
+                    <strong>Local</strong> (storage/disco interno), <strong>Nuvem</strong> (cópia
+                    externa segura) e/ou <strong>Replicação</strong> (máquinas virtuais contínuas).
+                    Ativos sem seleção permanecem como &quot;Não exige backup&quot;.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -374,8 +373,7 @@ export const BackupGuiaPage: React.FC = () => {
                   </span>
                   <span>
                     Clique no botão verde <strong>Salvar exigências</strong>. As alterações são
-                    gravadas em lote e registradas de forma append-only no log de auditoria da
-                    serventia.
+                    gravadas em lote e registradas de forma append-only no log de auditoria.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -383,10 +381,9 @@ export const BackupGuiaPage: React.FC = () => {
                     4
                   </span>
                   <span>
-                    Na seção logo abaixo, crie ou ajuste os{' '}
-                    <strong>Agrupadores de Escopo de Proteção</strong> (ex.:{' '}
-                    <em>Base Central de Atos e Documentos Notariais</em> ou{' '}
-                    <em>Servidores Virtuais de Produção</em>) e vincule os ativos correspondentes.
+                    Na seção abaixo, crie o <strong>Escopo de Proteção</strong> (ex.:{' '}
+                    <em>Base Central de Atos Notariais</em>) marcando exatamente quais ativos do
+                    inventário farão parte deste escopo.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -394,9 +391,8 @@ export const BackupGuiaPage: React.FC = () => {
                     5
                   </span>
                   <span>
-                    Avance para <strong>2. Planos</strong> e{' '}
-                    <strong>3. Rotinas &amp; Fontes</strong>: ao cadastrar as fontes, o sistema já
-                    destaca com ⭐ os ativos que possuem exigência de salvaguarda ativa.
+                    Avance para <strong>2. Planos</strong>: ao criar o plano, selecione este escopo
+                    e os ativos vinculados aparecerão de imediato no formulário.
                   </span>
                 </li>
               </ol>
@@ -534,8 +530,9 @@ export const BackupGuiaPage: React.FC = () => {
                     2
                   </span>
                   <span>
-                    Dê um nome descritivo baseado na estratégia (ex.:{' '}
-                    <em>Plano Contínuo de Produção (30 min)</em>).
+                    Selecione o <strong>Escopo Vinculado</strong> (dropdown com os escopos
+                    cadastrados e o total de ativos de cada um). Ao selecionar, os ativos protegidos
+                    por aquele escopo são exibidos em modo informativo com seus selos de exigência.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -543,21 +540,9 @@ export const BackupGuiaPage: React.FC = () => {
                     3
                   </span>
                   <span>
-                    Preencha os <strong>Requisitos Técnicos</strong>:
-                    <ul className="list-disc pl-5 mt-1 space-y-0.5 text-xs text-slate-600">
-                      <li>
-                        <strong>RTO (horas):</strong> tempo máximo previsto para restabelecer a
-                        operação (ex.: 2 ou 4).
-                      </li>
-                      <li>
-                        <strong>RPO (horas):</strong> perda máxima tolerável entre backups (ex.: 0.5
-                        para 30 min, ou 24 para diário).
-                      </li>
-                      <li>
-                        <strong>Retenção (dias):</strong> guarda dos pontos de restauração (ex.: 30,
-                        60 ou 365 dias).
-                      </li>
-                    </ul>
+                    Dê um nome descritivo baseado na estratégia (ex.:{' '}
+                    <em>Plano Contínuo de Produção (30 min)</em>) e defina os alvos de RTO, RPO e
+                    Retenção.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -709,7 +694,9 @@ export const BackupGuiaPage: React.FC = () => {
                     2
                   </span>
                   <span>
-                    Selecione a qual <strong>Plano</strong> a rotina pertence.
+                    Selecione o <strong>Plano Vinculado</strong>. O formulário exibe o breadcrumb da
+                    cadeia de herança (Escopo &rarr; Plano &rarr; Rotina) e resume os ativos
+                    herdados que receberão cobertura.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -718,7 +705,7 @@ export const BackupGuiaPage: React.FC = () => {
                   </span>
                   <span>
                     Defina o <strong>Nome da Rotina</strong> (ex.:{' '}
-                    <em>Rotina Veeam Produção Local</em>).
+                    <em>Rotina Veeam Produção Local</em>) e ajuste a periodicidade e o horário.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -726,28 +713,10 @@ export const BackupGuiaPage: React.FC = () => {
                     4
                   </span>
                   <span>
-                    No campo <strong>Aliases / Apelidos do Job</strong>, insira todos os nomes
-                    literais como o software emissor (Veeam, Acronis, Script) chama esse job nos
-                    relatórios, separados por vírgula.
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                    5
-                  </span>
-                  <span>
-                    Ajuste a <strong>Periodicidade</strong> (ex.: intervalo de 30 minutos ou diária
-                    com horário 23:00) e o tipo de execução (Incremental/Full).
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                    6
-                  </span>
-                  <span>
-                    Salve a rotina. Em seguida, clique no botão{' '}
-                    <strong>&quot;Fontes &amp; Ativos&quot;</strong> no card da rotina para
-                    cadastrar as origens protegidas.
+                    Salve a rotina. No card, clique no botão{' '}
+                    <strong>&quot;Fontes &amp; Ativos&quot;</strong>: o modal já lista todos os
+                    ativos herdados com o botão <strong>&quot;Criar fonte deste ativo&quot;</strong>{' '}
+                    em 1 clique, com preenchimento automático.
                   </span>
                 </li>
               </ol>
@@ -917,14 +886,15 @@ export const BackupGuiaPage: React.FC = () => {
                 <span>Fluxo Rápido de Configuração (Caminho Simples)</span>
               </div>
               <p className="text-xs sm:text-sm font-semibold leading-relaxed text-teal-950">
-                1. Cadastre a rotina com os aliases do job &rarr; 2. Cole o comprovante em
-                Evidências &rarr; 3. Abra o laudo &rarr; 4. Clique em &quot;Cadastrar fontes
-                pendentes&quot;. O sistema cria as fontes com os nomes exatos do comprovante.
+                1. No modal &quot;Fontes &amp; Ativos&quot;, clique em &quot;Criar fonte deste
+                ativo&quot; para derivar automaticamente as origens a partir dos ativos herdados
+                &rarr; 2. Opcionalmente, importe as fontes do último comprovante recebido &rarr; 3.
+                As fontes derivadas ganham o badge &quot;Do Inventário&quot;.
               </p>
               <p className="text-[11px] text-teal-800 leading-snug">
-                Você também pode abrir o modal &quot;Fontes &amp; Ativos&quot; na aba de rotinas e
-                clicar em &quot;Importar fontes do último comprovante&quot; para puxar todas as VMs
-                automaticamente.
+                Você não precisa digitar novamente o nome do ativo: o sistema preenche o caminho com
+                o nome do inventário, associa o tipo correspondente e mantém o vínculo de
+                integridade em 1 clique.
               </p>
             </div>
 

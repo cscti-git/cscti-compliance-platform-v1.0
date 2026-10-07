@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T14:16:23.725Z",
+  "generatedAt": "2026-10-07T14:40:18.110Z",
   "collections": [
     {
       "name": "users",
@@ -1353,9 +1353,19 @@
           "required": false,
           "system": false,
           "selectValues": ["local", "nuvem", "externo"]
+        },
+        {
+          "name": "escopo",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_escopo"
         }
       ],
-      "indexes": ["CREATE INDEX idx_bkplanos_org_status ON backup_planos (organization, status)"]
+      "indexes": [
+        "CREATE INDEX idx_bkplanos_org_status ON backup_planos (organization, status)",
+        "CREATE INDEX `idx_bkplanos_escopo` ON `backup_planos` (escopo)"
+      ]
     },
     {
       "name": "backup_plano_requisitos",
