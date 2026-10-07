@@ -464,9 +464,14 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
               <div className="p-8 text-center text-xs text-slate-500 italic">
                 Carregando laudo de conformidade...
               </div>
-            ) : laudoCarregado?.laudo_tecnico ? (
+            ) : laudoCarregado?.laudo_tecnico || selectedExecucaoParaLaudo?.confronto_escopo ? (
               <BackupLaudoCard
-                laudo={laudoCarregado.laudo_tecnico}
+                laudo={laudoCarregado?.laudo_tecnico || null}
+                confrontoEscopo={
+                  laudoCarregado?.confronto_escopo ||
+                  selectedExecucaoParaLaudo?.confronto_escopo ||
+                  null
+                }
                 titulo="Laudo Técnico de Conformidade"
                 rotinaId={selectedExecucaoParaLaudo?.rotina || undefined}
                 evidenciaId={selectedExecucaoParaLaudo?.evidencia || undefined}

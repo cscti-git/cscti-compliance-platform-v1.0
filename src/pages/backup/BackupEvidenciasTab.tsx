@@ -1495,9 +1495,10 @@ Lista de atividades (1 dia):
                     <p className="text-slate-400 italic p-3 border rounded bg-slate-50">
                       Carregando laudo de avaliação...
                     </p>
-                  ) : selectedAvaliacao?.laudo_tecnico ? (
+                  ) : selectedAvaliacao?.laudo_tecnico || selectedAvaliacao?.confronto_escopo ? (
                     <BackupLaudoCard
-                      laudo={selectedAvaliacao.laudo_tecnico}
+                      laudo={selectedAvaliacao?.laudo_tecnico || null}
+                      confrontoEscopo={selectedAvaliacao?.confronto_escopo || null}
                       titulo="Laudo Técnico Emitido pelo Sistema"
                       evidenciaId={selectedEvidencia.id}
                       rotinaId={selectedEvidencia.rotina || undefined}

@@ -462,6 +462,57 @@ export interface BackupProcessamentoItem {
 
 export type BackupExecucaoStatus = 'sucesso' | 'erro' | 'parcial' | 'nao_executada'
 
+export interface BackupConfrontoEscopoExigencia {
+  ativo_id: string
+  ativo_nome: string
+  ativo_tipo?: string
+  local: boolean
+  nuvem: boolean
+  replicacao: boolean
+  modalidades: string[]
+}
+
+export interface BackupConfrontoEscopoComprovado {
+  ativo_id: string
+  ativo_nome: string
+  ativo_tipo?: string
+  modalidade: string
+  item_comprovante: string
+  fonte_casada?: string | null
+  rotina_nome?: string | null
+  plano_nome?: string | null
+  status: string
+  comprovado_em?: string
+}
+
+export interface BackupConfrontoEscopoPendencia {
+  ativo_id: string
+  ativo_nome: string
+  ativo_tipo?: string
+  modalidade_pendente: string
+  ativo_presente_no_comprovante: boolean
+  item_comprovante?: string | null
+  motivo: string
+  atendivel_por_outra_rotina: boolean
+}
+
+export interface BackupConfrontoEscopo {
+  escopo_id?: string | null
+  escopo_nome?: string | null
+  rotina_id?: string | null
+  rotina_nome?: string | null
+  plano_id?: string | null
+  plano_nome?: string | null
+  modalidades_plano?: string[]
+  exigencias: BackupConfrontoEscopoExigencia[]
+  comprovado: BackupConfrontoEscopoComprovado[]
+  pendencias: BackupConfrontoEscopoPendencia[]
+  total_ativos_escopo: number
+  total_exigencias_modalidade: number
+  total_comprovadas: number
+  total_pendencias: number
+}
+
 export interface BackupExecucaoItem {
   id: string
   organization: string
@@ -476,6 +527,7 @@ export interface BackupExecucaoItem {
   destino?: string
   observacao?: string
   detalhes_vms?: BackupVmDetailItem[]
+  confronto_escopo?: BackupConfrontoEscopo
   created?: string
   updated?: string
   expand?: {
@@ -563,6 +615,7 @@ export interface BackupAvaliacaoItem {
   detalhe?: string
   itens_avaliados?: Record<string, unknown>
   laudo_tecnico?: BackupLaudoTecnico
+  confronto_escopo?: BackupConfrontoEscopo
   created?: string
   updated?: string
   expand?: {

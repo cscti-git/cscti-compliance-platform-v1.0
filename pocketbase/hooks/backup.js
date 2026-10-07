@@ -122,6 +122,71 @@ routerAdd(
         }
       } catch (_) {}
 
+      // BLOQUEIO DE REPROCESSAMENTO DUPLICADO (idempotência estrita por hash)
+      // Se a evidência já existe e já possui execução cadastrada para (organization, evidencia),
+      // NÃO criar nova execução nem nova avaliação. Retornar resposta HTTP 200 com payload indicando duplicidade.
+      if (evidenciaRec) {
+        try {
+          const existingExecs = $app.findRecordsByFilter(
+            'backup_execucoes',
+            `organization = '${organizationId}' && evidencia = '${evidenciaRec.id}'`,
+            '-created',
+            1,
+            0,
+          )
+          if (existingExecs.length > 0) {
+            const exRec = existingExecs[0]
+            const exId = exRec.id
+            const rawDt =
+              exRec.getString('data_inicio') ||
+              exRec.getString('created') ||
+              evidenciaRec.getString('created') ||
+              ''
+            let dataFormatada = rawDt
+            try {
+              if (rawDt) {
+                dataFormatada = new Date(rawDt).toLocaleString('pt-BR')
+              }
+            } catch (_) {}
+
+            // Registrar na auditoria append-only a tentativa de reprocessamento duplicado
+            try {
+              const auditCol = $app.findCollectionByNameOrId('audit_log')
+              const auditRec = new Record(auditCol)
+              auditRec.set('organization', organizationId)
+              auditRec.set('user', auth.id)
+              auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
+              auditRec.set('user_email', auth.getString('email'))
+              auditRec.set('action', 'BACKUP_EVIDENCE_DUPLICATE_BLOCKED')
+              auditRec.set('entity', 'Backup e Continuidade')
+              auditRec.set(
+                'detail',
+                `Reprocessamento duplicado bloqueado por hash SHA-256 (${hashConteudo.slice(0, 12)}...). Execução existente: #${exId}.`,
+              )
+              auditRec.set('metadata', {
+                evidencia_id: evidenciaRec.id,
+                execucao_id: exId,
+                hash_conteudo: hashConteudo,
+                data_original: rawDt,
+              })
+              $app.save(auditRec)
+            } catch (_) {}
+
+            return e.json(200, {
+              ok: false,
+              success: false,
+              duplicado: true,
+              idempotent: true,
+              evidencia_id: evidenciaRec.id,
+              execucao_id: exId,
+              status: 'duplicado',
+              mensagem: `Este comprovante já foi processado em ${dataFormatada || 'data anterior'}. Ele já possui execução e laudo registrados — não é necessário processar novamente.`,
+              message: `Este comprovante já foi processado em ${dataFormatada || 'data anterior'}. Ele já possui execução e laudo registrados — não é necessário processar novamente.`,
+            })
+          }
+        } catch (_) {}
+      }
+
       const evidenciasCol = $app.findCollectionByNameOrId('backup_evidencias')
       const nowIso = new Date().toISOString()
 
@@ -1561,9 +1626,12 @@ routerAdd(
       let rotinaHorario = ''
       let rotinaNomeReal = ''
       let rotinaRecObj = null
+      let planoRecObj = null
       let planoNomeReal = ''
       let planoRpoHoras = 24
       let planoDestinoEsperado = ''
+      let planoDestinoValores = []
+      let escopoIdRef = ''
 
       if (rotinaFinalId) {
         try {
@@ -1577,11 +1645,42 @@ routerAdd(
             const planoIdRef = rotinaRecObj.getString('plano')
             if (planoIdRef) {
               try {
-                const pRec = $app.findRecordById('backup_planos', planoIdRef)
-                if (pRec) {
-                  planoNomeReal = pRec.getString('nome')
-                  planoRpoHoras = pRec.getInt('rpo_horas') || 24
-                  planoDestinoEsperado = pRec.getString('destino_tipo') || ''
+                planoRecObj = $app.findRecordById('backup_planos', planoIdRef)
+                if (planoRecObj) {
+                  planoNomeReal = planoRecObj.getString('nome')
+                  planoRpoHoras = planoRecObj.getInt('rpo_horas') || 24
+                  escopoIdRef = planoRecObj.getString('escopo') || ''
+
+                  // Obter modalidades de destino configuradas no plano da rotina
+                  try {
+                    const rawDest = planoRecObj.get('destino')
+                    if (Array.isArray(rawDest)) {
+                      planoDestinoValores = rawDest.map((d) => String(d).toLowerCase().trim())
+                    } else if (typeof rawDest === 'string') {
+                      try {
+                        const parsed = JSON.parse(rawDest)
+                        if (Array.isArray(parsed)) {
+                          planoDestinoValores = parsed.map((d) => String(d).toLowerCase().trim())
+                        } else if (parsed) {
+                          planoDestinoValores = [String(parsed).toLowerCase().trim()]
+                        }
+                      } catch (_) {
+                        if (rawDest.trim()) {
+                          planoDestinoValores = rawDest
+                            .split(',')
+                            .map((s) => s.trim().toLowerCase())
+                            .filter(Boolean)
+                        }
+                      }
+                    }
+                  } catch (_) {}
+
+                  if (planoDestinoValores.length === 0) {
+                    const dStr = planoRecObj.getString('destino')
+                    if (dStr) planoDestinoValores = [dStr.toLowerCase().trim()]
+                  }
+
+                  planoDestinoEsperado = planoDestinoValores.join(', ') || ''
                 }
               } catch (_) {}
             }
@@ -1658,6 +1757,295 @@ routerAdd(
       const fontesCobertas = matchResult.fontesCobertas
       const fontesNaoCobertas = matchResult.fontesNaoCobertas
 
+      // -------------------------------------------------------------
+      // ITEM 2: CONFRONTO EVIDÊNCIA × EXIGÊNCIAS DO ESCOPO
+      // Cadeia: rotina → plano → escopo → lista de ativos vinculados ao escopo
+      // -------------------------------------------------------------
+      const confrontoEscopo = {
+        escopo_id: escopoIdRef || null,
+        escopo_nome: null,
+        rotina_id: rotinaFinalId || null,
+        rotina_nome: rotinaNomeReal || null,
+        plano_id: planoRecObj ? planoRecObj.id : null,
+        plano_nome: planoNomeReal || null,
+        modalidades_plano: planoDestinoValores,
+        exigencias: [],
+        comprovado: [],
+        pendencias: [],
+        total_ativos_escopo: 0,
+        total_exigencias_modalidade: 0,
+        total_comprovadas: 0,
+        total_pendencias: 0,
+      }
+
+      try {
+        let escopoRec = null
+        if (escopoIdRef) {
+          try {
+            escopoRec = $app.findRecordById('backup_escopo', escopoIdRef)
+          } catch (_) {}
+        }
+
+        // Se o plano não apontar escopo direto, tentar localizar escopo ativo da organização
+        if (!escopoRec) {
+          try {
+            const escoposOrg = $app.findRecordsByFilter(
+              'backup_escopo',
+              `organization = '${organizationId}' && status = 'ativo'`,
+              '+created',
+              1,
+              0,
+            )
+            if (escoposOrg.length > 0) {
+              escopoRec = escoposOrg[0]
+            }
+          } catch (_) {}
+        }
+
+        if (escopoRec) {
+          confrontoEscopo.escopo_id = escopoRec.id
+          confrontoEscopo.escopo_nome = escopoRec.getString('nome') || 'Escopo Geral'
+
+          // Ler ativos vinculados ao escopo
+          let ativosIds = []
+          try {
+            const rawAtivos = escopoRec.get('ativos')
+            if (Array.isArray(rawAtivos)) {
+              ativosIds = rawAtivos
+            } else if (typeof rawAtivos === 'string') {
+              try {
+                const parsed = JSON.parse(rawAtivos)
+                if (Array.isArray(parsed)) ativosIds = parsed
+                else if (parsed) ativosIds = [parsed]
+              } catch (_) {
+                if (rawAtivos.trim()) ativosIds = [rawAtivos.trim()]
+              }
+            }
+          } catch (_) {}
+
+          // Buscar os registros completos dos ativos em inventory_assets
+          const ativosEscopo = []
+          if (ativosIds && ativosIds.length > 0) {
+            for (let aIdx = 0; aIdx < ativosIds.length; aIdx++) {
+              const aId =
+                typeof ativosIds[aIdx] === 'string'
+                  ? ativosIds[aIdx]
+                  : ativosIds[aIdx] && ativosIds[aIdx].id
+              if (!aId) continue
+              try {
+                const aRec = $app.findRecordById('inventory_assets', aId)
+                if (aRec) ativosEscopo.push(aRec)
+              } catch (_) {}
+            }
+          } else {
+            // Se o campo ativos estiver vazio no escopo, buscar todos os ativos com exigência da org
+            try {
+              const assetsOrg = $app.findRecordsByFilter(
+                'inventory_assets',
+                `organization = '${organizationId}' && status = 'ativo' && (exige_backup_local = true || exige_backup_nuvem = true || exige_backup_replicacao = true)`,
+                '+name',
+                50,
+                0,
+              )
+              for (let i = 0; i < assetsOrg.length; i++) {
+                ativosEscopo.push(assetsOrg[i])
+              }
+            } catch (_) {}
+          }
+
+          confrontoEscopo.total_ativos_escopo = ativosEscopo.length
+
+          // Modalidades que ESTA evidência comprova, conforme destino do plano da rotina
+          // Normalização: local -> 'local', nuvem -> 'nuvem', replicacao/externo -> 'replicacao'
+          const modalidadesComprovadasPorEsta = new Set()
+          if (planoDestinoValores.length > 0) {
+            for (let dI = 0; dI < planoDestinoValores.length; dI++) {
+              const dVal = planoDestinoValores[dI]
+              if (dVal === 'local') modalidadesComprovadasPorEsta.add('local')
+              else if (dVal === 'nuvem') modalidadesComprovadasPorEsta.add('nuvem')
+              else if (dVal === 'replicacao' || dVal === 'externo')
+                modalidadesComprovadasPorEsta.add('replicacao')
+            }
+          } else if (destinoDetectado) {
+            const dDet = destinoDetectado.toLowerCase()
+            if (dDet.includes('nuvem') || dDet.includes('cloud'))
+              modalidadesComprovadasPorEsta.add('nuvem')
+            if (dDet.includes('local') || dDet.includes('disco') || dDet.includes('storage'))
+              modalidadesComprovadasPorEsta.add('local')
+            if (dDet.includes('repli') || dDet.includes('externo') || dDet.includes('copy'))
+              modalidadesComprovadasPorEsta.add('replicacao')
+          }
+
+          // Se nenhuma modalidade foi identificada pelo plano/destino, fallback seguro para o adaptador
+          if (modalidadesComprovadasPorEsta.size === 0) {
+            if (adaptadorUsado === 'ACRONIS_PDF') modalidadesComprovadasPorEsta.add('nuvem')
+            else modalidadesComprovadasPorEsta.add('local')
+          }
+
+          // Montar mapa de fontes cadastradas que apontam para ativos do inventário
+          // para permitir casamento ativo_inventario <-> fontes <-> itens comprovados
+          const fontesPorAtivoId = {}
+          for (let fI = 0; fI < fontesCadastradas.length; fI++) {
+            const f = fontesCadastradas[fI]
+            const aId =
+              typeof f.getString === 'function'
+                ? f.getString('ativo_inventario')
+                : f.ativo_inventario
+            if (aId) {
+              if (!fontesPorAtivoId[aId]) fontesPorAtivoId[aId] = []
+              fontesPorAtivoId[aId].push(f)
+            }
+          }
+
+          // Lista de itens extraídos do comprovante normalizados
+          const itensComprovanteNorm = itensComprovante.map((item) => ({
+            original: item,
+            norm: normalizarTexto(item),
+          }))
+
+          // Iterar cada ativo do escopo e avaliar exigências vs. comprovado vs. pendências
+          for (let aIdx = 0; aIdx < ativosEscopo.length; aIdx++) {
+            const aRec = ativosEscopo[aIdx]
+            const aId = aRec.id
+            const aNome = aRec.getString('name') || `Ativo #${aId}`
+            const aNomeNorm = normalizarTexto(aNome)
+            const aTipo = aRec.getString('tipo') || ''
+            const exLocal = Boolean(aRec.getBool('exige_backup_local'))
+            const exNuvem = Boolean(aRec.getBool('exige_backup_nuvem'))
+            const exReplicacao = Boolean(aRec.getBool('exige_backup_replicacao'))
+
+            const modalidadesExigidas = []
+            if (exLocal) modalidadesExigidas.push('local')
+            if (exNuvem) modalidadesExigidas.push('nuvem')
+            if (exReplicacao) modalidadesExigidas.push('replicacao')
+
+            // Adicionar à lista (a) EXIGÊNCIAS
+            confrontoEscopo.exigencias.push({
+              ativo_id: aId,
+              ativo_nome: aNome,
+              ativo_tipo: aTipo,
+              local: exLocal,
+              nuvem: exNuvem,
+              replicacao: exReplicacao,
+              modalidades: modalidadesExigidas,
+            })
+            confrontoEscopo.total_exigencias_modalidade += modalidadesExigidas.length
+
+            // Casamento exato normalizado (trim + lowercase) do ativo contra:
+            // 1) O nome do ativo diretamente contra os itens do comprovante
+            // 2) Fontes associadas ao ativo (caminho_identificacao e aliases da fonte)
+            let ativoComprovadoNestaEvidencia = false
+            let itemCasadoNome = ''
+            let fonteCasadaNome = ''
+
+            // 1. Match direto nome do ativo <-> item do comprovante
+            for (let itI = 0; itI < itensComprovanteNorm.length; itI++) {
+              const it = itensComprovanteNorm[itI]
+              if (
+                it.norm &&
+                aNomeNorm &&
+                (it.norm === aNomeNorm ||
+                  it.norm.includes(aNomeNorm) ||
+                  aNomeNorm.includes(it.norm))
+              ) {
+                ativoComprovadoNestaEvidencia = true
+                itemCasadoNome = it.original
+                break
+              }
+            }
+
+            // 2. Se não casou direto, testar fontes cadastradas do ativo
+            const fontesDoAtivo = fontesPorAtivoId[aId] || []
+            if (!ativoComprovadoNestaEvidencia && fontesDoAtivo.length > 0) {
+              for (let fI = 0; fI < fontesDoAtivo.length; fI++) {
+                const f = fontesDoAtivo[fI]
+                const fCaminho =
+                  typeof f.getString === 'function'
+                    ? f.getString('caminho_identificacao')
+                    : f.caminho_identificacao || ''
+                const fAliasesRaw =
+                  typeof f.getString === 'function' ? f.getString('aliases') : f.aliases || ''
+                const fCaminhoNorm = normalizarTexto(fCaminho)
+                const fAliases = extrairAliases(fAliasesRaw)
+
+                for (let itI = 0; itI < itensComprovanteNorm.length; itI++) {
+                  const it = itensComprovanteNorm[itI]
+                  if (it.norm && fCaminhoNorm && it.norm === fCaminhoNorm) {
+                    ativoComprovadoNestaEvidencia = true
+                    itemCasadoNome = it.original
+                    fonteCasadaNome = fCaminho
+                    break
+                  }
+                  for (let alI = 0; alI < fAliases.length; alI++) {
+                    if (it.norm && fAliases[alI] === it.norm) {
+                      ativoComprovadoNestaEvidencia = true
+                      itemCasadoNome = it.original
+                      fonteCasadaNome = fAliases[alI]
+                      break
+                    }
+                  }
+                  if (ativoComprovadoNestaEvidencia) break
+                }
+                if (ativoComprovadoNestaEvidencia) break
+              }
+            }
+
+            // 3. Avaliar quais modalidades foram comprovadas e quais ficaram pendentes
+            for (let mI = 0; mI < modalidadesExigidas.length; mI++) {
+              const mod = modalidadesExigidas[mI]
+              const modalidadeAtendidaPorEstaRotina = modalidadesComprovadasPorEsta.has(mod)
+
+              if (
+                ativoComprovadoNestaEvidencia &&
+                modalidadeAtendidaPorEstaRotina &&
+                statusDetectado === 'sucesso'
+              ) {
+                // (b) COMPROVADO
+                confrontoEscopo.comprovado.push({
+                  ativo_id: aId,
+                  ativo_nome: aNome,
+                  ativo_tipo: aTipo,
+                  modalidade: mod,
+                  item_comprovante: itemCasadoNome,
+                  fonte_casada: fonteCasadaNome || null,
+                  rotina_nome: rotinaNomeReal || null,
+                  plano_nome: planoNomeReal || null,
+                  status: 'sucesso',
+                  comprovado_em: nowIso,
+                })
+              } else {
+                // (c) PENDÊNCIAS
+                let motivoPendencia = ''
+                if (!ativoComprovadoNestaEvidencia) {
+                  motivoPendencia = `Ativo não mencionado neste comprovante (pode ser coberto por outra rotina/job).`
+                } else if (!modalidadeAtendidaPorEstaRotina) {
+                  motivoPendencia = `Modalidade "${mod}" não é coberta por esta rotina (o plano desta rotina cobre: ${Array.from(modalidadesComprovadasPorEsta).join(', ') || 'nenhuma'}). Pode ser atendida por outra rotina/evidência.`
+                } else if (statusDetectado !== 'sucesso') {
+                  motivoPendencia = `Execução reportou status "${statusDetectado}". Modalidade não homologada.`
+                }
+
+                confrontoEscopo.pendencias.push({
+                  ativo_id: aId,
+                  ativo_nome: aNome,
+                  ativo_tipo: aTipo,
+                  modalidade_pendente: mod,
+                  ativo_presente_no_comprovante: ativoComprovadoNestaEvidencia,
+                  item_comprovante: itemCasadoNome || null,
+                  motivo: motivoPendencia,
+                  atendivel_por_outra_rotina:
+                    !modalidadeAtendidaPorEstaRotina || !ativoComprovadoNestaEvidencia,
+                })
+              }
+            }
+          }
+
+          confrontoEscopo.total_comprovadas = confrontoEscopo.comprovado.length
+          confrontoEscopo.total_pendencias = confrontoEscopo.pendencias.length
+        }
+      } catch (errEscopo) {
+        // Falha tolerante na montagem do confronto
+      }
+
       // Marcar nos detalhesVms se o item está fora do escopo cadastrado
       if (detalhesVms && detalhesVms.length > 0) {
         for (let dvI = 0; dvI < detalhesVms.length; dvI++) {
@@ -1673,8 +2061,13 @@ routerAdd(
           }
         }
         execRec.set('detalhes_vms', detalhesVms)
-        $app.save(execRec)
       }
+
+      // Gravar confronto_escopo na execução
+      if (confrontoEscopo) {
+        execRec.set('confronto_escopo', confrontoEscopo)
+      }
+      $app.save(execRec)
 
       const checklist = []
 
@@ -1948,6 +2341,9 @@ routerAdd(
         avaliado_em: nowIso,
       })
       avalRec.set('laudo_tecnico', laudoTecnico)
+      if (confrontoEscopo) {
+        avalRec.set('confronto_escopo', confrontoEscopo)
+      }
       $app.save(avalRec)
 
       // Agora que execução e avaliação foram persistidas com sucesso, atualizar evidência
@@ -2015,6 +2411,7 @@ routerAdd(
         status: statusDetectado,
         conformidade: conformidadeStatus,
         adaptador: adaptadorUsado,
+        confronto_escopo: confrontoEscopo,
         resultado: resultadoProcessado,
         laudo_tecnico: laudoTecnico,
         message: isNovaEvidencia

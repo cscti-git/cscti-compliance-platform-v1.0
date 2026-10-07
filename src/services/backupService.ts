@@ -476,18 +476,22 @@ export interface ProcessarEvidenciaPayload {
 }
 
 export interface ProcessarEvidenciaResponse {
+  ok?: boolean
   success: boolean
+  duplicado?: boolean
   idempotent?: boolean
   evidencia_id?: string
   processamento_id?: string
   execucao_id?: string
-  monitoramento_id?: string
-  tipo_registro?: string
-  status: string
+  avaliacao_id?: string
+  status?: string
   conformidade?: string
   adaptador?: string
+  confronto_escopo?: import('../types/cscti').BackupConfrontoEscopo
   resultado?: Record<string, unknown>
-  message: string
+  laudo_tecnico?: BackupLaudoTecnico
+  mensagem?: string
+  message?: string
 }
 export async function processarEvidenciaBackup(
   payload: ProcessarEvidenciaPayload,
