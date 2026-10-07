@@ -705,10 +705,249 @@ export const BackupGuiaPage: React.FC = () => {
                     6
                   </span>
                   <span>
-                    Salve a rotina. Em seguida, avance para vincular as Fontes protegidas por ela.
+                    Salve a rotina. Em seguida, clique no botão{' '}
+                    <strong>&quot;Fontes &amp; Ativos&quot;</strong> no card da rotina para cadastrar
+                    as origens protegidas.
                   </span>
                 </li>
               </ol>
+            </div>
+
+            {/* Subseção Detalhada: Botão e Modal "Fontes da Rotina" */}
+            <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-3 pt-3">
+              <div className="flex items-center gap-2">
+                <Server className="w-4 h-4 text-emerald-700" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                  O Botão e Modal &quot;Fontes da Rotina&quot; (O que esta rotina protege?)
+                </h4>
+              </div>
+              <p className="text-xs leading-relaxed text-emerald-950">
+                Cada rotina agrupa uma ou mais <strong>Fontes Protegidas</strong>. Quando um comprovante
+                (e-mail do Veeam, PDF da Acronis, e-mail do NOC) chega, o sistema extrai cada item
+                individual e confere se ele bate com as fontes vinculadas a esta rotina. Clicando no
+                botão <strong>&quot;Fontes &amp; Ativos&quot;</strong> em qualquer rotina, abre-se o
+                modal de gestão com 4 campos essenciais:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="p-2.5 rounded-lg bg-white border border-emerald-200 space-y-1">
+                  <span className="font-bold text-xs text-slate-900 block">
+                    1. Tipo de Fonte
+                  </span>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Classifica a natureza do dado resguardado:
+                    <strong> Banco de Dados</strong> (backup do banco, ex. PostgreSQL/WALs),
+                    <strong> Máquina Virtual Inteira</strong> (backup por snapshot da VM completa no
+                    Proxmox/VMware), <strong>Arquivos / PDF/A</strong> ou <strong>Sistema / Aplicação</strong>.
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white border border-emerald-200 space-y-1">
+                  <span className="font-bold text-xs text-slate-900 block">
+                    2. Tipo de Execução da Fonte
+                  </span>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    <strong>Padrão da Rotina</strong> = herda o tipo definido na rotina (ex. Incremental).
+                    Use outro valor (Completo/Diferencial) só se esta fonte tem ciclo de execução próprio.
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white border border-emerald-200 space-y-1">
+                  <span className="font-bold text-xs text-slate-900 block">
+                    3. Vincular Ativo do Inventário
+                  </span>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    <strong>Opcional:</strong> conecta esta fonte a um ativo cadastrado em{' '}
+                    <em>Ambiente &rarr; Ativos</em>. É este vínculo que permite ao dashboard apontar{' '}
+                    <em>&quot;X máquinas protegidas&quot;</em> e cruzar o inventário contra as rotinas.
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white border border-emerald-200 space-y-1">
+                  <span className="font-bold text-xs text-slate-900 block">
+                    4. Nome no Comprovante (Caminho / Identificação)
+                  </span>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Texto <strong>EXATAMENTE igual</strong> ao que aparece no comprovante emitido
+                    pelo software (ex.: <code className="font-mono bg-slate-100 px-1">SPCM-PROTESTO</code> na
+                    tabela do e-mail Veeam, <code className="font-mono bg-slate-100 px-1">BK-SPCM-ORION</code> no
+                    relatório Acronis). O vínculo é feito por igualdade exata contra este nome e os aliases.
+                  </p>
+                </div>
+              </div>
+
+              {/* Exemplos Prontos de Fontes */}
+              <div className="p-3 rounded-lg bg-white border border-emerald-200 space-y-2 mt-2">
+                <span className="text-xs font-bold text-emerald-950 block">
+                  Exemplos Reais para Copiar no Modal de Fontes:
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5 text-xs">
+                    <span className="font-semibold text-slate-800">Cenário Veeam (4 VMs):</span>
+                    <p className="text-[11px] text-slate-600">
+                      Cadastre cada VM como Tipo = <em>Máquina Virtual Inteira</em> e Nome no Comprovante igual a:
+                    </p>
+                    <div className="space-y-1">
+                      <CopyableCode text="SPCM-TDePJ" label="VM 1" />
+                      <CopyableCode text="SPCM-REGWIN" label="VM 2" />
+                      <CopyableCode text="SPCM-PROTESTO" label="VM 3" />
+                      <CopyableCode text="SPCM-ORION" label="VM 4" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs">
+                    <span className="font-semibold text-slate-800">Cenário Acronis / SocNoc:</span>
+                    <p className="text-[11px] text-slate-600">
+                      Cadastre as fontes com os nomes dos planos exatamente como constam no PDF:
+                    </p>
+                    <div className="space-y-1">
+                      <CopyableCode text="BK-SPCM-TDePJ" label="Plano 1" />
+                      <CopyableCode text="BK-SPCM-ORION" label="Plano 2" />
+                      <CopyableCode text="BK-SPCM-PROTESTO" label="Plano 3" />
+                      <CopyableCode text="BK-SPCM-REGWIN" label="Plano 4" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* DUMMY REPLACE LINE PARA MATCH */}
+      <div className="hidden">
+                    6
+                  </span>
+                  <span>
+                    Salve a rotina. Em seguida, clique no botão <strong>Fontes &amp; Ativos</strong>{' '}
+                    no card da rotina para associar as fontes protegidas.
+                  </span>
+                </li>
+              </ol>
+            </div>
+
+            {/* Subseção: Fontes da Rotina — o que a rotina protege */}
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded bg-emerald-100 text-emerald-800">
+                  <HardDrive className="w-4 h-4" />
+                </div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Fontes da Rotina — o que a rotina protege
+                </h4>
+              </div>
+
+              <p className="leading-relaxed">
+                Cada rotina executa o backup de uma ou mais <strong>fontes</strong>. Uma fonte
+                representa a origem concreta resguardada: uma máquina virtual inteira (snapshot do
+                hipervisor), um banco de dados relacional (ex.: PostgreSQL / WALs) ou arquivos e
+                sistemas. O modal de <strong>Fontes da Rotina</strong> (aberto pelo botão{' '}
+                <em>&quot;Fontes &amp; Ativos&quot;</em> de cada rotina) permite gerenciar essas
+                origens de forma granular.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/80 space-y-1">
+                  <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    <span>1. Tipo de Fonte</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Distingue a natureza da proteção: <strong>Banco de Dados</strong> protege
+                    estruturas lógicas e tabelas; <strong>Máquina Virtual Inteira</strong> executa
+                    backup completo por snapshot do hipervisor (Proxmox/VMware);{' '}
+                    <strong>Repositório de Arquivos</strong> ou <strong>Sistema</strong> atendem a
+                    pastas compartilhadas e caixas postais.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/80 space-y-1">
+                  <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    <span>2. Tipo de Execução da Fonte (&quot;Herda da rotina&quot;)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Por padrão vem como <strong>&quot;Padrão da Rotina&quot;</strong>, indicando que
+                    a fonte{' '}
+                    <em>herda a periodicidade e o tipo (Incremental, Diferencial ou Full)</em>{' '}
+                    configurados na rotina. Só selecione um valor próprio se essa fonte em
+                    particular tiver periodicidade ou tipo de cópia apartado.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/80 space-y-1">
+                  <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    <span>3. Vincular Ativo do Inventário (Opcional)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Conecta esta fonte ao registro físico ou virtual cadastrado em{' '}
+                    <em>Ambiente &rarr; Ativos</em>. <strong>É este vínculo cruzado</strong> que
+                    permite ao painel e ao dashboard calcular com precisão o indicador de{' '}
+                    <em>&quot;X máquinas protegidas&quot;</em> e validar a conformidade de cada
+                    ativo.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/80 space-y-1">
+                  <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    <span>4. Nome no Comprovante</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    O nome literal da VM, banco ou volume exatamente como impresso no comprovante
+                    (e-mail ou PDF). O sistema correlaciona a evidência por{' '}
+                    <strong>igualdade exata</strong> contra este nome e os aliases cadastrados.
+                  </p>
+                </div>
+              </div>
+
+              {/* Exemplos copiáveis */}
+              <div className="space-y-2 pt-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
+                  Exemplos copiáveis para preenchimento de Fontes:
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/50 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-emerald-950">
+                        Veeam — 4 fontes &quot;Máquina Virtual Inteira&quot;:
+                      </span>
+                      <Badge variant="outline" className="text-[10px] bg-white border-emerald-300">
+                        VMs em Lote
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Cadastre cada máquina virtual protegida no job do Veeam:
+                    </p>
+                    <div className="space-y-1">
+                      <CopyableCode text="SPCM-TDePJ" label="Fonte 1" />
+                      <CopyableCode text="SPCM-REGWIN" label="Fonte 2" />
+                      <CopyableCode text="SPCM-PROTESTO" label="Fonte 3" />
+                      <CopyableCode text="SPCM-ORION" label="Fonte 4" />
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-blue-950">
+                        Acronis — Fontes de Planos de Proteção:
+                      </span>
+                      <Badge variant="outline" className="text-[10px] bg-white border-blue-300">
+                        Nuvem SocNoc
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Cadastre os identificadores conforme saem no PDF diário:
+                    </p>
+                    <div className="space-y-1">
+                      <CopyableCode text="BK-SPCM-TDePJ" label="Fonte 1" />
+                      <CopyableCode text="BK-SPCM-ORION" label="Fonte 2" />
+                      <CopyableCode text="BK-SPCM-PROTESTO" label="Fonte 3" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -855,6 +1094,153 @@ export const BackupGuiaPage: React.FC = () => {
                   automático. Caso o software use nomes técnicos diferentes do nome usual na
                   serventia, cadastre ambos no campo de aliases separados por vírgula.
                 </p>
+              </div>
+            </div>
+
+            {/* Subseção: Regras de Identificação — como o sistema reconhece seus e-mails */}
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded bg-teal-100 text-teal-800">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Regras de Identificação — como o sistema reconhece seus e-mails
+                </h4>
+              </div>
+
+              <p className="leading-relaxed">
+                A aba <strong>Regras &amp; Adaptadores</strong> automatiza o reconhecimento dos
+                e-mails e relatórios de backup que chegam à caixa postal de monitoramento. Cada{' '}
+                <strong>regra de identificação</strong> combina critérios de triagem com um{' '}
+                <strong>adaptador de extração especializado</strong>.
+              </p>
+
+              <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/80 space-y-2 text-xs">
+                <div className="font-bold text-slate-800">
+                  Anatomia de uma Regra de Identificação:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                  <div className="p-2 rounded bg-white border border-slate-200">
+                    <strong className="text-slate-900 block mb-0.5">Filtro Remetente</strong>
+                    <span className="text-slate-600">
+                      Endereço ou domínio de envio (ex.: <em>newsletter@proitcs.com.br</em> ou{' '}
+                      <em>veeam@</em>).
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-white border border-slate-200">
+                    <strong className="text-slate-900 block mb-0.5">Filtro Assunto</strong>
+                    <span className="text-slate-600">
+                      Palavras-chave contidas no subject (ex.: <em>Backup Copy</em>,{' '}
+                      <em>Replication</em>, <em>SocNoc</em>).
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-white border border-slate-200">
+                    <strong className="text-slate-900 block mb-0.5">Padrão Conteúdo</strong>
+                    <span className="text-slate-600">
+                      Expressão presente no corpo da mensagem (ex.: <em>Backup Copy job:</em> ou{' '}
+                      <em>Success</em>).
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
+                  Adaptadores de Extração Disponíveis:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-lg border border-slate-200 bg-white space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-mono">
+                        VEEAM_HTML
+                      </Badge>
+                      <span className="font-bold text-slate-900 text-[11px]">
+                        Veeam B&amp;R 12.x / Jobs HTML
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      Lê a tabela completa de VMs do e-mail oficial do Veeam, extraindo tamanho,
+                      duração, taxa de transferência e status individual de cada máquina.
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg border border-slate-200 bg-white space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-[10px] font-mono">
+                        ACRONIS_PDF
+                      </Badge>
+                      <span className="font-bold text-slate-900 text-[11px]">
+                        Relatório PDF Acronis / SocNoc
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      Extrai dados estruturados do anexo PDF diário da Acronis, identificando planos
+                      de proteção na nuvem e resultados consolidados.
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg border border-slate-200 bg-white space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-purple-100 text-purple-800 border-purple-300 text-[10px] font-mono">
+                        NOC_DIARIO
+                      </Badge>
+                      <span className="font-bold text-slate-900 text-[11px]">
+                        Análise Preventiva Diária do NOC
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      Processa e-mails humanos diários enviados pela equipe de suporte/NOC com
+                      resumo preventivo das rotinas executadas.
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg border border-slate-200 bg-white space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-slate-100 text-slate-800 border-slate-300 text-[10px] font-mono">
+                        EMAIL_HTML_GENERICO
+                      </Badge>
+                      <span className="font-bold text-slate-900 text-[11px]">
+                        Leitor Genérico Universal
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      Leitor padrão para scripts customizados, Bacula, pg_dump, shell scripts ou
+                      qualquer notificação de backup em texto ou HTML.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/60 text-blue-950 space-y-1">
+                  <span className="text-xs font-bold block flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-700" />
+                    Modelos Rápidos de Identificação
+                  </span>
+                  <p className="text-[11px] leading-relaxed text-blue-900">
+                    Ao criar uma nova regra, clique nos botões de <strong>
+                      Modelos Rápidos
+                    </strong> (
+                    <em>Veeam Backup Job</em>, <em>Veeam Copy Job</em>,{' '}
+                    <em>Acronis (PDF SocNoc)</em> ou <em>NOC Diário</em>). Eles preenchem de
+                    imediato os critérios típicos recomendados — basta ajustar o remetente
+                    específico da sua serventia se for diferente.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 space-y-1">
+                  <span className="text-xs font-bold block flex items-center gap-1.5 text-slate-900">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Destino: &quot;Auto-detectada&quot; vs &quot;Fonte Específica&quot;
+                  </span>
+                  <p className="text-[11px] leading-relaxed text-slate-600">
+                    Quando o campo <em>Vincular a Fonte Específica</em> fica em branco, a regra
+                    opera em modo <strong>Auto-detectada</strong>: a vinculação com a fonte e rotina
+                    é resolvida automaticamente por igualdade de nomes e aliases. Se preferir forçar
+                    que todas as evidências capturadas por esta regra alimentem sempre um destino
+                    fixo, escolha uma fonte específica da lista.
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>

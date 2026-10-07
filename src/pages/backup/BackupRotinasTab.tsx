@@ -43,6 +43,7 @@ import {
   Layers,
   Repeat,
   CheckCircle2,
+  Info,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -700,29 +701,51 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
 
       {/* Modal Fontes da Rotina */}
       <Dialog open={fontesModalOpen} onOpenChange={setFontesModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Server className="w-5 h-5 text-[#0B2545]" />
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-6">
+          <DialogHeader className="pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-700">
+              <Server className="w-4 h-4 text-emerald-600" />
+              <span>O que esta rotina protege?</span>
+            </div>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2 mt-0.5">
               Fontes da Rotina: {selectedRotinaForFontes?.nome}
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              Mapeamento de origens (bancos de dados, arquivos, máquinas virtuais) vinculadas a
-              ativos do inventário.
+            <DialogDescription className="text-xs text-slate-600 leading-relaxed mt-1">
+              Cada fonte é uma origem protegida por esta rotina — uma máquina virtual inteira
+              (backup por snapshot), um banco de dados ou um sistema/arquivos. O nome da fonte deve
+              ser exatamente igual ao que aparece no comprovante.
             </DialogDescription>
           </DialogHeader>
 
+          {/* Dica em destaque (callout discreto) */}
+          <div className="my-1 p-2.5 rounded-lg border border-amber-200/80 bg-amber-50/70 text-amber-900 text-xs flex items-start gap-2">
+            <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+            <p className="leading-snug">
+              <span className="font-bold">Dica:</span> o nome aqui é o que o sistema procura no
+              comprovante. Se o comprovante usa outro nome, o vínculo com a evidência é feito por
+              igualdade exata contra este nome e os aliases cadastrados da fonte.
+            </p>
+          </div>
+
           <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
+            {/* Seção Fontes Associadas */}
             <div className="space-y-2">
-              <span className="text-[11px] font-bold uppercase text-slate-500 block">
-                Fontes Associadas ({fontesList.length})
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-slate-400" />
+                  Fontes Associadas ({fontesList.length})
+                </span>
+                <span className="text-[10px] text-slate-400 italic">
+                  Origens resguardadas nesta rotina
+                </span>
+              </div>
+
               {fontesLoading ? (
-                <p className="text-xs text-slate-400 italic">Carregando fontes...</p>
+                <p className="text-xs text-slate-400 italic py-2">Carregando fontes...</p>
               ) : fontesList.length === 0 ? (
-                <p className="text-xs text-slate-500 italic p-3 border border-dashed rounded bg-slate-50">
-                  Nenhuma fonte vinculada a esta rotina. Adicione abaixo o banco, diretório ou ativo
-                  de inventário.
+                <p className="text-xs text-slate-500 italic p-3.5 border border-dashed rounded-lg bg-slate-50 text-center">
+                  Nenhuma fonte vinculada a esta rotina. Adicione abaixo a máquina virtual, banco de
+                  dados ou sistema correspondente ao comprovante.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -748,30 +771,39 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                     return (
                       <div
                         key={f.id}
-                        className="p-2.5 rounded-lg border border-slate-200 bg-white flex items-center justify-between shadow-2xs"
+                        className="p-3 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition flex items-center justify-between shadow-2xs gap-3"
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <Badge
                               variant="secondary"
                               className="text-[10px] font-bold px-1.5 py-0 bg-blue-50 text-blue-900 border border-blue-200"
                             >
                               {tipoFonteDisplay}
                             </Badge>
-                            <span className="text-xs font-bold text-slate-900">
+                            <span className="text-xs font-bold text-slate-900 font-mono tracking-tight break-all">
                               {f.caminho_identificacao}
                             </span>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                            <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                            <span
+                              className="inline-flex items-center gap-1 font-medium text-slate-700"
+                              title="Usa a periodicidade e o tipo definidos na rotina"
+                            >
                               <Layers className="w-3 h-3 text-slate-400" />
-                              {tipoExecucaoFonteDisplay}
+                              Tipo de Execução: {tipoExecucaoFonteDisplay}
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                (usa a periodicidade e o tipo definidos na rotina)
+                              </span>
                             </span>
 
-                            {f.expand?.ativo_inventario && (
-                              <span className="text-blue-700 flex items-center gap-1 font-medium">
-                                <Server className="w-3 h-3" /> Ativo:{' '}
+                            {f.expand?.ativo_inventario ? (
+                              <span
+                                className="text-blue-700 flex items-center gap-1 font-medium"
+                                title="Integridade cruzada com o Inventário de Ativos"
+                              >
+                                <Server className="w-3 h-3 text-blue-600" /> Ativo:{' '}
                                 {f.expand.ativo_inventario.name} (
                                 {f.expand.ativo_inventario.tipo === 'servidor_virtualizado'
                                   ? 'Servidor Virtualizado / VM'
@@ -779,6 +811,13 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                                     ? 'Banco de Dados'
                                     : f.expand.ativo_inventario.tipo}
                                 )
+                                <span className="text-[10px] text-blue-500 font-normal">
+                                  — integridade cruzada com Ativos
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[10px] italic">
+                                Sem ativo vinculado no inventário
                               </span>
                             )}
                           </div>
@@ -789,7 +828,7 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteFonte(f.id)}
-                            className="h-7 w-7 text-slate-400 hover:text-red-600"
+                            className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
                             title="Remover fonte"
                           >
                             <X className="w-4 h-4" />
@@ -802,19 +841,26 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
               )}
             </div>
 
-            {/* Form Nova Fonte */}
+            {/* Seção Adicionar Nova Fonte à Rotina */}
             {canOperate && (
               <form
                 onSubmit={handleAddFonte}
-                className="p-3 rounded-lg border border-slate-200 bg-slate-50/70 space-y-3 text-xs"
+                className="p-4 rounded-xl border border-slate-200 bg-slate-50/80 space-y-3.5 text-xs shadow-2xs"
               >
-                <span className="text-xs font-bold text-slate-800 block">
-                  Adicionar Nova Fonte à Rotina
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-emerald-700" />
+                    Adicionar Nova Fonte à Rotina
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Campos com micro-ajuda contextual
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-600 block mb-1">
-                      Tipo de Fonte
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Tipo de Fonte <span className="text-red-500">*</span>
                     </label>
                     <Select
                       value={novaFonteTipo}
@@ -828,7 +874,7 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                           | 'outro',
                       ) => setNovaFonteTipo(val)}
                     >
-                      <SelectTrigger className="text-xs h-8">
+                      <SelectTrigger className="text-xs h-9 bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -844,10 +890,14 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                         <SelectItem value="outro">Outra Fonte</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                      Banco de Dados = backup do banco (ex. PostgreSQL/WAL). Máquina Virtual Inteira
+                      = snapshot da VM completa (Proxmox/VMware).
+                    </p>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-600 block mb-1">
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
                       Tipo de Execução da Fonte
                     </label>
                     <Select
@@ -856,7 +906,7 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                         setNovaFonteTipoExecucao(val)
                       }
                     >
-                      <SelectTrigger className="text-xs h-8">
+                      <SelectTrigger className="text-xs h-9 bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -869,14 +919,18 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                         <SelectItem value="completo">Completo (Full)</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                      Padrão da Rotina = herda o tipo definido na rotina (ex. Incremental). Use
+                      outro valor só se esta fonte tem execução própria.
+                    </p>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-600 block mb-1">
-                      Vincular Ativo de Inventário
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Vincular Ativo do Inventário
                     </label>
                     <Select value={novaFonteAssetId} onValueChange={setNovaFonteAssetId}>
-                      <SelectTrigger className="text-xs h-8">
+                      <SelectTrigger className="text-xs h-9 bg-white">
                         <SelectValue placeholder="Selecione um ativo..." />
                       </SelectTrigger>
                       <SelectContent className="max-h-72">
@@ -893,34 +947,45 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
                         })}
                       </SelectContent>
                     </Select>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                      Opcional. Conecta esta fonte a um ativo cadastrado em Ambiente &rarr; Ativos.
+                      É este vínculo que permite ao dashboard apontar &quot;X máquinas
+                      protegidas&quot;.
+                    </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-semibold text-slate-600 block mb-1">
-                    Caminho / Identificação da Fonte
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Nome no Comprovante <span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center gap-2">
                     <Input
                       placeholder={
                         novaFonteTipo === 'maquina_virtual'
-                          ? 'Ex: Proxmox/VMware VM 101 - SVR-APLICACAO (Snapshot 30 min)'
+                          ? 'Ex: SPCM-PROTESTO ou SPCM-ORION'
                           : novaFonteTipo === 'banco_de_dados'
-                            ? 'Ex: PostgreSQL /base_cartorio (WALs / Incremental 30 min)'
-                            : 'Ex: /var/lib/postgresql/data'
+                            ? 'Ex: PostgreSQL /base_cartorio (ou SRV-ATOS-DB)'
+                            : 'Ex: BK-SPCM-TDePJ ou /var/lib/postgresql/data'
                       }
                       value={novaFonteCaminho}
                       onChange={(e) => setNovaFonteCaminho(e.target.value)}
-                      className="text-xs h-8 flex-1"
+                      className="text-xs h-9 bg-white flex-1 font-mono"
                     />
                     <Button
                       type="submit"
                       size="sm"
-                      className="text-xs h-8 bg-[#0B2545] hover:bg-[#124E78] text-white shrink-0"
+                      className="text-xs h-9 px-4 bg-[#0B2545] hover:bg-[#124E78] text-white shrink-0 font-semibold gap-1 shadow-xs"
                     >
-                      <Plus className="w-3.5 h-3.5 mr-1" /> Vincular
+                      <Plus className="w-3.5 h-3.5" /> Vincular
                     </Button>
                   </div>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Texto EXATAMENTE igual ao que aparece no comprovante (ex.
+                    &quot;SPCM-PROTESTO&quot; na tabela do e-mail Veeam, &quot;BK-SPCM-ORION&quot;
+                    no PDF Acronis). O vínculo com a evidência é feito por igualdade exata contra
+                    este nome e os aliases.
+                  </p>
                 </div>
               </form>
             )}
