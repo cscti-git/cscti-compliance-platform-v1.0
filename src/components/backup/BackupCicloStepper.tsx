@@ -1,4 +1,5 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import {
   Layers,
   Sliders,
@@ -11,6 +12,7 @@ import {
   ChevronRight,
   AlertCircle,
   Check,
+  HelpCircle,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
@@ -166,6 +168,16 @@ export const BackupCicloStepper: React.FC<BackupCicloStepperProps> = ({
               Ciclo completamente configurado
             </Badge>
           )}
+
+          <Link
+            to="/backup/guia"
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-slate-700 bg-white hover:bg-blue-50 hover:text-blue-700 border border-slate-300 rounded-md transition shadow-2xs"
+            title="Abrir o Manual de Uso passo a passo do Backup"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">Guia de Backup</span>
+            <span className="sm:hidden">Guia</span>
+          </Link>
         </div>
       </div>
 

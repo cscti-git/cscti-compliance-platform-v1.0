@@ -147,6 +147,16 @@ export const BackupOverviewPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <Link to="/backup/guia">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs font-semibold text-[#0B2545] border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 gap-1.5 shadow-2xs"
+              title="Abrir o Manual de Uso passo a passo do Backup"
+            >
+              <HelpCircle className="w-4 h-4 text-blue-700" /> Guia / Ajuda (?)
+            </Button>
+          </Link>
           <Link to="/relatorios/backup" target="_blank">
             <Button
               variant="outline"
