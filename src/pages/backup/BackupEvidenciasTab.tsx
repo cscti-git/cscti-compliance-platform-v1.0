@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,7 +73,11 @@ import {
   Sliders,
   AlertOctagon,
   Trash2,
+  FileUp,
+  Loader2,
+  CheckCircle,
 } from 'lucide-react'
+import { extrairConteudoArquivo } from '@/lib/comprovanteImport'
 import { Checkbox } from '@/components/ui/checkbox'
 import { excluirBackupEvidencia, limparTodasEvidencias } from '@/services/backupService'
 
@@ -188,6 +192,16 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
   const [nomeArquivoAnexo, setNomeArquivoAnexo] = useState('')
   const [pdfTextoSimulado, setPdfTextoSimulado] = useState('')
 
+  // Estado para Importação de Arquivo (HTML, PDF, TXT, EML, XLSX)
+  const [importingFile, setImportingFile] = useState(false)
+  const [importedFileInfo, setImportedFileInfo] = useState<{
+    nome: string
+    tamanhoKb: number
+    tipo: string
+    vmsCount?: number
+  } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Conector IMAP e Estado de Ingestão (comportamento fail-closed verificado)
   const [emailConnector, setEmailConnector] = useState<IntegrationItem | null>(null)
   const [fetchingImap, setFetchingImap] = useState(false)
@@ -277,7 +291,66 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
     setFormTipo('veeam')
     setNomeArquivoAnexo('')
     setPdfTextoSimulado('')
+    setImportedFileInfo(null)
     setModalOpen(true)
+  }
+
+  const handleArquivoSelecionado = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    const file = files[0]
+
+    setImportingFile(true)
+    try {
+      const res = await extrairConteudoArquivo(file)
+
+      // Preencher campos
+      setConteudo(res.conteudo)
+      setNomeArquivoAnexo(res.nomeArquivo)
+      if (res.assunto) {
+        setAssunto(res.assunto)
+      }
+      if (res.remetente) {
+        setRemetente(res.remetente)
+      }
+
+      // Se for PDF
+      if (res.tipoDetectado === 'pdf') {
+        setFormTipo('acronis_pdf')
+        setPdfTextoSimulado(res.conteudo)
+      } else if (res.tipoDetectado === 'html') {
+        setFormTipo('veeam')
+      } else {
+        setFormTipo('generico')
+      }
+
+      setImportedFileInfo({
+        nome: res.nomeArquivo,
+        tamanhoKb: Math.round(res.tamanhoBytes / 1024),
+        tipo: res.tipoDetectado.toUpperCase(),
+        vmsCount: res.vmsDetectadas?.length,
+      })
+
+      toast({
+        title: 'Arquivo importado com sucesso',
+        description: `Conteúdo extraído de "${res.nomeArquivo}". Verifique os dados abaixo antes de processar.`,
+      })
+    } catch (err: unknown) {
+      toast({
+        title: 'Falha ao importar arquivo',
+        description:
+          err instanceof Error
+            ? err.message
+            : 'Formato ou tamanho inválido. Utilize HTML, PDF, TXT, EML ou XLSX até 10 MB.',
+        variant: 'destructive',
+      })
+    } finally {
+      setImportingFile(false)
+      // Resetar input para permitir selecionar o mesmo arquivo novamente se desejar
+      if (e.target) {
+        e.target.value = ''
+      }
+    }
   }
 
   const handleSelecionarModelo = (tipo: 'veeam' | 'acronis_pdf' | 'noc_diario' | 'generico') => {
@@ -1294,11 +1367,83 @@ Lista de atividades (1 dia):
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
+              {/* Painel de Importação Direta de Arquivo (Solução de e-mail intacto) */}
+              <div className="p-3 rounded-lg border-2 border-dashed border-blue-200 bg-blue-50/60 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-blue-950 text-xs flex items-center gap-1.5">
+                      <FileUp className="w-4 h-4 text-blue-600" />
+                      Importar comprovante por arquivo (HTML, PDF, TXT, EML, XLSX)
+                    </span>
+                    <p className="text-[11px] text-blue-800 mt-0.5">
+                      Salve o e-mail em <strong>.html</strong> no Gmail/Outlook e importe aqui. A
+                      tabela completa de VMs e status é preservada integralmente.
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".html,.htm,.pdf,.txt,.log,.csv,.eml,.msg,.xlsx,.xls"
+                      onChange={handleArquivoSelecionado}
+                      className="hidden"
+                      id="upload-comprovante-input"
+                      disabled={importingFile || submitting}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={importingFile || submitting}
+                      className="bg-blue-700 hover:bg-blue-800 text-white text-xs shadow-sm font-semibold h-8"
+                    >
+                      {importingFile ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          Extraindo dados...
+                        </>
+                      ) : (
+                        <>
+                          <FileUp className="w-3.5 h-3.5 mr-1.5" />
+                          Importar Arquivo
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Feedback discreto após extração bem-sucedida */}
+                {importedFileInfo && (
+                  <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span>
+                        Arquivo importado:{' '}
+                        <strong className="text-emerald-950 font-mono">
+                          {importedFileInfo.nome}
+                        </strong>{' '}
+                        ({importedFileInfo.tamanhoKb} KB · {importedFileInfo.tipo})
+                        {importedFileInfo.vmsCount !== undefined &&
+                          importedFileInfo.vmsCount > 0 && (
+                            <span className="ml-1 text-emerald-700">
+                              — <strong>{importedFileInfo.vmsCount}</strong> VM(s) na tabela
+                              detectada(s).
+                            </span>
+                          )}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 font-medium ml-2">
+                      Verifique o conteúdo abaixo antes de processar
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {/* Seleção rápida de Formato Real do Cliente */}
               <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                 <span className="text-[11px] font-bold text-slate-800 block mb-1.5 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  Formatos Reais de Comprovante:
+                  Ou selecione um modelo de demonstração rápida:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   <button
