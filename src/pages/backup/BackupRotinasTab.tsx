@@ -44,6 +44,7 @@ import {
   Repeat,
   CheckCircle2,
   Info,
+  Download,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -53,6 +54,10 @@ import {
   saveBackupFonte,
   deleteBackupFonte,
   listBackupEscopos,
+  listBackupEvidencias,
+  listBackupProcessamentos,
+  listBackupAvaliacoes,
+  criarFontesPendentes,
 } from '@/services/backupService'
 import { listPeople, listInventoryAssets } from '@/services/csctiService'
 import type {
@@ -121,6 +126,7 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
     useState<BackupFonteTipoExecucao>('padrao_rotina')
   const [novaFonteCaminho, setNovaFonteCaminho] = useState('')
   const [novaFonteAssetId, setNovaFonteAssetId] = useState('')
+  const [importingFromLastEvidencia, setImportingFromLastEvidencia] = useState(false)
 
   useEffect(() => {
     if (orgId) {
@@ -319,6 +325,101 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
       setFontesList(fontesList.filter((f) => f.id !== id))
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  // Importar fontes do último comprovante vinculado a esta rotina
+  const handleImportarFontesUltimoComprovante = async () => {
+    if (!selectedRotinaForFontes) return
+    setImportingFromLastEvidencia(true)
+    try {
+      const allEvidencias = await listBackupEvidencias(orgId)
+      // Evidências vinculadas à rotina, ordenadas da mais recente para a mais antiga
+      const rotinaEvidencias = allEvidencias
+        .filter((ev) => ev.rotina === selectedRotinaForFontes.id)
+        .sort((a, b) => new Date(b.created || '').getTime() - new Date(a.created || '').getTime())
+
+      if (rotinaEvidencias.length === 0) {
+        toast({
+          title: 'Nenhum comprovante encontrado',
+          description: `Nenhuma evidência vinculada à rotina "${selectedRotinaForFontes.nome}" foi localizada. Registre ou cole um comprovante na aba Evidências primeiro.`,
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const ultimaEvidencia = rotinaEvidencias[0]
+      let itensParaImportar: string[] = []
+
+      // 1. Tentar extrair do processamento estruturado da evidência
+      try {
+        const processamentos = await listBackupProcessamentos(orgId)
+        const proc = processamentos.find((p) => p.evidencia === ultimaEvidencia.id)
+        if (proc?.resultado?.vms && proc.resultado.vms.length > 0) {
+          itensParaImportar = proc.resultado.vms.map((v) => v.nome).filter(Boolean)
+        } else if (proc?.resultado?.job_name) {
+          itensParaImportar = [proc.resultado.job_name]
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+
+      // 2. Se não achou no processamento, buscar a avaliação mais recente para ver fontes não cobertas ou itens do laudo
+      if (itensParaImportar.length === 0) {
+        const avals = await listBackupAvaliacoes(orgId)
+        const avalRelacionada = avals.find((a) => {
+          const l = a.laudo_tecnico
+          return l?.vinculos?.rotina_id === selectedRotinaForFontes.id
+        })
+        if (avalRelacionada?.laudo_tecnico?.cobertura) {
+          const cob = avalRelacionada.laudo_tecnico.cobertura
+          const naoCob = Array.isArray(cob.fontes_nao_cobertas)
+            ? cob.fontes_nao_cobertas.map((x) => x.item).filter(Boolean)
+            : []
+          const cobItens = Array.isArray(cob.fontes_cobertas)
+            ? cob.fontes_cobertas.map((x) => x.item).filter(Boolean)
+            : []
+          itensParaImportar = [...naoCob, ...cobItens]
+        }
+      }
+
+      if (itensParaImportar.length === 0) {
+        toast({
+          title: 'Nenhum item detectado no comprovante',
+          description:
+            'O último comprovante recebido não possui itens ou VMs discriminados para importação automática.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const res = await criarFontesPendentes({
+        rotinaId: selectedRotinaForFontes.id,
+        itens: itensParaImportar,
+        evidenciaId: ultimaEvidencia.id,
+      })
+
+      const allFontes = await listBackupFontes(orgId)
+      setFontesList(allFontes.filter((f) => f.rotina === selectedRotinaForFontes.id))
+
+      const nomeComprovante =
+        ultimaEvidencia.assunto || ultimaEvidencia.remetente || ultimaEvidencia.id
+      toast({
+        title: 'Importação concluída!',
+        description:
+          res.criadas.length > 0
+            ? `${res.criadas.length} nova(s) fonte(s) importada(s) do último comprovante ("${nomeComprovante}").`
+            : `Todas as fontes do comprovante já estavam cadastradas (${res.reutilizadas.length} existente(s)).`,
+      })
+      onReload()
+    } catch (err: unknown) {
+      toast({
+        title: 'Erro ao importar fontes do comprovante',
+        description: err instanceof Error ? err.message : 'Falha na importação.',
+        variant: 'destructive',
+      })
+    } finally {
+      setImportingFromLastEvidencia(false)
     }
   }
 
@@ -730,14 +831,26 @@ export const BackupRotinasTab: React.FC<BackupRotinasTabProps> = ({
           <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
             {/* Seção Fontes Associadas */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-slate-400" />
                   Fontes Associadas ({fontesList.length})
                 </span>
-                <span className="text-[10px] text-slate-400 italic">
-                  Origens resguardadas nesta rotina
-                </span>
+                {canOperate && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={importingFromLastEvidencia}
+                    onClick={handleImportarFontesUltimoComprovante}
+                    className="h-7 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300 font-semibold gap-1 shadow-2xs"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-700" />
+                    {importingFromLastEvidencia
+                      ? 'Importando...'
+                      : 'Importar fontes do último comprovante'}
+                  </Button>
+                )}
               </div>
 
               {fontesLoading ? (

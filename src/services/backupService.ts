@@ -377,6 +377,35 @@ export async function deleteBackupFonte(id: string): Promise<boolean> {
   return true
 }
 
+export interface CriarFontesPendentesPayload {
+  rotinaId: string
+  itens: string[]
+  evidenciaId?: string
+}
+
+export interface CriarFontesPendentesResponse {
+  success: boolean
+  message: string
+  rotina_id: string
+  rotina_nome: string
+  evidencia_id?: string | null
+  criadas: Array<{ id: string; nome: string }>
+  reutilizadas: Array<{ id: string; nome: string; caminho_identificacao?: string }>
+  ignoradas: string[]
+  avaliacao_atualizada: boolean
+  novo_veredito?: string | null
+  laudo_tecnico?: import('@/types/cscti').BackupLaudoTecnico | null
+}
+
+export async function criarFontesPendentes(
+  payload: CriarFontesPendentesPayload,
+): Promise<CriarFontesPendentesResponse> {
+  return pb.send<CriarFontesPendentesResponse>('/backend/v1/backup/fontes/criar-pendentes', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 // -------------------------------------------------------------
 // 6. Regras de Identificação
 // -------------------------------------------------------------

@@ -621,6 +621,23 @@ export const BackupGuiaPage: React.FC = () => {
               </p>
             </div>
 
+            {/* Callout em Destaque — Caminho Simples */}
+            <div className="p-4 rounded-xl border-2 border-emerald-300 bg-emerald-50/90 text-emerald-950 space-y-2 shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-emerald-900">
+                <Sparkles className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>Fluxo Rápido de Configuração (Caminho Simples)</span>
+              </div>
+              <p className="text-xs sm:text-sm font-semibold leading-relaxed text-emerald-950">
+                1. Cadastre a rotina com os aliases do job &rarr; 2. Cole o comprovante em
+                Evidências &rarr; 3. Abra o laudo &rarr; 4. Clique em &quot;Cadastrar fontes
+                pendentes&quot;. O sistema cria as fontes com os nomes exatos do comprovante.
+              </p>
+              <p className="text-[11px] text-emerald-800 leading-snug">
+                Você não precisa digitar manualmente o nome de cada máquina virtual ou ativo: o
+                laudo detecta os itens do comprovante e permite criá-los com um único clique.
+              </p>
+            </div>
+
             {/* Como funciona o vínculo */}
             <div className="p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/60 text-emerald-950 space-y-1.5">
               <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-emerald-900">
@@ -868,6 +885,24 @@ export const BackupGuiaPage: React.FC = () => {
                 SQL Server, Oracle), uma pasta de rede ou um plano de proteção na nuvem. Cada fonte
                 é ligada a um <strong>Ativo do Inventário</strong> e possui seus próprios{' '}
                 <strong>Aliases</strong>.
+              </p>
+            </div>
+
+            {/* Callout em Destaque — Caminho Simples */}
+            <div className="p-4 rounded-xl border-2 border-teal-300 bg-teal-50/90 text-teal-950 space-y-2 shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-teal-900">
+                <Sparkles className="w-4 h-4 text-teal-700 shrink-0" />
+                <span>Fluxo Rápido de Configuração (Caminho Simples)</span>
+              </div>
+              <p className="text-xs sm:text-sm font-semibold leading-relaxed text-teal-950">
+                1. Cadastre a rotina com os aliases do job &rarr; 2. Cole o comprovante em
+                Evidências &rarr; 3. Abra o laudo &rarr; 4. Clique em &quot;Cadastrar fontes
+                pendentes&quot;. O sistema cria as fontes com os nomes exatos do comprovante.
+              </p>
+              <p className="text-[11px] text-teal-800 leading-snug">
+                Você também pode abrir o modal &quot;Fontes &amp; Ativos&quot; na aba de rotinas e
+                clicar em &quot;Importar fontes do último comprovante&quot; para puxar todas as VMs
+                automaticamente.
               </p>
             </div>
 

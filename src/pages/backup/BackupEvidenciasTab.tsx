@@ -1499,6 +1499,19 @@ Lista de atividades (1 dia):
                     <BackupLaudoCard
                       laudo={selectedAvaliacao.laudo_tecnico}
                       titulo="Laudo Técnico Emitido pelo Sistema"
+                      evidenciaId={selectedEvidencia.id}
+                      rotinaId={selectedEvidencia.rotina || undefined}
+                      onFontesCadastradas={(novoLaudo) => {
+                        if (novoLaudo && selectedAvaliacao) {
+                          setSelectedAvaliacao({
+                            ...selectedAvaliacao,
+                            resultado_conformidade: (novoLaudo.resultado as any) || 'conforme',
+                            detalhe: novoLaudo.veredito || selectedAvaliacao.detalhe,
+                            laudo_tecnico: novoLaudo,
+                          })
+                        }
+                        onReload()
+                      }}
                     />
                   ) : (
                     <div className="p-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-600 text-xs">

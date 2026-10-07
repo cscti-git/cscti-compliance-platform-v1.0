@@ -1,15 +1,49 @@
-import { CheckCircle2, AlertTriangle, XCircle, ShieldCheck, Layers, FileText } from 'lucide-react'
+import { useState } from 'react'
+import {
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  ShieldCheck,
+  Layers,
+  FileText,
+  PlusCircle,
+  Loader2,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/hooks/use-toast'
+import { criarFontesPendentes } from '@/services/backupService'
 import type { BackupLaudoTecnico, BackupVerificacaoItem } from '@/types/cscti'
 
 interface BackupLaudoCardProps {
   laudo?: BackupLaudoTecnico | null
   className?: string
   titulo?: string
+  rotinaId?: string
+  evidenciaId?: string
+  onFontesCadastradas?: (novoLaudo?: BackupLaudoTecnico | null) => void
 }
 
-export function BackupLaudoCard({ laudo, className = '', titulo }: BackupLaudoCardProps) {
+export function BackupLaudoCard({
+  laudo: initialLaudo,
+  className = '',
+  titulo,
+  rotinaId: propRotinaId,
+  evidenciaId: propEvidenciaId,
+  onFontesCadastradas,
+}: BackupLaudoCardProps) {
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const [internalLaudo, setInternalLaudo] = useState<BackupLaudoTecnico | null>(null)
+  const [loadingCriar, setLoadingCriar] = useState(false)
+
+  const laudo = internalLaudo || initialLaudo
+  const canManageFontes = user?.system_role === 'admin' || user?.system_role === 'suporte'
+  const targetRotinaId = propRotinaId || laudo?.vinculos?.rotina_id || ''
+  const targetEvidenciaId = propEvidenciaId || ''
+
   if (!laudo) {
     return (
       <div
@@ -97,10 +131,58 @@ export function BackupLaudoCard({ laudo, className = '', titulo }: BackupLaudoCa
 
         {/* Alerta / Badges suaves de itens/VMs não cadastrados na rotina */}
         {fontesNaoCobertas.length > 0 && (
-          <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-xs">
-              <Layers className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>Itens detectados no comprovante sem fonte cadastrada na rotina:</span>
+          <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 space-y-2.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 font-semibold text-xs">
+                <Layers className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>Itens detectados no comprovante sem fonte cadastrada na rotina:</span>
+              </div>
+              {canManageFontes && targetRotinaId && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingCriar}
+                  onClick={async () => {
+                    setLoadingCriar(true)
+                    try {
+                      const itensNomes = fontesNaoCobertas.map((f) => f.item).filter(Boolean)
+                      const res = await criarFontesPendentes({
+                        rotinaId: targetRotinaId,
+                        itens: itensNomes,
+                        evidenciaId: targetEvidenciaId || undefined,
+                      })
+                      toast({
+                        title: 'Fontes cadastradas com sucesso!',
+                        description:
+                          res.message || `${itensNomes.length} fonte(s) vinculada(s) à rotina.`,
+                      })
+                      if (res.laudo_tecnico) {
+                        setInternalLaudo(res.laudo_tecnico)
+                      }
+                      if (onFontesCadastradas) {
+                        onFontesCadastradas(res.laudo_tecnico || null)
+                      }
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : 'Falha ao cadastrar fontes.'
+                      toast({
+                        variant: 'destructive',
+                        title: 'Erro ao cadastrar fontes',
+                        description: msg,
+                      })
+                    } finally {
+                      setLoadingCriar(false)
+                    }
+                  }}
+                  className="h-7 text-xs bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 font-semibold gap-1 shadow-2xs"
+                >
+                  {loadingCriar ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <PlusCircle className="w-3.5 h-3.5 text-amber-800" />
+                  )}
+                  Cadastrar fontes pendentes ({fontesNaoCobertas.length})
+                </Button>
+              )}
             </div>
             <div className="flex flex-wrap gap-1.5 pt-0.5">
               {fontesNaoCobertas.map((f, idx) => (
@@ -114,8 +196,9 @@ export function BackupLaudoCard({ laudo, className = '', titulo }: BackupLaudoCa
               ))}
             </div>
             <p className="text-[11px] text-amber-800">
-              Recomendação: cadastre as fontes acima na aba de rotinas para garantir rastreabilidade
-              completa.
+              {canManageFontes
+                ? 'Clique no botão acima para criar automaticamente as fontes com os nomes exatos do comprovante e reavaliar o laudo para Conforme.'
+                : 'Recomendação: solicite a um administrador ou suporte o cadastro das fontes acima para garantir rastreabilidade completa.'}
             </p>
           </div>
         )}

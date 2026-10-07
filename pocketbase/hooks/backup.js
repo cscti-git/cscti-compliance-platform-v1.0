@@ -884,6 +884,23 @@ routerAdd(
                   const c1 = stripHtml(cellMatches[1]).trim()
                   if (!c0 || c0.toLowerCase() === 'name' || c0.toLowerCase() === 'vm') continue
 
+                  // Ignora linha se o nome for igual ao jobName detectado ou cabeçalho de job
+                  const c0Norm = c0
+                    .toLowerCase()
+                    .replace(/\\/g, '/')
+                    .replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
+                    .replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                  const jnNormLocal = (jobName || '')
+                    .toLowerCase()
+                    .replace(/\\/g, '/')
+                    .replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
+                    .replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                  if (c0Norm && jnNormLocal && c0Norm === jnNormLocal) continue
+
                   const statusVm = /success/i.test(row)
                     ? 'success'
                     : /warning/i.test(row)
@@ -956,6 +973,22 @@ routerAdd(
               if (cabecalhosIgnorar.includes(lowerName)) return null
               if (lowerName.startsWith('job') || lowerName.startsWith('http')) return null
 
+              const rawNorm = rawName
+                .toLowerCase()
+                .replace(/\\/g, '/')
+                .replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
+                .replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+              const jnNormLinha = (jobName || '')
+                .toLowerCase()
+                .replace(/\\/g, '/')
+                .replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
+                .replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+              if (rawNorm && jnNormLinha && rawNorm === jnNormLinha) return null
+
               const statusRaw = m[2].toLowerCase()
               const rest = m[3] || ''
               const statusVm =
@@ -986,8 +1019,24 @@ routerAdd(
               const p0 = parts[0]
               const p1 = parts[1]
               const lowerP0 = p0.toLowerCase()
+              const p0Norm = p0
+                .toLowerCase()
+                .replace(/\\/g, '/')
+                .replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
+                .replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+              const jnNormParts = (jobName || '')
+                .toLowerCase()
+                .replace(/\\/g, '/')
+                .replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
+                .replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+
               if (
                 !cabecalhosIgnorar.includes(lowerP0) &&
+                !(p0Norm && jnNormParts && p0Norm === jnNormParts) &&
                 /^(Success|Warning|Failed|Error)$/i.test(p1)
               ) {
                 const statusVm =
@@ -1551,13 +1600,58 @@ routerAdd(
         )
       } catch (_) {}
 
+      // Função canônica de normalização para matching e exclusão de job/rotina/aliases
+      const normalizarParaComparacao = (str) => {
+        if (str === null || str === undefined) return ''
+        let s = String(str).trim().toLowerCase()
+        s = s.replace(/\\/g, '/')
+        s = s.replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
+        s = s.replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
+        s = s.replace(/\s+/g, ' ').trim()
+        return s
+      }
+
+      // Conjunto de nomes normalizados que representam o JOB ou a ROTINA e NÃO devem entrar como itens
+      const nomesExcluirComoItem = new Set()
+      if (jobName) {
+        const jnNorm = normalizarParaComparacao(jobName)
+        if (jnNorm) nomesExcluirComoItem.add(jnNorm)
+      }
+      if (rotinaNomeReal) {
+        const rnNorm = normalizarParaComparacao(rotinaNomeReal)
+        if (rnNorm) nomesExcluirComoItem.add(rnNorm)
+      }
+      if (rotinaRecObj) {
+        const rAliasesRaw = rotinaRecObj.getString('aliases') || ''
+        const rAliasesArr = extrairAliases(rAliasesRaw)
+        for (let aIdx = 0; aIdx < rAliasesArr.length; aIdx++) {
+          const aNorm = normalizarParaComparacao(rAliasesArr[aIdx])
+          if (aNorm) nomesExcluirComoItem.add(aNorm)
+        }
+      }
+
+      // Filtrar detalhesVms caso algum cabeçalho de job tenha entrado como VM
+      if (detalhesVms && detalhesVms.length > 0 && nomesExcluirComoItem.size > 0) {
+        detalhesVms = detalhesVms.filter((dv) => {
+          const dvNorm = normalizarParaComparacao(dv.nome)
+          return !nomesExcluirComoItem.has(dvNorm)
+        })
+      }
+
       const itensComprovante = []
       if (detalhesVms && detalhesVms.length > 0) {
         for (let dvI = 0; dvI < detalhesVms.length; dvI++) {
-          itensComprovante.push(detalhesVms[dvI].nome || `Item #${dvI + 1}`)
+          const rawItemNome = detalhesVms[dvI].nome || `Item #${dvI + 1}`
+          const itemNorm = normalizarParaComparacao(rawItemNome)
+          if (!nomesExcluirComoItem.has(itemNorm)) {
+            itensComprovante.push(rawItemNome)
+          }
         }
       } else if (jobName) {
-        itensComprovante.push(jobName)
+        const jobNorm = normalizarParaComparacao(jobName)
+        if (!nomesExcluirComoItem.has(jobNorm)) {
+          itensComprovante.push(jobName)
+        }
       }
 
       const matchResult = casarItensComFontesInline(itensComprovante, fontesCadastradas)
@@ -2575,6 +2669,307 @@ routerAdd(
         action: 'BACKUP_ALL_EVIDENCES_CLEARED',
         registrado_em: nowIso,
       },
+    })
+  },
+  $apis.requireAuth(),
+)
+
+// -------------------------------------------------------------------
+// 6. Criação de fontes pendentes detectadas no comprovante
+//    POST /backend/v1/backup/fontes/criar-pendentes
+// -------------------------------------------------------------------
+routerAdd(
+  'POST',
+  '/backend/v1/backup/fontes/criar-pendentes',
+  (e) => {
+    const auth = e.auth
+    if (!auth) {
+      return e.forbiddenError('Não autenticado.')
+    }
+
+    const systemRole = auth.getString('system_role') || 'usuario'
+    if (systemRole !== 'admin' && systemRole !== 'suporte') {
+      return e.forbiddenError(
+        'Apenas perfis Administrador e Suporte têm permissão para cadastrar fontes pendentes.',
+      )
+    }
+
+    const body = e.requestInfo().body || {}
+    const rotinaId = String(body.rotinaId || '').trim()
+    const itens = Array.isArray(body.itens) ? body.itens : []
+    const evidenciaId = body.evidenciaId ? String(body.evidenciaId).trim() : ''
+
+    if (!rotinaId) {
+      return e.badRequestError('O identificador da rotina (rotinaId) é obrigatório.')
+    }
+
+    let rotinaRec = null
+    try {
+      rotinaRec = $app.findRecordById('backup_rotinas', rotinaId)
+    } catch (_) {
+      return e.notFoundError('Rotina de backup não encontrada.')
+    }
+
+    let organizationId = rotinaRec.getString('organization')
+    if (!organizationId) {
+      organizationId = auth.getString('organization')
+    }
+
+    if (systemRole !== 'admin' && auth.getString('organization') !== organizationId) {
+      return e.forbiddenError('Acesso restrito à própria organização.')
+    }
+
+    if (itens.length === 0) {
+      return e.badRequestError('A lista de itens a cadastrar não pode ser vazia.')
+    }
+
+    // Normalização padrão
+    const normalizarParaComparacao = (str) => {
+      if (str === null || str === undefined) return ''
+      let s = String(str).trim().toLowerCase()
+      s = s.replace(/\\/g, '/')
+      s = s.replace(/^(?:backup\s+copy\s+job|backup\s+job|replication\s+job)[:\s]+/i, '')
+      s = s.replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
+      s = s.replace(/\s+/g, ' ').trim()
+      return s
+    }
+
+    const extrairAliases = (campoAliases) => {
+      if (!campoAliases) return []
+      const partes = String(campoAliases).split(',')
+      const lista = []
+      for (let i = 0; i < partes.length; i++) {
+        const limpo = normalizarParaComparacao(partes[i])
+        if (limpo) lista.push(limpo)
+      }
+      return lista
+    }
+
+    // Nomes a ignorar (job/rotina/aliases)
+    const rotinaNome = rotinaRec.getString('nome') || ''
+    const rotinaAliases = extrairAliases(rotinaRec.getString('aliases') || '')
+    const nomesIgnorar = new Set()
+    if (rotinaNome) nomesIgnorar.add(normalizarParaComparacao(rotinaNome))
+    for (let raI = 0; raI < rotinaAliases.length; raI++) {
+      nomesIgnorar.add(rotinaAliases[raI])
+    }
+
+    // Buscar fontes existentes da rotina na organização
+    let fontesExistentes = []
+    try {
+      fontesExistentes = $app.findRecordsByFilter(
+        'backup_fontes',
+        `organization = '${organizationId}' && rotina = '${rotinaId}' && ativo = true`,
+        '+created',
+        200,
+        0,
+      )
+    } catch (_) {}
+
+    const mapaFontesNorm = new Map()
+    for (let fI = 0; fI < fontesExistentes.length; fI++) {
+      const f = fontesExistentes[fI]
+      const fCaminho = f.getString('caminho_identificacao') || ''
+      const fCaminhoNorm = normalizarParaComparacao(fCaminho)
+      if (fCaminhoNorm) mapaFontesNorm.set(fCaminhoNorm, f)
+      const aliasesList = extrairAliases(f.getString('aliases') || '')
+      for (let aI = 0; aI < aliasesList.length; aI++) {
+        mapaFontesNorm.set(aliasesList[aI], f)
+      }
+    }
+
+    const fontesCol = $app.findCollectionByNameOrId('backup_fontes')
+    const criadas = []
+    const reutilizadas = []
+    const ignoradas = []
+
+    for (let i = 0; i < itens.length; i++) {
+      const itemRaw = String(itens[i] || '').trim()
+      if (!itemRaw) continue
+
+      const itemNorm = normalizarParaComparacao(itemRaw)
+      if (!itemNorm) continue
+
+      if (nomesIgnorar.has(itemNorm)) {
+        ignoradas.push(itemRaw)
+        continue
+      }
+
+      if (mapaFontesNorm.has(itemNorm)) {
+        const fExistente = mapaFontesNorm.get(itemNorm)
+        reutilizadas.push({
+          id: fExistente.id,
+          nome: itemRaw,
+          caminho_identificacao: fExistente.getString('caminho_identificacao'),
+        })
+        continue
+      }
+
+      // Criar nova fonte de backup
+      const novaFonte = new Record(fontesCol)
+      novaFonte.set('organization', organizationId)
+      novaFonte.set('rotina', rotinaId)
+      novaFonte.set('tipo_fonte', 'maquina_virtual')
+      novaFonte.set('tipo_execucao', 'padrao_rotina')
+      novaFonte.set('caminho_identificacao', itemRaw)
+      novaFonte.set('aliases', itemRaw)
+      novaFonte.set('ativo', true)
+      $app.save(novaFonte)
+
+      mapaFontesNorm.set(itemNorm, novaFonte)
+      criadas.push({
+        id: novaFonte.id,
+        nome: itemRaw,
+      })
+    }
+
+    const nowIso = new Date().toISOString()
+
+    // Se evidenciaId veio, reavaliar a backup_avaliacao da evidência para virar CONFORME
+    let avaliacaoAtualizada = false
+    let novoVeredito = ''
+    let novoLaudo = null
+
+    if (evidenciaId) {
+      try {
+        const avals = $app.findRecordsByFilter(
+          'backup_avaliacoes',
+          `organization = '${organizationId}'`,
+          '-created',
+          50,
+          0,
+        )
+
+        let targetAval = null
+        for (let avI = 0; avI < avals.length; avI++) {
+          const a = avals[avI]
+          const execId = a.getString('execucao')
+          if (execId) {
+            try {
+              const ex = $app.findRecordById('backup_execucoes', execId)
+              if (ex && ex.getString('evidencia') === evidenciaId) {
+                targetAval = a
+                // Também atualiza detalhes_vms da execução marcando fora_escopo = false
+                const dVms = ex.get('detalhes_vms')
+                if (Array.isArray(dVms)) {
+                  let mudouDv = false
+                  for (let dvIdx = 0; dvIdx < dVms.length; dvIdx++) {
+                    if (dVms[dvIdx].fora_escopo) {
+                      dVms[dvIdx].fora_escopo = false
+                      dVms[dvIdx].status_escopo = 'coberto'
+                      dVms[dvIdx].motivo_escopo = 'Fonte cadastrada na rotina'
+                      mudouDv = true
+                    }
+                  }
+                  if (mudouDv) {
+                    ex.set('detalhes_vms', dVms)
+                    $app.save(ex)
+                  }
+                }
+                break
+              }
+            } catch (_) {}
+          }
+        }
+
+        if (targetAval) {
+          const laudo = targetAval.get('laudo_tecnico') || {}
+          novoVeredito = `Conforme: cópia executada com sucesso com todas as fontes cadastradas na rotina "${rotinaNome}".`
+          targetAval.set('resultado_conformidade', 'conforme')
+          targetAval.set('detalhe', novoVeredito)
+
+          if (laudo && typeof laudo === 'object') {
+            laudo.resultado = 'conforme'
+            laudo.veredito = novoVeredito
+
+            // Limpa fontes não cobertas e adiciona às cobertas
+            const cob = laudo.cobertura || {}
+            const antigosNaoCobertos = Array.isArray(cob.fontes_nao_cobertas)
+              ? cob.fontes_nao_cobertas
+              : []
+            const antigosCobertos = Array.isArray(cob.fontes_cobertas) ? cob.fontes_cobertas : []
+
+            for (let ancI = 0; ancI < antigosNaoCobertos.length; ancI++) {
+              const itNome = antigosNaoCobertos[ancI].item || `Item #${ancI + 1}`
+              antigosCobertos.push({
+                item: itNome,
+                fonte_cadastrada: itNome,
+                fora_escopo: false,
+              })
+            }
+
+            cob.fontes_nao_cobertas = []
+            cob.fontes_cobertas = antigosCobertos
+            cob.total_nao_cobertos = 0
+            cob.total_cobertos = cob.total_itens || antigosCobertos.length
+            laudo.cobertura = cob
+
+            // Atualiza verificações (cobertura_fontes)
+            if (Array.isArray(laudo.verificacoes)) {
+              for (let vI = 0; vI < laudo.verificacoes.length; vI++) {
+                if (laudo.verificacoes[vI].item === 'cobertura_fontes') {
+                  laudo.verificacoes[vI].status = 'conforme'
+                  laudo.verificacoes[vI].passou = true
+                  laudo.verificacoes[vI].nao_cobertas_count = 0
+                  laudo.verificacoes[vI].cobertas_count = cob.total_cobertos
+                  laudo.verificacoes[vI].detalhes =
+                    `Todos os ${cob.total_cobertos} itens do comprovante possuem fonte cadastrada correspondente.`
+                }
+              }
+            }
+
+            targetAval.set('laudo_tecnico', laudo)
+            novoLaudo = laudo
+          }
+
+          $app.save(targetAval)
+          avaliacaoAtualizada = true
+        }
+      } catch (errAval) {
+        // Log defensive
+      }
+    }
+
+    // Gravar auditoria append-only
+    try {
+      const auditCol = $app.findCollectionByNameOrId('audit_log')
+      const auditRec = new Record(auditCol)
+      auditRec.set('organization', organizationId)
+      auditRec.set('user', auth.id)
+      auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
+      auditRec.set('user_email', auth.getString('email'))
+      auditRec.set('action', 'BACKUP_FONTES_CRIADAS_PENDENTES')
+      auditRec.set('entity', 'Backup e Continuidade')
+      auditRec.set(
+        'detail',
+        `Criação de fontes pendentes da rotina "${rotinaNome}": ${criadas.length} criada(s) [${criadas.map((c) => c.nome).join(', ')}], ${reutilizadas.length} reutilizada(s). Evidência associada: ${evidenciaId || 'nenhuma'}.`,
+      )
+      auditRec.set('metadata', {
+        rotina_id: rotinaId,
+        rotina_nome: rotinaNome,
+        evidencia_id: evidenciaId || null,
+        criadas_quantidade: criadas.length,
+        criadas_nomes: criadas.map((c) => c.nome),
+        reutilizadas_quantidade: reutilizadas.length,
+        reutilizadas_nomes: reutilizadas.map((r) => r.nome),
+        avaliacao_atualizada: avaliacaoAtualizada,
+        criado_em: nowIso,
+      })
+      $app.save(auditRec)
+    } catch (_) {}
+
+    return e.json(200, {
+      success: true,
+      message: `${criadas.length} fonte(s) criada(s) com sucesso na rotina "${rotinaNome}".`,
+      rotina_id: rotinaId,
+      rotina_nome: rotinaNome,
+      evidencia_id: evidenciaId || null,
+      criadas: criadas,
+      reutilizadas: reutilizadas,
+      ignoradas: ignoradas,
+      avaliacao_atualizada: avaliacaoAtualizada,
+      novo_veredito: novoVeredito || null,
+      laudo_tecnico: novoLaudo,
     })
   },
   $apis.requireAuth(),

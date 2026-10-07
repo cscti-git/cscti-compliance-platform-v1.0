@@ -468,6 +468,11 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
               <BackupLaudoCard
                 laudo={laudoCarregado.laudo_tecnico}
                 titulo="Laudo Técnico de Conformidade"
+                rotinaId={selectedExecucaoParaLaudo?.rotina || undefined}
+                evidenciaId={selectedExecucaoParaLaudo?.evidencia || undefined}
+                onFontesCadastradas={() => {
+                  onReload()
+                }}
               />
             ) : (
               <div className="p-6 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-center text-xs text-slate-600 space-y-2">
