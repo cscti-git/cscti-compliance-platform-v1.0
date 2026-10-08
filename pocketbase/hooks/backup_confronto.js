@@ -85,6 +85,7 @@ routerAdd(
       const t = String(texto || '').toLowerCase()
       if (
         t.indexOf('nuvem') !== -1 ||
+        t.indexOf('nuvens') !== -1 ||
         t.indexOf('cloud') !== -1 ||
         t.indexOf('backup_copy') !== -1 ||
         t.indexOf('copy job') !== -1 ||
@@ -96,7 +97,9 @@ routerAdd(
       if (
         t.indexOf('replica') !== -1 ||
         t.indexOf('replicas') !== -1 ||
-        t.indexOf('replication') !== -1
+        t.indexOf('replication') !== -1 ||
+        t.indexOf('replicação') !== -1 ||
+        t.indexOf('replicações') !== -1
       ) {
         return 'replicacao'
       }
@@ -116,6 +119,7 @@ routerAdd(
       const rot = String(rotinaNome || '').toLowerCase()
       const dest = String(destino || '').toLowerCase()
 
+      // 1. Observação da execução (conteúdo/identidade do comprovante tem máxima prioridade)
       if (obs.indexOf('veeam backup_copy') !== -1 || obs.indexOf('backup_copy') !== -1) {
         return 'nuvem'
       }
@@ -126,11 +130,29 @@ routerAdd(
         return 'local'
       }
 
+      // 2. Nome da rotina vinculada à execução
       const modRot = inferirModalidadePorTexto(rot)
       if (modRot) return modRot
 
-      const modDest = inferirModalidadePorTexto(dest)
-      if (modDest) return modDest
+      // 3. Destino caso seja específico (evitando destino genérico que contenha ambas as palavras)
+      if (
+        dest &&
+        dest.indexOf('local') !== -1 &&
+        dest.indexOf('nuvem') === -1 &&
+        dest.indexOf('cloud') === -1
+      ) {
+        return 'local'
+      }
+      if (
+        dest &&
+        (dest.indexOf('nuvem') !== -1 || dest.indexOf('cloud') !== -1) &&
+        dest.indexOf('local') === -1
+      ) {
+        return 'nuvem'
+      }
+      if (dest && (dest.indexOf('replica') !== -1 || dest.indexOf('replication') !== -1)) {
+        return 'replicacao'
+      }
 
       return null
     }
@@ -138,10 +160,14 @@ routerAdd(
     function executionMatchesModalidade(execItem, targetModalidade) {
       const target = String(targetModalidade || '').toLowerCase()
 
-      if (execItem.modalidade_inferida === target) {
-        return true
+      // 1. Se a execução possui modalidade inferida, ela DEVE ser igual à exigência avaliada.
+      // Uma execução LOCAL NUNCA pode satisfazer NUVEM ou REPLICAÇÃO, e vice-versa.
+      if (execItem.modalidade_inferida) {
+        return execItem.modalidade_inferida === target
       }
 
+      // 2. Se a execução não tiver modalidade inferida direta, verificar se comprovados ou falhas
+      // trazem a modalidade explicitamente
       const comprovados = execItem.comprovados || []
       for (let i = 0; i < comprovados.length; i++) {
         const m = String(comprovados[i].modalidade || '').toLowerCase()
@@ -154,9 +180,10 @@ routerAdd(
         if (mf === target) return true
       }
 
+      // 3. Fallback estrito no nome da rotina (somente se a rotina declarar explicitamente a modalidade)
       const rotMod = inferirModalidadePorTexto(execItem.rotina_nome)
-      if (rotMod === target) {
-        return true
+      if (rotMod) {
+        return rotMod === target
       }
 
       return false
@@ -166,13 +193,21 @@ routerAdd(
       const normAssetNome = normalizarNomeSimples(assetNome)
       const targetMod = String(targetModalidade || '').toLowerCase()
 
+      // Regra de Ouro: a execução como um todo deve ser compatível com a modalidade
+      if (execItem.modalidade_inferida && execItem.modalidade_inferida !== targetMod) {
+        return { encontrado: false }
+      }
+
       // 1. Verificar no array comprovado de confronto_escopo
       const comprovados = execItem.comprovados || []
       for (let i = 0; i < comprovados.length; i++) {
         const comp = comprovados[i]
         const compMod = String(comp.modalidade || '').toLowerCase()
-        const modalidadeOk =
-          !compMod || compMod === targetMod || execItem.modalidade_inferida === targetMod
+        // Se o item tem modalidade explícita, DEVE bater com targetMod.
+        // Se não tem modalidade explícita, a execução DEVE ter modalidade inferida igual a targetMod.
+        const modalidadeOk = compMod
+          ? compMod === targetMod
+          : execItem.modalidade_inferida === targetMod
 
         if (modalidadeOk) {
           const matchId = comp.ativo_id && comp.ativo_id === assetId
@@ -198,8 +233,9 @@ routerAdd(
       for (let j = 0; j < falhas.length; j++) {
         const falha = falhas[j]
         const falhaMod = String(falha.modalidade || '').toLowerCase()
-        const modalidadeOk =
-          !falhaMod || falhaMod === targetMod || execItem.modalidade_inferida === targetMod
+        const modalidadeOk = falhaMod
+          ? falhaMod === targetMod
+          : execItem.modalidade_inferida === targetMod
 
         if (modalidadeOk) {
           const matchId = falha.ativo_id && falha.ativo_id === assetId
@@ -220,40 +256,47 @@ routerAdd(
         }
       }
 
-      // 3. Fallback: verificar em detalhes_vms
-      const vms = execItem.detalhes_vms || []
-      if (vms.length > 0) {
-        const vmsFalhasList = []
-        const vmsSucessoList = []
-        let vmMatch = null
+      // 3. Fallback: verificar em detalhes_vms (apenas se a execução demonstrar a mesma modalidade da exigência)
+      const modExec =
+        execItem.modalidade_inferida || inferirModalidadePorTexto(execItem.rotina_nome)
+      if (modExec === targetMod) {
+        const vms = execItem.detalhes_vms || []
+        if (vms.length > 0) {
+          const vmsFalhasList = []
+          const vmsSucessoList = []
+          let vmMatch = null
 
-        for (let vI = 0; vI < vms.length; vI++) {
-          const vm = vms[vI]
-          const vmNome = vm.nome || ''
-          const normVm = normalizarNomeSimples(vmNome)
-          const st = String(vm.status || '').toLowerCase()
-          const isFailed = st === 'failed' || st === 'error' || st === 'erro' || st === 'falha'
-          if (isFailed) {
-            vmsFalhasList.push(vmNome)
-          } else {
-            vmsSucessoList.push(vmNome)
+          for (let vI = 0; vI < vms.length; vI++) {
+            const vm = vms[vI]
+            const vmNome = vm.nome || ''
+            const normVm = normalizarNomeSimples(vmNome)
+            const st = String(vm.status || '').toLowerCase()
+            const isFailed = st === 'failed' || st === 'error' || st === 'erro' || st === 'falha'
+            if (isFailed) {
+              vmsFalhasList.push(vmNome)
+            } else {
+              vmsSucessoList.push(vmNome)
+            }
+
+            if (vm.ativo_id === assetId || normVm === normAssetNome) {
+              vmMatch = vm
+            }
           }
 
-          if (vm.ativo_id === assetId || normVm === normAssetNome) {
-            vmMatch = vm
-          }
-        }
-
-        if (vmMatch) {
-          const stMatch = String(vmMatch.status || '').toLowerCase()
-          const matchFailed =
-            stMatch === 'failed' || stMatch === 'error' || stMatch === 'erro' || stMatch === 'falha'
-          return {
-            encontrado: true,
-            status: matchFailed ? 'falha' : 'sucesso',
-            job_nome: execItem.rotina_nome,
-            vms_falhas: vmsFalhasList,
-            vms_sucesso: vmsSucessoList,
+          if (vmMatch) {
+            const stMatch = String(vmMatch.status || '').toLowerCase()
+            const matchFailed =
+              stMatch === 'failed' ||
+              stMatch === 'error' ||
+              stMatch === 'erro' ||
+              stMatch === 'falha'
+            return {
+              encontrado: true,
+              status: matchFailed ? 'falha' : 'sucesso',
+              job_nome: execItem.rotina_nome,
+              vms_falhas: vmsFalhasList,
+              vms_sucesso: vmsSucessoList,
+            }
           }
         }
       }
@@ -868,6 +911,7 @@ routerAdd(
       const t = String(texto || '').toLowerCase()
       if (
         t.indexOf('nuvem') !== -1 ||
+        t.indexOf('nuvens') !== -1 ||
         t.indexOf('cloud') !== -1 ||
         t.indexOf('backup_copy') !== -1 ||
         t.indexOf('copy job') !== -1 ||
@@ -879,7 +923,9 @@ routerAdd(
       if (
         t.indexOf('replica') !== -1 ||
         t.indexOf('replicas') !== -1 ||
-        t.indexOf('replication') !== -1
+        t.indexOf('replication') !== -1 ||
+        t.indexOf('replicação') !== -1 ||
+        t.indexOf('replicações') !== -1
       ) {
         return 'replicacao'
       }
@@ -899,6 +945,7 @@ routerAdd(
       const rot = String(rotinaNome || '').toLowerCase()
       const dest = String(destino || '').toLowerCase()
 
+      // 1. Observação da execução (conteúdo/identidade do comprovante tem máxima prioridade)
       if (obs.indexOf('veeam backup_copy') !== -1 || obs.indexOf('backup_copy') !== -1) {
         return 'nuvem'
       }
@@ -909,11 +956,29 @@ routerAdd(
         return 'local'
       }
 
+      // 2. Nome da rotina vinculada à execução
       const modRot = inferirModalidadePorTexto(rot)
       if (modRot) return modRot
 
-      const modDest = inferirModalidadePorTexto(dest)
-      if (modDest) return modDest
+      // 3. Destino caso seja específico (evitando destino genérico que contenha ambas as palavras)
+      if (
+        dest &&
+        dest.indexOf('local') !== -1 &&
+        dest.indexOf('nuvem') === -1 &&
+        dest.indexOf('cloud') === -1
+      ) {
+        return 'local'
+      }
+      if (
+        dest &&
+        (dest.indexOf('nuvem') !== -1 || dest.indexOf('cloud') !== -1) &&
+        dest.indexOf('local') === -1
+      ) {
+        return 'nuvem'
+      }
+      if (dest && (dest.indexOf('replica') !== -1 || dest.indexOf('replication') !== -1)) {
+        return 'replicacao'
+      }
 
       return null
     }
@@ -921,10 +986,14 @@ routerAdd(
     function executionMatchesModalidade(execItem, targetModalidade) {
       const target = String(targetModalidade || '').toLowerCase()
 
-      if (execItem.modalidade_inferida === target) {
-        return true
+      // 1. Se a execução possui modalidade inferida, ela DEVE ser igual à exigência avaliada.
+      // Uma execução LOCAL NUNCA pode satisfazer NUVEM ou REPLICAÇÃO, e vice-versa.
+      if (execItem.modalidade_inferida) {
+        return execItem.modalidade_inferida === target
       }
 
+      // 2. Se a execução não tiver modalidade inferida direta, verificar se comprovados ou falhas
+      // trazem a modalidade explicitamente
       const comprovados = execItem.comprovados || []
       for (let i = 0; i < comprovados.length; i++) {
         const m = String(comprovados[i].modalidade || '').toLowerCase()
@@ -937,9 +1006,10 @@ routerAdd(
         if (mf === target) return true
       }
 
+      // 3. Fallback estrito no nome da rotina (somente se a rotina declarar explicitamente a modalidade)
       const rotMod = inferirModalidadePorTexto(execItem.rotina_nome)
-      if (rotMod === target) {
-        return true
+      if (rotMod) {
+        return rotMod === target
       }
 
       return false
@@ -949,12 +1019,21 @@ routerAdd(
       const normAssetNome = normalizarNomeSimples(assetNome)
       const targetMod = String(targetModalidade || '').toLowerCase()
 
+      // Regra de Ouro: a execução como um todo deve ser compatível com a modalidade
+      if (execItem.modalidade_inferida && execItem.modalidade_inferida !== targetMod) {
+        return { encontrado: false }
+      }
+
+      // 1. Verificar no array comprovado de confronto_escopo
       const comprovados = execItem.comprovados || []
       for (let i = 0; i < comprovados.length; i++) {
         const comp = comprovados[i]
         const compMod = String(comp.modalidade || '').toLowerCase()
-        const modalidadeOk =
-          !compMod || compMod === targetMod || execItem.modalidade_inferida === targetMod
+        // Se o item tem modalidade explícita, DEVE bater com targetMod.
+        // Se não tem modalidade explícita, a execução DEVE ter modalidade inferida igual a targetMod.
+        const modalidadeOk = compMod
+          ? compMod === targetMod
+          : execItem.modalidade_inferida === targetMod
 
         if (modalidadeOk) {
           const matchId = comp.ativo_id && comp.ativo_id === assetId
@@ -975,12 +1054,14 @@ routerAdd(
         }
       }
 
+      // 2. Verificar no array falhas de confronto_escopo
       const falhas = execItem.falhas || []
       for (let j = 0; j < falhas.length; j++) {
         const falha = falhas[j]
         const falhaMod = String(falha.modalidade || '').toLowerCase()
-        const modalidadeOk =
-          !falhaMod || falhaMod === targetMod || execItem.modalidade_inferida === targetMod
+        const modalidadeOk = falhaMod
+          ? falhaMod === targetMod
+          : execItem.modalidade_inferida === targetMod
 
         if (modalidadeOk) {
           const matchId = falha.ativo_id && falha.ativo_id === assetId
@@ -1001,39 +1082,47 @@ routerAdd(
         }
       }
 
-      const vms = execItem.detalhes_vms || []
-      if (vms.length > 0) {
-        const vmsFalhasList = []
-        const vmsSucessoList = []
-        let vmMatch = null
+      // 3. Fallback: verificar em detalhes_vms (apenas se a execução demonstrar a mesma modalidade da exigência)
+      const modExec =
+        execItem.modalidade_inferida || inferirModalidadePorTexto(execItem.rotina_nome)
+      if (modExec === targetMod) {
+        const vms = execItem.detalhes_vms || []
+        if (vms.length > 0) {
+          const vmsFalhasList = []
+          const vmsSucessoList = []
+          let vmMatch = null
 
-        for (let vI = 0; vI < vms.length; vI++) {
-          const vm = vms[vI]
-          const vmNome = vm.nome || ''
-          const normVm = normalizarNomeSimples(vmNome)
-          const st = String(vm.status || '').toLowerCase()
-          const isFailed = st === 'failed' || st === 'error' || st === 'erro' || st === 'falha'
-          if (isFailed) {
-            vmsFalhasList.push(vmNome)
-          } else {
-            vmsSucessoList.push(vmNome)
+          for (let vI = 0; vI < vms.length; vI++) {
+            const vm = vms[vI]
+            const vmNome = vm.nome || ''
+            const normVm = normalizarNomeSimples(vmNome)
+            const st = String(vm.status || '').toLowerCase()
+            const isFailed = st === 'failed' || st === 'error' || st === 'erro' || st === 'falha'
+            if (isFailed) {
+              vmsFalhasList.push(vmNome)
+            } else {
+              vmsSucessoList.push(vmNome)
+            }
+
+            if (vm.ativo_id === assetId || normVm === normAssetNome) {
+              vmMatch = vm
+            }
           }
 
-          if (vm.ativo_id === assetId || normVm === normAssetNome) {
-            vmMatch = vm
-          }
-        }
-
-        if (vmMatch) {
-          const stMatch = String(vmMatch.status || '').toLowerCase()
-          const matchFailed =
-            stMatch === 'failed' || stMatch === 'error' || stMatch === 'erro' || stMatch === 'falha'
-          return {
-            encontrado: true,
-            status: matchFailed ? 'falha' : 'sucesso',
-            job_nome: execItem.rotina_nome,
-            vms_falhas: vmsFalhasList,
-            vms_sucesso: vmsSucessoList,
+          if (vmMatch) {
+            const stMatch = String(vmMatch.status || '').toLowerCase()
+            const matchFailed =
+              stMatch === 'failed' ||
+              stMatch === 'error' ||
+              stMatch === 'erro' ||
+              stMatch === 'falha'
+            return {
+              encontrado: true,
+              status: matchFailed ? 'falha' : 'sucesso',
+              job_nome: execItem.rotina_nome,
+              vms_falhas: vmsFalhasList,
+              vms_sucesso: vmsSucessoList,
+            }
           }
         }
       }
