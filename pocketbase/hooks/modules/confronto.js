@@ -8,7 +8,7 @@
  * (ou que nunca teve evidência) está DESPROTEGIDA / FORA DO RPO.
  *
  * Regra de Ouro (Fonte única de verdade):
- * Cada execução comprova SOMENTE a modalidade que a evidência/rotina demonstra
+ * Cada execução comprova SOMENTE a modalidade que a evidência demonstra
  * ("backup copy job:" ou "copy job:" -> 'nuvem'; "replication job:" -> 'replicacao';
  * "backup job:" -> 'local'; ambíguo -> null). O plano NÃO transfere modalidades.
  * job_name e caminho de pasta Veeam NUNCA determinam modalidade.
@@ -17,6 +17,10 @@
  * - Multi-tenant: isolamento estrito por organization;
  * - RBAC: apenas usuários autenticados com acesso à própria organização;
  * - Zero dados fictícios / mocks — ausência de evidência = "nunca comprovada".
+ * - PROTEÇÃO CONTRA SOBRESCRITA DESTRUTIVA: reconciliarExecucoesComprovadas JAMAIS grava
+ *   comprovado=[] por cima de dados válidos já persistidos na execução. Se houver avaliação
+ *   com comprovado não-vazio, clona integralmente (JSON.parse(JSON.stringify)). Se não houver,
+ *   preserva o comprovado existente. Se novoComprovado estiver vazio, NUNCA sobrescreve.
  */
 
 routerAdd(
@@ -109,7 +113,6 @@ routerAdd(
     } catch (_) {}
 
     // 4. Carregar fontes de backup ativas da organização
-    // Mapear por ativo_inventario
     const fontesPorAtivo = {} // assetId -> Array de fonteRec
     const todasFontes = []
     try {
@@ -134,7 +137,6 @@ routerAdd(
     } catch (_) {}
 
     // 5. Carregar TODAS as execuções de backup da organização (incluindo erro/falha)
-    // Ordenadas por data_inicio DESC / created DESC para inspeção cronológica estrita
     let execucoes = []
     try {
       execucoes = $app.findRecordsByFilter(
@@ -158,7 +160,7 @@ routerAdd(
       )
     } catch (_) {}
 
-    // Helper: normalizar string para matching de caminhos/aliases
+    // Helper: normalizar string para matching de caminhos/aliases/nomes
     const normalizarString = (str) => {
       if (!str) return ''
       let s = String(str)
@@ -171,6 +173,16 @@ routerAdd(
       s = s.replace(/\s*\(\d+\s*objects?\)\s*$/i, '')
       s = s.replace(/\s+/g, ' ').trim()
       return s
+    }
+
+    // Helper: normalizar string compacta (sem pontuação nem espaços) para match tolerante
+    const normalizarCompacto = (str) => {
+      if (!str) return ''
+      return String(str)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '')
     }
 
     // Helper: extrair array de detalhes_vms de uma execução, com fallback em backup_processamentos ou backup_avaliacoes
@@ -224,12 +236,11 @@ routerAdd(
       return []
     }
 
-    // Helper: extrair nome amigável do Job para exibição (ex.: "Backup VMs to Cloud\Backup VMs GOLD")
+    // Helper: extrair nome amigável do Job para exibição
     const extrairNomeJob = (execRec, rotinaRec) => {
       if (!execRec) return ''
       let jobNome = ''
 
-      // 1. Tentar extrair da observação (ex.: 'Veeam backup_copy: "Backup VMs to Cloud\Backup VMs GOLD" (...)')
       const obs = execRec.getString('observacao') || ''
       if (obs) {
         const obsMatch = obs.match(/"([^"]+)"/)
@@ -238,7 +249,6 @@ routerAdd(
         }
       }
 
-      // 2. Se não achou, tentar da avaliação / laudo
       if (!jobNome) {
         try {
           const avals = $app.findRecordsByFilter(
@@ -257,7 +267,6 @@ routerAdd(
         } catch (_) {}
       }
 
-      // 3. Tentar de backup_processamentos
       if (!jobNome) {
         const evidenciaId = execRec.getString('evidencia')
         if (evidenciaId) {
@@ -279,7 +288,6 @@ routerAdd(
         }
       }
 
-      // 4. Fallback: nome da rotina
       if (!jobNome && rotinaRec) {
         jobNome = rotinaRec.getString('nome') || ''
       }
@@ -287,15 +295,13 @@ routerAdd(
       return jobNome
     }
 
-    // Helper: extrair modalidade comprovada pelo conteúdo REAL do comprovante/execução
-    // Regra de Negócio A: Considerar SOMENTE a identidade do job da própria evidência
-    // (assunto da evidência e/ou nome do job/rotina vinculada), NUNCA o corpo do texto
-    // nem o nome da ferramenta (ex.: "Veeam Backup & Replication" JAMAIS deve inferir 'replicacao').
-    // - assunto/job contém "backup copy job:" -> 'nuvem'
-    // - assunto/job contém "replication job:" -> 'replicacao'
-    // - assunto/job contém "backup job:" (sem copy/replication) -> 'local'
-    // - adaptador ACRONIS_PDF -> 'nuvem'
-    // - ambíguo -> null (não comprova nada)
+    // Helper: inferir modalidade comprovada pelo conteúdo REAL em 4 camadas (FIX 4):
+    // a) Assinatura da ferramenta / adaptador no comprovante/avaliação
+    // b) Modalidade pelo TIPO DO JOB no CORPO: "Backup job:" -> 'local'; "Backup Copy job:" -> 'nuvem'; "Replication job:" -> 'replicacao'
+    //    ou Adaptador ACRONIS_PDF -> 'nuvem'
+    //    NUNCA usar o caminho da pasta do job (ex. "to Cloud" em "Backup VMs to Cloud\...") e NUNCA depender do assunto.
+    // c) Fallback pelo nome da rotina vinculada (- LOCAL, - NUVEM, - REPLICA)
+    // d) Ambíguo -> null (fail-closed mantido)
     const inferirModalidadeComprovante = (execRec, rotinaRec) => {
       if (!execRec) return null
 
@@ -304,7 +310,6 @@ routerAdd(
       let adaptadorCodigo = ''
       let jobNameLaudo = ''
 
-      // 1. Buscar dados da avaliação técnica vinculada (laudo / adaptador / job_name)
       let evidenciaId = ''
       try {
         evidenciaId = execRec.getString('evidencia') || ''
@@ -340,7 +345,6 @@ routerAdd(
         }
       } catch (_) {}
 
-      // 2. Se temos evidencia vinculada na execução ou através de backup_ocorrencias / backup_processamentos
       if (!evidenciaId || !adaptadorCodigo) {
         try {
           const procs = $app.findRecordsByFilter(
@@ -373,7 +377,6 @@ routerAdd(
         } catch (_) {}
       }
 
-      // Se ainda não temos assunto/corpo, buscar evidência vinculada à rotina
       if ((!assuntoEvidencia || !corpoEvidencia) && rotinaRec) {
         try {
           const evList = $app.findRecordsByFilter(
@@ -397,29 +400,8 @@ routerAdd(
         return 'nuvem'
       }
 
-      // Regra de Ouro de Inferência de Modalidade (Ordem de Precedência Estrita):
-      // a) Prefixo declarado no ASSUNTO da evidência ("backup copy job:"/"copy job:" -> nuvem, "replication job:" -> replicacao, "backup job:" -> local)
-      // b) Prefixo declarado no CORPO do comprovante na linha de cabeçalho do job Veeam ("Backup Copy Job:" -> nuvem, "Replication Job:" -> replicacao, "Backup job:" -> local)
-      // c) Marcador explícito no NOME DA ROTINA (- LOCAL -> local, - NUVEM/- NUVENS -> nuvem, - REPLICA/- REPLICAS/- REPLICACAO -> replicacao)
-      // d) Se nada declarar -> null (fail-closed)
-      // NUNCA usar job_name/caminho de pasta ("to Cloud") nem a assinatura do e-mail.
-
-      // a) Prefixo no ASSUNTO (deve ser prefixo / início do assunto após tags como [Success])
-      const assuntoLimpo = String(assuntoEvidencia || '')
-        .replace(/^(\s*\[[^\]]+\]\s*)+/i, '')
-        .trim()
-        .toLowerCase()
-      if (assuntoLimpo.startsWith('backup copy job:') || assuntoLimpo.startsWith('copy job:')) {
-        return 'nuvem'
-      }
-      if (assuntoLimpo.startsWith('replication job:')) {
-        return 'replicacao'
-      }
-      if (assuntoLimpo.startsWith('backup job:')) {
-        return 'local'
-      }
-
-      // b) Prefixo no CORPO do comprovante (linha de cabeçalho Veeam)
+      // CAMADA B (Prioridade máxima de conteúdo): Tipo declarado NO CORPO do comprovante
+      // NUNCA usar pasta de job ("to Cloud") nem assinatura da ferramenta ("Backup & Replication").
       if (corpoEvidencia) {
         const headerVeeamRegex =
           /(?:^|[\r\n]|<[^>]*>)\s*(Backup Copy [Jj]ob|Copy [Jj]ob|Replication [Jj]ob|Backup [Jj]ob)\s*:\s*([^<\r\n]+?)(?=\s*Created by|\s*Success|\s*Warning|\s*Failed|\s*Error|[\r\n]|<|$)/i
@@ -436,9 +418,19 @@ routerAdd(
             return 'local'
           }
         }
+
+        // Tipo explícito no corpo/HTML: "Type: Backup" / "Type: Backup Copy" / "Type: Replication"
+        const typeRegex = /(?:Type|Tipo)\s*[:=]\s*(Backup Copy|Copy|Replication|Backup)/i
+        const typeMatch = corpoEvidencia.match(typeRegex)
+        if (typeMatch && typeMatch[1]) {
+          const tLower = typeMatch[1].trim().toLowerCase()
+          if (tLower.includes('copy')) return 'nuvem'
+          if (tLower.includes('replication')) return 'replicacao'
+          if (tLower.includes('backup')) return 'local'
+        }
       }
 
-      // c) Marcador explícito no NOME DA ROTINA (- LOCAL, - NUVEM/- NUVENS, - REPLICA/- REPLICAS/- REPLICACAO)
+      // CAMADA C: Marcador explícito no NOME DA ROTINA (- LOCAL, - NUVEM/- NUVENS, - REPLICA/- REPLICAS/- REPLICACAO)
       if (rotinaNome) {
         const rNome = rotinaNome.trim().toLowerCase()
         if (/(?:^|\s|-)\s*(?:replicas?|replicacao|replica[çc][aã]o)\s*$/i.test(rNome)) {
@@ -452,7 +444,24 @@ routerAdd(
         }
       }
 
-      // d) Ambíguo ou não identificado com precisão -> null (não comprova nada - fail closed)
+      // CAMADA A/Fallback de assunto (só se corpo e rotina não definiram)
+      if (assuntoEvidencia) {
+        const assuntoLimpo = String(assuntoEvidencia)
+          .replace(/^(\s*\[[^\]]+\]\s*)+/i, '')
+          .trim()
+          .toLowerCase()
+        if (assuntoLimpo.startsWith('backup copy job:') || assuntoLimpo.startsWith('copy job:')) {
+          return 'nuvem'
+        }
+        if (assuntoLimpo.startsWith('replication job:')) {
+          return 'replicacao'
+        }
+        if (assuntoLimpo.startsWith('backup job:')) {
+          return 'local'
+        }
+      }
+
+      // CAMADA D: Ambíguo -> null (fail-closed mantido)
       return null
     }
 
@@ -489,33 +498,38 @@ routerAdd(
       // Se não encontrou por ativo_inventario direto, tentar correspondência por caminho_identificacao ou nome
       if (fontesDoAtivo.length === 0) {
         const nomeNorm = normalizarString(assetNome)
+        const nomeComp = normalizarCompacto(assetNome)
         for (let fi = 0; fi < todasFontes.length; fi++) {
           const f = todasFontes[fi]
           const camNorm = normalizarString(f.getString('caminho_identificacao'))
           const fNomeNorm = normalizarString(f.getString('nome'))
+          const camComp = normalizarCompacto(f.getString('caminho_identificacao'))
+          const fNomeComp = normalizarCompacto(f.getString('nome'))
+
           if (
             (camNorm &&
               (camNorm === nomeNorm || camNorm.includes(nomeNorm) || nomeNorm.includes(camNorm))) ||
             (fNomeNorm &&
               (fNomeNorm === nomeNorm ||
                 fNomeNorm.includes(nomeNorm) ||
-                nomeNorm.includes(fNomeNorm)))
+                nomeNorm.includes(fNomeNorm))) ||
+            (camComp &&
+              (camComp === nomeComp || camComp.includes(nomeComp) || nomeComp.includes(camComp))) ||
+            (fNomeComp &&
+              (fNomeComp === nomeComp ||
+                fNomeComp.includes(nomeComp) ||
+                nomeComp.includes(fNomeComp)))
           ) {
             fontesDoAtivo.push(f)
           }
         }
       }
 
-      // Se ainda não encontrou e existem fontes genéricas/VMs cadastradas da organização, considerar as fontes ativas da rotina
       if (fontesDoAtivo.length === 0 && todasFontes.length > 0) {
         fontesDoAtivo = todasFontes
       }
 
-      // Função de avaliação de uma modalidade exigida ('local', 'nuvem', 'replicacao')
-      // Regra de Ouro B: Fonte única de verdade — cada execução prova APENAS a modalidade que
-      // o conteúdo do comprovante demonstra. O plano NÃO transfere modalidades.
       const avaliarModalidade = (modalidadeNome) => {
-        // Encontrar todas as fontes ativas cadastradas para este ativo
         const fontesCandidatas = []
         for (let fi = 0; fi < fontesDoAtivo.length; fi++) {
           const f = fontesDoAtivo[fi]
@@ -527,8 +541,6 @@ routerAdd(
           const plano = planosMap[planoId]
           if (!plano) continue
 
-          // Uma rotina é candidata se o nome/tipo da rotina ou comprovante casar com a modalidade,
-          // ou se houver fonte cadastrada na rotina. Guardamos a cadeia para auditoria e RPO.
           fontesCandidatas.push({
             fonte: f,
             rotina: rotina,
@@ -558,10 +570,6 @@ routerAdd(
           }
         }
 
-        // Fontes cadastradas existem na cadeia. Agora inspecionar execuções reais com FAIL-CLOSED estrito.
-        // OBRIGATÓRIO: A execução deve corresponder especificamente a esta modalidade (modalidadeNome).
-        // Se a ÚLTIMA execução comprovada ou tentada para esta modalidade falhou (status !== 'sucesso'),
-        // a modalidade entra em FALHA_ULTIMA_EXECUCAO, derrubando a conformidade do ativo.
         let melhorComprovacao = null
         let melhorDataTime = 0
         let melhorCandidato = fontesCandidatas[0]
@@ -575,41 +583,45 @@ routerAdd(
           const caminhoNorm = normalizarString(
             cand.fonte.getString('caminho_identificacao') || assetNome,
           )
+          const caminhoComp = normalizarCompacto(
+            cand.fonte.getString('caminho_identificacao') || assetNome,
+          )
 
-          // Buscar execuções dessa rotina
           for (let ei = 0; ei < execucoes.length; ei++) {
             const ex = execucoes[ei]
             if (ex.getString('rotina') !== rotinaId) continue
 
-            // 1. INFERÊNCIA ESTRITA DA MODALIDADE DO COMPROVANTE
             const modalidadeProvadaPelaExecucao = inferirModalidadeComprovante(ex, cand.rotina)
             if (modalidadeProvadaPelaExecucao !== modalidadeNome) {
-              // Esta execução NÃO se aplica à modalidade avaliada
               continue
             }
 
-            // 2. Granularidade por VM / Ativo:
-            // Inspecionar detalhes_vms para saber se o ativo está presente e qual seu status individual
             let cobreAtivoNaExecucao = false
-            let statusIndividualAtivo = null // 'sucesso' | 'erro' | 'aviso'
+            let statusIndividualAtivo = null
             let motivoIndividualAtivo = ''
             const dVms = obterDetalhesVmsExecucao(ex)
             const assetNomeNorm = normalizarString(assetNome)
+            const assetNomeComp = normalizarCompacto(assetNome)
 
             if (Array.isArray(dVms) && dVms.length > 0) {
               for (let vi = 0; vi < dVms.length; vi++) {
                 const vm = dVms[vi]
                 const vmNomeNorm = normalizarString(vm.nome)
-                if (!vmNomeNorm) continue
+                const vmNomeComp = normalizarCompacto(vm.nome)
+                if (!vmNomeNorm && !vmNomeComp) continue
 
-                // Match tolerante: igualdade exata OU containment em ambos os sentidos
+                // Match tolerante em qualquer direção (normalizado e compacto)
                 const bateu =
                   vmNomeNorm === assetNomeNorm ||
                   vmNomeNorm === caminhoNorm ||
+                  vmNomeComp === assetNomeComp ||
+                  vmNomeComp === caminhoComp ||
                   (assetNomeNorm && vmNomeNorm.includes(assetNomeNorm)) ||
                   (assetNomeNorm && assetNomeNorm.includes(vmNomeNorm)) ||
                   (caminhoNorm && vmNomeNorm.includes(caminhoNorm)) ||
-                  (caminhoNorm && caminhoNorm.includes(vmNomeNorm))
+                  (caminhoNorm && caminhoNorm.includes(vmNomeNorm)) ||
+                  (assetNomeComp && vmNomeComp.includes(assetNomeComp)) ||
+                  (assetNomeComp && assetNomeComp.includes(vmNomeComp))
 
                 if (bateu) {
                   if (!vm.fora_escopo && vm.status_escopo !== 'fora_escopo') {
@@ -634,10 +646,7 @@ routerAdd(
                   }
                 }
               }
-              // FAIL-CLOSED: Se a execução tem tabela de VMs (dVms não-vazio) e este ativo NÃO consta na tabela,
-              // ele NÃO é coberto por esta execução! Nem sucesso nem falha dessa execução se aplicam a ele.
             } else {
-              // Execução da rotina que cobre as fontes vinculadas sem detalhes_vms
               cobreAtivoNaExecucao = true
               statusIndividualAtivo = ex.getString('status') || 'sucesso'
             }
@@ -648,7 +657,6 @@ routerAdd(
                 const dtTime = new Date(dtIso).getTime()
                 const nomeJobExec = extrairNomeJob(ex, cand.rotina)
 
-                // Rastrear a ÚLTIMA execução cronológica absoluta PARA ESTA VM
                 if (dtTime > ultimaExecucaoCronologicaTime) {
                   ultimaExecucaoCronologicaTime = dtTime
                   ultimaExecucaoCronologica = {
@@ -661,7 +669,6 @@ routerAdd(
                   }
                 }
 
-                // O sucesso do item da VM prevalece como comprovação válida para esta VM
                 if (statusIndividualAtivo === 'sucesso') {
                   if (dtTime > melhorDataTime) {
                     melhorDataTime = dtTime
@@ -682,8 +689,6 @@ routerAdd(
           (ultimaExecucaoCronologica && ultimaExecucaoCronologica.candidato) || melhorCandidato
         const rpoHoras = candReferencia.plano.getInt('rpo_horas') || 24
 
-        // FAIL-CLOSED: Se a última execução cronológica foi de erro/falha,
-        // a modalidade está compulsoriamente em falha, NÃO protegida!
         const ultimaFalhou =
           ultimaExecucaoCronologica &&
           ultimaExecucaoCronologica.status !== 'sucesso' &&
@@ -790,11 +795,6 @@ routerAdd(
         if (av.dentro_do_rpo) totalAtendidas++
       }
 
-      // Status consolidado do ativo:
-      // - PROTEGIDO: todas as modalidades exigidas estão cadastradas e comprovadas dentro do RPO
-      // - PARCIAL: algumas modalidades atendidas dentro do RPO
-      // - NAO_PROTEGIDO: possui fonte cadastrada mas nenhuma modalidade comprovada dentro do RPO
-      // - NAO_CADASTRADO: exige modalidade mas não possui nenhuma fonte cadastrada
       const modLocal = modalidades.local
       const modNuvem = modalidades.nuvem
       const modRepl = modalidades.replicacao
@@ -842,7 +842,6 @@ routerAdd(
       })
     }
 
-    // Ordenação pedagógica: primeiro os problemáticos (NAO_CADASTRADO, NAO_PROTEGIDO, PARCIAL, e por último PROTEGIDO)
     const prioridadeStatus = {
       NAO_CADASTRADO: 1,
       NAO_PROTEGIDO: 2,
@@ -860,39 +859,27 @@ routerAdd(
     const percentualProtegido =
       totalExigidos > 0 ? Math.round((totalProtegidos / totalExigidos) * 100) : 0
 
-    // Regra de Ouro D: Reconciliação das execuções e avaliações existentes
-    // Recalcula confronto_escopo nas execuções gravadas para nunca exibir dados inflados
-    // e registra o recálculo na auditoria append-only quando houver discrepância corrigida.
+    // -----------------------------------------------------------------
+    // FIX 1 & 2: RECONCILIAÇÃO SEGURA E NÃO-DESTRUTIVA DAS EXECUÇÕES
+    // Regra inegociável: NUNCA sobrescrever comprovado com array vazio [].
+    // Se a avaliação vinculada possui confronto_escopo.comprovado válido (não-vazio),
+    // copia INTEGRALMENTE para a execução clonando com JSON.parse(JSON.stringify(...)).
+    // Se a avaliação não tiver itens válidos ou não for encontrada, o runtime
+    // NÃO TOCA no campo comprovado da execução — preserva o que já está gravado.
+    // -----------------------------------------------------------------
     let totalExecucoesReconciliadas = 0
     try {
       for (let ei = 0; ei < execucoes.length; ei++) {
         const ex = execucoes[ei]
         const rotinaId = ex.getString('rotina')
         const rotina = rotinasMap[rotinaId]
-        const confAntigo = ex.get('confronto_escopo')
 
         const modalidadeEx = inferirModalidadeComprovante(ex, rotina)
         if (!modalidadeEx) continue
 
-        // Se o confronto antigo tinha modalidades comprovadas indevidas (ex.: múltiplas modalidades como nuvem/replicacao para job local)
-        let precisaAtualizar = false
-        if (confAntigo && typeof confAntigo === 'object') {
-          const compArr = confAntigo.comprovado || []
-          for (let ci = 0; ci < compArr.length; ci++) {
-            if (compArr[ci].modalidade !== modalidadeEx) {
-              precisaAtualizar = true
-              break
-            }
-          }
-        }
-
-        // Granularidade por VM na reconciliação:
-        // Se a execução tem detalhes_vms, verificar status individual de cada VM.
-        // Se não tem detalhes_vms, usa status da execução.
+        // 1. Garantir detalhes_vms se disponíveis em outros registros
         let dVmsEx = obterDetalhesVmsExecucao(ex)
         const temDetalhesVms = Array.isArray(dVmsEx) && dVmsEx.length > 0
-
-        // Se a execução ainda não tem detalhes_vms gravados diretamente nela, persistir agora
         const dVmsGravados = ex.get('detalhes_vms')
         if ((!Array.isArray(dVmsGravados) || dVmsGravados.length === 0) && temDetalhesVms) {
           try {
@@ -906,10 +893,15 @@ routerAdd(
           }
         }
 
-        const nomeJobReconciliado = extrairNomeJob(ex, rotina)
+        const confExistenteEx = ex.get('confronto_escopo')
+        const temComprovadoValidoEx =
+          confExistenteEx &&
+          typeof confExistenteEx === 'object' &&
+          Array.isArray(confExistenteEx.comprovado) &&
+          confExistenteEx.comprovado.length > 0
 
-        // Se a avaliação já possui confronto completo e correto com comprovado não-vazio,
-        // sincronizar diretamente para a execução (Fonte Única de Verdade)
+        // 2. Buscar avaliação vinculada para sincronização (Fonte Única de Verdade)
+        let avalRecEncontrada = null
         let confrontoCopiadoDaAvaliacao = null
         try {
           const avalsExistentes = $app.findRecordsByFilter(
@@ -920,35 +912,35 @@ routerAdd(
             0,
           )
           if (avalsExistentes.length > 0) {
-            const cAval = avalsExistentes[0].get('confronto_escopo')
+            avalRecEncontrada = avalsExistentes[0]
+            const cAval = avalRecEncontrada.get('confronto_escopo')
             if (
               cAval &&
               typeof cAval === 'object' &&
               Array.isArray(cAval.comprovado) &&
-              cAval.comprovado.length > 0 &&
-              Array.isArray(cAval.exigencias) &&
-              cAval.exigencias.length > 0
+              cAval.comprovado.length > 0
             ) {
-              confrontoCopiadoDaAvaliacao = cAval
+              // CLONE DEFENSIVO para evitar o erro "Can't set property on Go slice"
+              confrontoCopiadoDaAvaliacao = JSON.parse(JSON.stringify(cAval))
             }
           }
         } catch (errBuscaAval) {
           console.error(
-            '[confronto:reconciliacao] Erro ao buscar avaliação para cópia na execução #' +
-              ex.id +
-              ':',
+            '[confronto:reconciliacao] Erro ao buscar avaliação para a execução #' + ex.id + ':',
             errBuscaAval?.message || errBuscaAval,
           )
         }
 
-        // Se a execução tem comprovado vazio ou inflado, ou precisa de reconciliação granular
-        if (
-          precisaAtualizar ||
-          confrontoCopiadoDaAvaliacao ||
-          (confAntigo && confAntigo.comprovado && confAntigo.comprovado.length === 0) ||
-          temDetalhesVms
-        ) {
-          if (confrontoCopiadoDaAvaliacao) {
+        // CENÁRIO A: Avaliação possui confronto_escopo com comprovado válido (não-vazio).
+        // Copiar INTEGRALMENTE para a execução, mantendo fonte única de verdade.
+        if (confrontoCopiadoDaAvaliacao) {
+          // Só persistir se a execução ainda não tiver os mesmos itens comprovados
+          const precisaCopiar =
+            !temComprovadoValidoEx ||
+            confExistenteEx.comprovado.length !== confrontoCopiadoDaAvaliacao.comprovado.length ||
+            confExistenteEx.comprovado[0]?.modalidade !== modalidadeEx
+
+          if (precisaCopiar) {
             try {
               ex.set('confronto_escopo', confrontoCopiadoDaAvaliacao)
               $app.save(ex)
@@ -956,7 +948,6 @@ routerAdd(
               console.log(
                 `[confronto:reconciliacao] Confronto copiado com sucesso da avaliação para a execução #${ex.id}. Comprovados: ${confrontoCopiadoDaAvaliacao.comprovado.length}.`,
               )
-              continue
             } catch (errSaveCopia) {
               console.error(
                 `[confronto:reconciliacao] FALHA LOUD ao salvar confronto copiado na execução #${ex.id}:`,
@@ -977,278 +968,266 @@ routerAdd(
               } catch (_) {}
             }
           }
-          // Reconstruir comprovado e pendencias a partir dos ativos exigidos
-          const novoComprovado = []
-          const novasPendencias = []
+          continue
+        }
 
+        // CENÁRIO B: Avaliação NÃO possui comprovado válido, mas a EXECUÇÃO JÁ POSSUI.
+        // PRESERVAR O QUE JÁ ESTÁ GRAVADO NA EXECUÇÃO. Se a avaliação existir, copia da execução para a avaliação.
+        if (temComprovadoValidoEx) {
+          if (avalRecEncontrada) {
+            try {
+              const cClone = JSON.parse(JSON.stringify(confExistenteEx))
+              avalRecEncontrada.set('confronto_escopo', cClone)
+              $app.save(avalRecEncontrada)
+            } catch (errSyncAval) {
+              console.error(
+                `[confronto:reconciliacao] Falha ao sincronizar avaliação a partir da execução #${ex.id}:`,
+                errSyncAval?.message || errSyncAval,
+              )
+            }
+          }
+          // Execução já protegida e com dados válidos: não recalcular nem sobrescrever!
+          continue
+        }
+
+        // CENÁRIO C: Nem a avaliação nem a execução têm comprovado preenchido.
+        // Tentar calcular NOVO confronto a partir dos ativos exigidos e dos detalhes de VMs.
+        const nomeJobReconciliado = extrairNomeJob(ex, rotina)
+        const novoComprovado = []
+        const novasPendencias = []
+
+        for (let ai = 0; ai < assetsExigidos.length; ai++) {
+          const a = assetsExigidos[ai]
+          const aId = a.id
+          const aNome = a.getString('name')
+          const aTipo = a.getString('tipo')
+          const aNomeNorm = normalizarString(aNome)
+          const aNomeComp = normalizarCompacto(aNome)
+          const exLoc = Boolean(a.getBool('exige_backup_local'))
+          const exNuv = Boolean(a.getBool('exige_backup_nuvem'))
+          const exRep = Boolean(a.getBool('exige_backup_replicacao'))
+
+          const mods = []
+          if (exLoc) mods.push('local')
+          if (exNuv) mods.push('nuvem')
+          if (exRep) mods.push('replicacao')
+
+          let vmPresente = false
+          let vmComSucesso = false
+          let vmMotivoErro = ''
+
+          if (temDetalhesVms) {
+            for (let vi = 0; vi < dVmsEx.length; vi++) {
+              const vmObj = dVmsEx[vi]
+              const vmNorm = normalizarString(vmObj.nome)
+              const vmComp = normalizarCompacto(vmObj.nome)
+              const bateuVm =
+                (vmNorm &&
+                  (vmNorm === aNomeNorm ||
+                    vmNorm.includes(aNomeNorm) ||
+                    aNomeNorm.includes(vmNorm))) ||
+                (vmComp &&
+                  (vmComp === aNomeComp ||
+                    vmComp.includes(aNomeComp) ||
+                    aNomeComp.includes(vmComp)))
+
+              if (bateuVm) {
+                vmPresente = true
+                const st = String(vmObj.status || '').toLowerCase()
+                if (st === 'success' || st === 'sucesso') {
+                  vmComSucesso = true
+                } else {
+                  vmComSucesso = false
+                  vmMotivoErro = `VM ${vmObj.nome} constou com status "${vmObj.status}" na execução do job ${nomeJobReconciliado ? "'" + nomeJobReconciliado + "'" : ''}.`
+                }
+                break
+              }
+            }
+          } else {
+            vmPresente = true
+            vmComSucesso = ex.getString('status') === 'sucesso'
+            if (!vmComSucesso) {
+              vmMotivoErro = `Execução do job ${nomeJobReconciliado ? "'" + nomeJobReconciliado + "'" : ''} reportou status "${ex.getString('status')}".`
+            }
+          }
+
+          for (let mi = 0; mi < mods.length; mi++) {
+            const m = mods[mi]
+            if (m === modalidadeEx && vmComSucesso) {
+              novoComprovado.push({
+                ativo_id: aId,
+                ativo_nome: aNome,
+                ativo_tipo: aTipo,
+                modalidade: m,
+                item_comprovante: aNome,
+                fonte_casada: aNome,
+                rotina_nome: rotina ? rotina.getString('nome') : null,
+                job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
+                plano_nome:
+                  rotina && planosMap[rotina.getString('plano')]
+                    ? planosMap[rotina.getString('plano')].getString('nome')
+                    : null,
+                status: 'sucesso',
+                comprovado_em: extrairDataExecucao(ex) || now.toISOString(),
+              })
+            } else {
+              const modLabel = m === 'local' ? 'Local' : m === 'nuvem' ? 'Nuvem' : 'Replicação'
+              let motivoPend = `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`
+              if (m === modalidadeEx) {
+                if (!vmPresente) {
+                  motivoPend = `Ativo não mencionado neste comprovante (pode ser coberto por outra rotina/job).`
+                } else if (!vmComSucesso) {
+                  motivoPend =
+                    vmMotivoErro ||
+                    `Execução reportou falha para este item. Modalidade não homologada.`
+                }
+              }
+              novasPendencias.push({
+                ativo_id: aId,
+                ativo_nome: aNome,
+                ativo_tipo: aTipo,
+                modalidade_pendente: m,
+                ativo_presente_no_comprovante: vmPresente,
+                item_comprovante: aNome,
+                motivo: motivoPend,
+                job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
+                atendivel_por_outra_rotina: m !== modalidadeEx,
+              })
+            }
+          }
+        }
+
+        // REGRA DE OURO FIX 1: NUNCA inicializar novoComprovado como [] e persistir!
+        // Se novoComprovado for vazio, NÃO PERSISTIR NADA na execução nem na avaliação.
+        if (novoComprovado.length === 0) {
+          console.warn(
+            `[confronto:reconciliacao] Nenhum item comprovado foi calculado para a execução #${ex.id}. Sobrescrita destrutiva neutralizada: registro mantido intacto.`,
+          )
+          continue
+        }
+
+        // Resolução robusta de escopo
+        let escIdReconciliado =
+          confExistenteEx && confExistenteEx.escopo_id ? confExistenteEx.escopo_id : null
+        let escNomeReconciliado =
+          confExistenteEx && confExistenteEx.escopo_nome ? confExistenteEx.escopo_nome : null
+
+        if (!escIdReconciliado && rotina) {
+          const pId = rotina.getString('plano')
+          const pRec = pId ? planosMap[pId] : null
+          if (pRec) {
+            const eId = pRec.getString('escopo')
+            if (eId) {
+              try {
+                const eRec = $app.findRecordById('backup_escopo', eId)
+                if (eRec) {
+                  escIdReconciliado = eRec.id
+                  escNomeReconciliado = eRec.getString('nome')
+                }
+              } catch (_) {}
+            }
+          }
+        }
+
+        if (!escIdReconciliado) {
+          try {
+            const escOrg = $app.findRecordsByFilter(
+              'backup_escopo',
+              `organization = '${targetOrgId}' && status = 'ativo'`,
+              '+created',
+              1,
+              0,
+            )
+            if (escOrg.length > 0) {
+              escIdReconciliado = escOrg[0].id
+              escNomeReconciliado = escOrg[0].getString('nome')
+            }
+          } catch (_) {}
+        }
+
+        let exigenciasReconciliadas =
+          confExistenteEx &&
+          Array.isArray(confExistenteEx.exigencias) &&
+          confExistenteEx.exigencias.length > 0
+            ? confExistenteEx.exigencias
+            : []
+
+        if (exigenciasReconciliadas.length === 0) {
           for (let ai = 0; ai < assetsExigidos.length; ai++) {
             const a = assetsExigidos[ai]
-            const aId = a.id
-            const aNome = a.getString('name')
-            const aTipo = a.getString('tipo')
-            const aNomeNorm = normalizarString(aNome)
             const exLoc = Boolean(a.getBool('exige_backup_local'))
             const exNuv = Boolean(a.getBool('exige_backup_nuvem'))
             const exRep = Boolean(a.getBool('exige_backup_replicacao'))
-
             const mods = []
             if (exLoc) mods.push('local')
             if (exNuv) mods.push('nuvem')
             if (exRep) mods.push('replicacao')
-
-            // Verificar status desta VM especificamente nesta execução
-            let vmPresente = false
-            let vmComSucesso = false
-            let vmMotivoErro = ''
-
-            if (temDetalhesVms) {
-              for (let vi = 0; vi < dVmsEx.length; vi++) {
-                const vmObj = dVmsEx[vi]
-                const vmNorm = normalizarString(vmObj.nome)
-                if (
-                  vmNorm &&
-                  (vmNorm === aNomeNorm || vmNorm.includes(aNomeNorm) || aNomeNorm.includes(vmNorm))
-                ) {
-                  vmPresente = true
-                  const st = String(vmObj.status || '').toLowerCase()
-                  if (st === 'success' || st === 'sucesso') {
-                    vmComSucesso = true
-                  } else {
-                    vmComSucesso = false
-                    vmMotivoErro = `VM ${vmObj.nome} constou com status "${vmObj.status}" na execução do job ${nomeJobReconciliado ? "'" + nomeJobReconciliado + "'" : ''}.`
-                  }
-                  break
-                }
-              }
-            } else {
-              vmPresente = true
-              vmComSucesso = ex.getString('status') === 'sucesso'
-              if (!vmComSucesso) {
-                vmMotivoErro = `Execução do job ${nomeJobReconciliado ? "'" + nomeJobReconciliado + "'" : ''} reportou status "${ex.getString('status')}".`
-              }
-            }
-
-            for (let mi = 0; mi < mods.length; mi++) {
-              const m = mods[mi]
-              if (m === modalidadeEx && vmComSucesso) {
-                novoComprovado.push({
-                  ativo_id: aId,
-                  ativo_nome: aNome,
-                  ativo_tipo: aTipo,
-                  modalidade: m,
-                  item_comprovante: aNome,
-                  fonte_casada: aNome,
-                  rotina_nome: rotina ? rotina.getString('nome') : null,
-                  job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
-                  plano_nome:
-                    rotina && planosMap[rotina.getString('plano')]
-                      ? planosMap[rotina.getString('plano')].getString('nome')
-                      : null,
-                  status: 'sucesso',
-                  comprovado_em: extrairDataExecucao(ex) || now.toISOString(),
-                })
-              } else {
-                const modLabel = m === 'local' ? 'Local' : m === 'nuvem' ? 'Nuvem' : 'Replicação'
-                let motivoPend = `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`
-                if (m === modalidadeEx) {
-                  if (!vmPresente) {
-                    motivoPend = `Ativo não mencionado neste comprovante (pode ser coberto por outra rotina/job).`
-                  } else if (!vmComSucesso) {
-                    motivoPend =
-                      vmMotivoErro ||
-                      `Execução reportou falha para este item. Modalidade não homologada.`
-                  }
-                }
-                novasPendencias.push({
-                  ativo_id: aId,
-                  ativo_nome: aNome,
-                  ativo_tipo: aTipo,
-                  modalidade_pendente: m,
-                  ativo_presente_no_comprovante: vmPresente,
-                  item_comprovante: aNome,
-                  motivo: motivoPend,
-                  job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
-                  atendivel_por_outra_rotina: m !== modalidadeEx,
-                })
-              }
-            }
+            exigenciasReconciliadas.push({
+              ativo_id: a.id,
+              ativo_nome: a.getString('name'),
+              ativo_tipo: a.getString('tipo') || '',
+              local: exLoc,
+              nuvem: exNuv,
+              replicacao: exRep,
+              modalidades: mods,
+            })
           }
+        }
 
-          // Resolução robusta de escopo para o confronto reconciliado
-          let escIdReconciliado = confAntigo && confAntigo.escopo_id ? confAntigo.escopo_id : null
-          let escNomeReconciliado =
-            confAntigo && confAntigo.escopo_nome ? confAntigo.escopo_nome : null
+        const novoConfronto = {
+          escopo_id: escIdReconciliado,
+          escopo_nome: escNomeReconciliado || 'Base Principal dos Sistemas da Serventia',
+          rotina_id: rotinaId,
+          rotina_nome: rotina ? rotina.getString('nome') : null,
+          job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
+          plano_id: rotina ? rotina.getString('plano') : null,
+          plano_nome:
+            rotina && planosMap[rotina.getString('plano')]
+              ? planosMap[rotina.getString('plano')].getString('nome')
+              : null,
+          modalidades_plano: [modalidadeEx],
+          exigencias: exigenciasReconciliadas,
+          comprovado: novoComprovado,
+          pendencias: novasPendencias,
+          total_ativos_escopo: assetsExigidos.length,
+          total_exigencias_modalidade: exigenciasReconciliadas.reduce(
+            (acc, cur) => acc + (cur.modalidades ? cur.modalidades.length : 3),
+            0,
+          ),
+          total_comprovadas: novoComprovado.length,
+          total_pendencias: novasPendencias.length,
+        }
 
-          if (!escIdReconciliado && rotina) {
-            const pId = rotina.getString('plano')
-            const pRec = pId ? planosMap[pId] : null
-            if (pRec) {
-              const eId = pRec.getString('escopo')
-              if (eId) {
-                try {
-                  const eRec = $app.findRecordById('backup_escopo', eId)
-                  if (eRec) {
-                    escIdReconciliado = eRec.id
-                    escNomeReconciliado = eRec.getString('nome')
-                  }
-                } catch (errEsc) {
-                  console.error(
-                    '[confronto:reconciliacao] Erro ao buscar backup_escopo #' + eId + ':',
-                    errEsc?.message || errEsc,
-                  )
-                }
-              }
-            }
-          }
-
-          if (!escIdReconciliado) {
-            try {
-              const escOrg = $app.findRecordsByFilter(
-                'backup_escopo',
-                `organization = '${targetOrgId}' && status = 'ativo'`,
-                '+created',
-                1,
-                0,
-              )
-              if (escOrg.length > 0) {
-                escIdReconciliado = escOrg[0].id
-                escNomeReconciliado = escOrg[0].getString('nome')
-              }
-            } catch (errEscOrg) {
-              console.error(
-                '[confronto:reconciliacao] Erro ao buscar escopo ativo da org ' + targetOrgId + ':',
-                errEscOrg?.message || errEscOrg,
-              )
-            }
-          }
-
-          if (!escIdReconciliado) {
-            console.error(
-              '[confronto:reconciliacao] Não foi possível resolver escopo para rotina ' +
-                rotinaId +
-                ' e execução #' +
-                ex.id,
-            )
-          }
-
-          // Montar lista completa de exigências com os 4 ativos se estiver vazio
-          let exigenciasReconciliadas =
-            confAntigo && Array.isArray(confAntigo.exigencias) && confAntigo.exigencias.length > 0
-              ? confAntigo.exigencias
-              : []
-
-          if (exigenciasReconciliadas.length === 0) {
-            for (let ai = 0; ai < assetsExigidos.length; ai++) {
-              const a = assetsExigidos[ai]
-              const exLoc = Boolean(a.getBool('exige_backup_local'))
-              const exNuv = Boolean(a.getBool('exige_backup_nuvem'))
-              const exRep = Boolean(a.getBool('exige_backup_replicacao'))
-              const mods = []
-              if (exLoc) mods.push('local')
-              if (exNuv) mods.push('nuvem')
-              if (exRep) mods.push('replicacao')
-              exigenciasReconciliadas.push({
-                ativo_id: a.id,
-                ativo_nome: a.getString('name'),
-                ativo_tipo: a.getString('tipo') || '',
-                local: exLoc,
-                nuvem: exNuv,
-                replicacao: exRep,
-                modalidades: mods,
-              })
-            }
-          }
-
-          const novoConfronto = {
-            escopo_id: escIdReconciliado,
-            escopo_nome: escNomeReconciliado || 'Base Principal dos Sistemas da Serventia',
-            rotina_id: rotinaId,
-            rotina_nome: rotina ? rotina.getString('nome') : null,
-            job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
-            plano_id: rotina ? rotina.getString('plano') : null,
-            plano_nome:
-              rotina && planosMap[rotina.getString('plano')]
-                ? planosMap[rotina.getString('plano')].getString('nome')
-                : null,
-            modalidades_plano: [modalidadeEx],
-            exigencias: exigenciasReconciliadas,
-            comprovado: novoComprovado,
-            pendencias: novasPendencias,
-            total_ativos_escopo: assetsExigidos.length,
-            total_exigencias_modalidade: exigenciasReconciliadas.reduce(
-              (acc, cur) => acc + (cur.modalidades ? cur.modalidades.length : 3),
-              0,
-            ),
-            total_comprovadas: novoComprovado.length,
-            total_pendencias: novasPendencias.length,
-          }
+        // Persistir novo confronto válido na execução
+        try {
+          ex.set('confronto_escopo', novoConfronto)
+          $app.save(ex)
+          totalExecucoesReconciliadas++
+        } catch (errSaveEx) {
+          console.error(
+            `[confronto:reconciliacao] FALHA LOUD ao salvar confronto recalculado na execução #${ex.id}:`,
+            errSaveEx?.message || errSaveEx,
+          )
           try {
-            ex.set('confronto_escopo', novoConfronto)
-            $app.save(ex)
-            totalExecucoesReconciliadas++
-          } catch (errSaveEx) {
-            console.error(
-              `[confronto:reconciliacao] FALHA LOUD ao salvar confronto recalculado na execução #${ex.id}:`,
-              errSaveEx?.message || errSaveEx,
+            const auditCol = $app.findCollectionByNameOrId('audit_log')
+            const auditRec = new Record(auditCol)
+            auditRec.set('organization', targetOrgId)
+            auditRec.set('action', 'BACKUP_EXECUCAO_UPDATE_ERROR')
+            auditRec.set('entity', 'Backup e Continuidade')
+            auditRec.set(
+              'detail',
+              `FALHA ao salvar confronto recalculado na execução #${ex.id}: ${errSaveEx?.message || String(errSaveEx)}`,
             )
-            try {
-              const auditCol = $app.findCollectionByNameOrId('audit_log')
-              const auditRec = new Record(auditCol)
-              auditRec.set('organization', targetOrgId)
-              auditRec.set('action', 'BACKUP_EXECUCAO_UPDATE_ERROR')
-              auditRec.set('entity', 'Backup e Continuidade')
-              auditRec.set(
-                'detail',
-                `FALHA ao salvar confronto recalculado na execução #${ex.id}: ${errSaveEx?.message || String(errSaveEx)}`,
-              )
-              auditRec.set('metadata', { execucao_id: ex.id, error: String(errSaveEx) })
-              $app.save(auditRec)
-            } catch (_) {}
-          }
+            auditRec.set('metadata', { execucao_id: ex.id, error: String(errSaveEx) })
+            $app.save(auditRec)
+          } catch (_) {}
+        }
 
-          // Atualizar avaliação correspondente
+        // Persistir na avaliação correspondente (Fonte Única de Verdade)
+        if (avalRecEncontrada) {
           try {
-            const avals = $app.findRecordsByFilter(
-              'backup_avaliacoes',
-              `execucao = '${ex.id}'`,
-              '-created',
-              1,
-              0,
-            )
-            if (avals.length > 0) {
-              const avRec = avals[0]
-              avRec.set('confronto_escopo', novoConfronto)
-
-              // Ajustar laudo técnico da avaliação para que não seja conflitante (com clone defensivo para PocketBase Go slice)
-              let laudoObj = avRec.get('laudo_tecnico')
-              if (laudoObj && typeof laudoObj === 'object') {
-                try {
-                  const laudoClone = JSON.parse(JSON.stringify(laudoObj))
-                  const checks = laudoClone.verificacoes || []
-                  for (let ci = 0; ci < checks.length; ci++) {
-                    if (checks[ci].item === 'identificacao') {
-                      checks[ci].passou = true
-                      checks[ci].status = 'conforme'
-                      checks[ci].detalhes =
-                        'Regra de identificação correspondente ao job Veeam identificada com sucesso.'
-                    }
-                  }
-                  laudoClone.verificacoes = checks
-                  laudoClone.resultado = 'conforme'
-                  laudoClone.veredito = `Conforme: Cópia executada com sucesso. Modalidade comprovada: ${modalidadeEx.toUpperCase()}.`
-                  avRec.set('laudo_tecnico', laudoClone)
-                } catch (_) {
-                  // Se falhar o parse/clone, mantém laudo original
-                }
-                avRec.set('resultado_conformidade', 'conforme')
-                avRec.set(
-                  'detalhe',
-                  `Conforme: Cópia executada com sucesso. Modalidade comprovada: ${modalidadeEx.toUpperCase()}.`,
-                )
-              }
-
-              $app.save(avRec)
-            }
+            avalRecEncontrada.set('confronto_escopo', JSON.parse(JSON.stringify(novoConfronto)))
+            $app.save(avalRecEncontrada)
           } catch (errAv) {
             console.error(
               '[confronto:reconciliacao] Falha ao atualizar backup_avaliacoes da execução #' +
@@ -1260,7 +1239,6 @@ routerAdd(
         }
       }
 
-      // Se houve reconciliação, registrar na auditoria append-only
       if (totalExecucoesReconciliadas > 0) {
         try {
           const auditCol = $app.findCollectionByNameOrId('audit_log')
@@ -1273,7 +1251,7 @@ routerAdd(
           auditRec.set('entity', 'Backup e Continuidade')
           auditRec.set(
             'detail',
-            `Reconciliação de confronto de proteção por ativo executada. ${totalExecucoesReconciliadas} execução(ões) recalculada(s) pela regra estrita de comprovação.`,
+            `Reconciliação segura de confronto executada. ${totalExecucoesReconciliadas} execução(ões) sincronizada(s) pela regra estrita de comprovação.`,
           )
           auditRec.set('metadata', {
             total_reconciliadas: totalExecucoesReconciliadas,
@@ -1282,36 +1260,13 @@ routerAdd(
             percentual_protegido: percentualProtegido,
           })
           $app.save(auditRec)
-        } catch (errAudit) {
-          console.error(
-            '[confronto:reconciliacao] Falha ao registrar log de auditoria de reconciliação:',
-            errAudit?.message || errAudit,
-          )
-        }
+        } catch (_) {}
       }
     } catch (errReconciliacao) {
       console.error(
-        '[confronto:reconciliacao] Exceção durante a reconciliação paralela:',
+        '[confronto:reconciliacao] Exceção durante a reconciliação segura:',
         errReconciliacao?.message || errReconciliacao,
       )
-      try {
-        const auditCol = $app.findCollectionByNameOrId('audit_log')
-        const auditRec = new Record(auditCol)
-        auditRec.set('organization', targetOrgId)
-        auditRec.set('user', auth.id)
-        auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
-        auditRec.set('user_email', auth.getString('email'))
-        auditRec.set('action', 'BACKUP_CONFRONTO_RECONCILE_FAILED')
-        auditRec.set('entity', 'Backup e Continuidade')
-        auditRec.set(
-          'detail',
-          `Falha durante a reconciliação de confronto de proteção por ativo: ${errReconciliacao?.message || String(errReconciliacao)}.`,
-        )
-        auditRec.set('metadata', {
-          error: String(errReconciliacao),
-        })
-        $app.save(auditRec)
-      } catch (_) {}
     }
 
     return e.json(200, {
