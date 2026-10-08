@@ -30,6 +30,13 @@ import {
   FileCheck2,
   ShieldAlert,
   Trash2,
+  Sparkles,
+  ExternalLink,
+  HelpCircle,
+  Server,
+  Cloud,
+  Layers,
+  Info,
 } from 'lucide-react'
 import {
   AlertDialog,
@@ -290,12 +297,41 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
               <CardContent className="p-4 text-xs space-y-3">
                 <p className="text-slate-700">{oco.descricao}</p>
 
+                {/* Badge Resolvida automaticamente na listagem */}
+                {oco.status === 'resolvida' && oco.resolvida_automaticamente && (
+                  <div className="flex items-center gap-1.5">
+                    <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold gap-1 shadow-2xs">
+                      <Sparkles className="w-3 h-3 text-emerald-200" />
+                      Resolvida automaticamente
+                    </Badge>
+                    {oco.resolvida_por_evidencia && (
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        (Evidência #{oco.resolvida_por_evidencia.slice(0, 8)})
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {oco.resolucao && (
                   <div className="p-2.5 rounded bg-emerald-50/70 border border-emerald-200 text-emerald-900">
-                    <span className="block text-[10px] font-bold uppercase text-emerald-700 mb-0.5">
-                      Resolução e Parecer:
-                    </span>
-                    <p className="text-xs">{oco.resolucao}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold uppercase text-emerald-700 flex items-center gap-1">
+                        {oco.resolvida_automaticamente ? (
+                          <>
+                            <Sparkles className="w-3 h-3 text-emerald-600" />
+                            Comprovação de Resolução Automática:
+                          </>
+                        ) : (
+                          'Resolução e Parecer:'
+                        )}
+                      </span>
+                      {oco.resolvida_automaticamente && (
+                        <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">
+                          Comprovante Posterior
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs leading-relaxed">{oco.resolucao}</p>
                     {oco.resolvida_em && (
                       <span className="block text-[10px] text-emerald-700 mt-1 font-mono">
                         Resolvido em {formatDateTime(oco.resolvida_em)}
@@ -456,7 +492,7 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
 
       {/* Modal Resolver Ocorrência */}
       <Dialog open={resolverModalOpen} onOpenChange={setResolverModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleConfirmarResolucao}>
             <DialogHeader>
               <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -468,11 +504,155 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-3 text-xs">
-              <div className="p-2.5 rounded bg-slate-50 border text-slate-700">
-                <strong>Ocorrência:</strong> {resolvendoItem?.titulo}
+            <div className="space-y-4 py-3 text-xs">
+              {/* SEÇÃO 1: O QUE OCORREU */}
+              <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-blue-600" />
+                    O que ocorreu
+                  </span>
+                  {resolvendoItem?.tipo && (
+                    <span className="text-[10px] font-mono text-slate-500">
+                      #{resolvendoItem.tipo}
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-2.5 rounded bg-white border border-slate-200 text-slate-800">
+                  <div className="font-semibold text-slate-900 mb-1">{resolvendoItem?.titulo}</div>
+                  <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">
+                    {resolvendoItem?.descricao}
+                  </p>
+                </div>
+
+                {/* Se existir fato_real estruturado, exibir detalhes técnicos completos */}
+                {resolvendoItem?.fato_real && (
+                  <div className="space-y-2 pt-1 border-t border-slate-200/80">
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      {resolvendoItem.fato_real.rotina_nome && (
+                        <div>
+                          <span className="text-slate-500 block">Rotina:</span>
+                          <span className="font-semibold text-slate-800">
+                            {resolvendoItem.fato_real.rotina_nome}
+                          </span>
+                        </div>
+                      )}
+                      {resolvendoItem.fato_real.modalidade && (
+                        <div>
+                          <span className="text-slate-500 block">Modalidade:</span>
+                          <span className="font-semibold text-slate-800">
+                            {resolvendoItem.fato_real.modalidade}
+                          </span>
+                        </div>
+                      )}
+                      {(resolvendoItem.fato_real.data_hora_sp ||
+                        resolvendoItem.fato_real.data_iso) && (
+                        <div>
+                          <span className="text-slate-500 block">Data/Hora (SP):</span>
+                          <span className="font-mono text-slate-800">
+                            {resolvendoItem.fato_real.data_hora_sp ||
+                              formatDateTime(resolvendoItem.fato_real.data_iso)}
+                          </span>
+                        </div>
+                      )}
+                      {resolvendoItem.fato_real.adaptador && (
+                        <div>
+                          <span className="text-slate-500 block">Adaptador:</span>
+                          <span className="font-mono text-slate-800">
+                            {resolvendoItem.fato_real.adaptador}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* VMs com falha (badges vermelhas) */}
+                    {Array.isArray(resolvendoItem.fato_real.vms_falhas) &&
+                      resolvendoItem.fato_real.vms_falhas.length > 0 && (
+                        <div>
+                          <span className="text-[10px] font-bold text-red-700 uppercase block mb-1">
+                            VMs com falha ({resolvendoItem.fato_real.vms_falhas.length}):
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {resolvendoItem.fato_real.vms_falhas.map((vm, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="outline"
+                                className="bg-red-50 text-red-700 border-red-300 font-mono text-[10px] py-0.5"
+                              >
+                                {vm}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* VMs com sucesso (badges verdes) */}
+                    {Array.isArray(resolvendoItem.fato_real.vms_sucesso) &&
+                      resolvendoItem.fato_real.vms_sucesso.length > 0 && (
+                        <div>
+                          <span className="text-[10px] font-bold text-emerald-700 uppercase block mb-1">
+                            VMs com sucesso ({resolvendoItem.fato_real.vms_sucesso.length}):
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {resolvendoItem.fato_real.vms_sucesso.map((vm, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="outline"
+                                className="bg-emerald-50 text-emerald-700 border-emerald-300 font-mono text-[10px] py-0.5"
+                              >
+                                {vm}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Ids de Execução e Evidência de origem */}
+                    <div className="flex items-center gap-3 pt-1 text-[10px] text-slate-500 font-mono">
+                      {resolvendoItem.fato_real.execucao_id && (
+                        <span>Execução #{resolvendoItem.fato_real.execucao_id.slice(0, 10)}</span>
+                      )}
+                      {resolvendoItem.fato_real.evidencia_id && (
+                        <span>Evidência #{resolvendoItem.fato_real.evidencia_id.slice(0, 10)}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Se não tem fato_real mas tem execucao/evidencia vinculadas diretamente */}
+                {!resolvendoItem?.fato_real &&
+                  (resolvendoItem?.execucao || resolvendoItem?.evidencia) && (
+                    <div className="flex items-center gap-3 pt-1 text-[10px] text-slate-500 font-mono border-t border-slate-200">
+                      {resolvendoItem?.execucao && (
+                        <span>Execução #{resolvendoItem.execucao.slice(0, 10)}</span>
+                      )}
+                      {resolvendoItem?.evidencia && (
+                        <span>Evidência #{resolvendoItem.evidencia.slice(0, 10)}</span>
+                      )}
+                    </div>
+                  )}
               </div>
 
+              {/* SEÇÃO 2: COMO RESPONDER */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-700" />
+                  Como responder
+                </span>
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  1. Verifique o job de backup correspondente no console do software (ex.: Veeam /
+                  Acronis).
+                  <br />
+                  2. Reexecute a cópia sobressalente para as máquinas virtuais faltantes.
+                  <br />
+                  3. Anexe ou processe o comprovante novo na aba <strong>Evidências</strong>. Caso a
+                  nova execução conclua com 100% de sucesso, esta ocorrência será resolvida
+                  automaticamente, ou informe o parecer manual abaixo.
+                </p>
+              </div>
+
+              {/* SEÇÃO 3: PARECER DE RESOLUÇÃO */}
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">
                   Parecer de Resolução / Ação Corretiva <span className="text-red-500">*</span>

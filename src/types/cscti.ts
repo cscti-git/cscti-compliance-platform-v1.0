@@ -651,6 +651,22 @@ export interface BackupMonitoramentoExternoItem {
   }
 }
 
+export interface BackupOcorrenciaFatoReal {
+  rotina_id?: string
+  rotina_nome?: string
+  modalidade?: string
+  data_hora_sp?: string
+  data_iso?: string
+  vms_falhas?: string[]
+  vms_sucesso?: string[]
+  total_vms?: number
+  execucao_id?: string
+  evidencia_id?: string
+  job_nome?: string
+  erro_detalhe?: string
+  adaptador?: string
+}
+
 export interface BackupOcorrenciaItem {
   id: string
   organization: string
@@ -670,12 +686,18 @@ export interface BackupOcorrenciaItem {
   resolucao?: string
   resolvida_em?: string
   resolvida_por?: string
+  resolvida_automaticamente?: boolean
+  resolvida_por_execucao?: string
+  resolvida_por_evidencia?: string
+  fato_real?: BackupOcorrenciaFatoReal | null
   created?: string
   updated?: string
   expand?: {
     execucao?: BackupExecucaoItem
     evidencia?: BackupEvidenciaItem
     resolvida_por?: PersonItem
+    resolvida_por_execucao?: BackupExecucaoItem
+    resolvida_por_evidencia?: BackupEvidenciaItem
   }
 }
 

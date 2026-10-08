@@ -3035,9 +3035,224 @@ routerAdd(
             oc.set('descricao', descricaoFactual)
             oc.set('execucao', execRec.id)
             oc.set('evidencia', evidenciaRec.id)
+            oc.set('fato_real', {
+              rotina_id: rotinaFinalId || null,
+              rotina_nome: nomeRotinaFinal,
+              modalidade: modalidadeLabel,
+              data_hora_sp: dataExecucaoSp,
+              data_iso: execRec.getString('data_inicio') || nowIso,
+              vms_falhas: vmsFalhadas,
+              vms_sucesso: vmsSucesso,
+              total_vms: totalVmsCount,
+              execucao_id: execRec.id,
+              evidencia_id: evidenciaRec.id,
+              job_nome: jobName,
+              erro_detalhe: veeamErrorMessage || null,
+              adaptador: adaptadorUsado,
+            })
             $app.save(oc)
           }
         } catch (_) {}
+      }
+
+      // -------------------------------------------------------------
+      // RESOLUÇÃO AUTOMÁTICA DE OCORRÊNCIAS ABERTAS NO SUCESSO TOTAL
+      // Se a execução foi SUCESSO TOTAL (status 'sucesso', contadores.error === 0,
+      // zero falhas e contadores.success > 0):
+      // Buscar ocorrências abertas da mesma organização para a mesma rotina/modalidade
+      // e encerrar automaticamente com referência à execução e evidência novas.
+      // -------------------------------------------------------------
+      if (
+        statusDetectado === 'sucesso' &&
+        contadores.error === 0 &&
+        (!Array.isArray(detalhesVms) ||
+          detalhesVms.every((v) => {
+            const st = String((v && v.status) || '').toLowerCase()
+            return st !== 'failed' && st !== 'error' && st !== 'erro' && st !== 'falha'
+          }))
+      ) {
+        try {
+          // Identificar modalidade resolvida
+          let modalidadeSucesso = 'Local'
+          if (
+            confrontoEscopo &&
+            Array.isArray(confrontoEscopo.modalidades_plano) &&
+            confrontoEscopo.modalidades_plano.length > 0
+          ) {
+            const m0 = String(confrontoEscopo.modalidades_plano[0] || '').toLowerCase()
+            modalidadeSucesso =
+              m0 === 'nuvem' ? 'Nuvem' : m0 === 'replicacao' ? 'Replicação' : 'Local'
+          } else if (rotinaNomeReal) {
+            const rLow = rotinaNomeReal.toLowerCase()
+            if (rLow.includes('nuvem') || rLow.includes('cloud')) modalidadeSucesso = 'Nuvem'
+            else if (rLow.includes('replica')) modalidadeSucesso = 'Replicação'
+            else modalidadeSucesso = 'Local'
+          }
+
+          // Data formatada no fuso America/Sao_Paulo
+          let dataSucessoSp = ''
+          try {
+            const dtRefIso = execRec.getString('data_inicio') || nowIso
+            const dObj = new Date(dtRefIso)
+            const ano = dObj.getUTCFullYear()
+            const mes = dObj.getUTCMonth()
+            const dia = dObj.getUTCDate()
+            const hora = dObj.getUTCHours()
+            const min = dObj.getUTCMinutes()
+            const sec = dObj.getUTCSeconds()
+            const dSp = new Date(Date.UTC(ano, mes, dia, hora - 3, min, sec))
+            const pad2 = (n) => (n < 10 ? '0' + n : String(n))
+            dataSucessoSp = `${pad2(dSp.getUTCDate())}/${pad2(dSp.getUTCMonth() + 1)}/${dSp.getUTCFullYear()} ${pad2(dSp.getUTCHours())}:${pad2(dSp.getUTCMinutes())}`
+          } catch (_) {
+            dataSucessoSp = nowIso
+          }
+
+          // Nomes reais das VMs com sucesso
+          const vmsSucessoNomes = []
+          if (Array.isArray(detalhesVms) && detalhesVms.length > 0) {
+            for (let vi = 0; vi < detalhesVms.length; vi++) {
+              const vmItem = detalhesVms[vi]
+              if (vmItem && vmItem.nome) {
+                vmsSucessoNomes.push(vmItem.nome)
+              }
+            }
+          }
+          const vmsSucessoTexto =
+            vmsSucessoNomes.length > 0
+              ? vmsSucessoNomes.join(', ')
+              : `${contadores.success || 1} VM(s)`
+
+          const nomeRotinaSucesso = rotinaNomeReal || jobName || 'Rotina de Backup'
+          const assuntoEvidenciaAtual = evidenciaRec.getString('assunto') || assunto || ''
+
+          // Buscar ocorrências abertas da mesma organização
+          const ocorrenciasAbertas = $app.findRecordsByFilter(
+            'backup_ocorrencias',
+            `organization = '${organizationId}' && status = 'aberta'`,
+            '-created',
+            50,
+            0,
+          )
+
+          const modSucessoNorm = modalidadeSucesso
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+
+          for (let oi = 0; oi < ocorrenciasAbertas.length; oi++) {
+            const ocAberta = ocorrenciasAbertas[oi]
+            let deveResolver = false
+
+            // 1. Checar se tem fato_real com rotina_id ou modalidade coincidente
+            let frObj = null
+            try {
+              frObj = ocAberta.get('fato_real')
+              if (typeof frObj === 'string' && frObj.trim().startsWith('{')) {
+                frObj = JSON.parse(frObj)
+              }
+            } catch (_) {}
+
+            if (frObj && typeof frObj === 'object') {
+              const frRotinaId = frObj.rotina_id
+              const frModalidade = String(frObj.modalidade || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+
+              if (rotinaFinalId && frRotinaId && rotinaFinalId === frRotinaId) {
+                deveResolver = true
+              } else if (frModalidade && frModalidade === modSucessoNorm) {
+                // Mesma modalidade e mesmo job ou rotina aproximada
+                const frRotinaNome = String(frObj.rotina_nome || frObj.job_nome || '').toLowerCase()
+                const currentRotinaNome = nomeRotinaSucesso.toLowerCase()
+                if (
+                  frRotinaNome === currentRotinaNome ||
+                  currentRotinaNome.includes(frRotinaNome) ||
+                  frRotinaNome.includes(currentRotinaNome)
+                ) {
+                  deveResolver = true
+                }
+              }
+            }
+
+            // 2. Se não bateu pelo fato_real, verificar vínculo pela execução anterior
+            if (!deveResolver) {
+              const execAnteriorId = ocAberta.getString('execucao')
+              if (execAnteriorId) {
+                try {
+                  const exAnt = $app.findRecordById('backup_execucoes', execAnteriorId)
+                  if (exAnt && rotinaFinalId && exAnt.getString('rotina') === rotinaFinalId) {
+                    deveResolver = true
+                  }
+                } catch (_) {}
+              }
+            }
+
+            // 3. Fallback: verificar se a descrição ou título da ocorrência aberta menciona a rotina/trabalho e modalidade
+            if (!deveResolver) {
+              const descOc = (ocAberta.getString('descricao') || '').toLowerCase()
+              const titOc = (ocAberta.getString('titulo') || '').toLowerCase()
+              const jobLower = (jobName || '').toLowerCase()
+              const rotLower = (nomeRotinaSucesso || '').toLowerCase()
+
+              const mencionaJobOuRotina =
+                (jobLower && (descOc.includes(jobLower) || titOc.includes(jobLower))) ||
+                (rotLower && (descOc.includes(rotLower) || titOc.includes(rotLower)))
+
+              const mencionaModalidade =
+                modSucessoNorm &&
+                (descOc.includes(modSucessoNorm) ||
+                  (modSucessoNorm === 'nuvem' &&
+                    (descOc.includes('cloud') || descOc.includes('nuvem'))))
+
+              if (mencionaJobOuRotina || mencionaModalidade) {
+                deveResolver = true
+              }
+            }
+
+            if (deveResolver) {
+              const parecerAuto = `Ocorrência #${ocAberta.id} resolvida automaticamente pela comprovação da evidência posterior de backup ${modalidadeSucesso} em ${dataSucessoSp}: rotina '${nomeRotinaSucesso}' executou com sucesso todas as VMs (${vmsSucessoTexto}). Comprovante: evidência #${evidenciaRec.id} — '${assuntoEvidenciaAtual}'.`
+
+              ocAberta.set('status', 'resolvida')
+              ocAberta.set('resolvida_automaticamente', true)
+              ocAberta.set('resolvida_por_execucao', execRec.id)
+              ocAberta.set('resolvida_por_evidencia', evidenciaRec.id)
+              ocAberta.set('resolvida_em', nowIso)
+              ocAberta.set('resolucao', parecerAuto)
+              $app.save(ocAberta)
+
+              // Auditoria append-only por ocorrência resolvida
+              try {
+                const auditCol = $app.findCollectionByNameOrId('audit_log')
+                const auditRec = new Record(auditCol)
+                auditRec.set('organization', organizationId)
+                auditRec.set('user', auth.id)
+                auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
+                auditRec.set('user_email', auth.getString('email'))
+                auditRec.set('action', 'BACKUP_OCORRENCIA_RESOLVED_AUTO')
+                auditRec.set('entity', 'Backup e Continuidade')
+                auditRec.set(
+                  'detail',
+                  `Ocorrência #${ocAberta.id} encerrada automaticamente pela comprovação com sucesso total na execução #${execRec.id} (evidência #${evidenciaRec.id}).`,
+                )
+                auditRec.set('metadata', {
+                  ocorrencia_id: ocAberta.id,
+                  execucao_id: execRec.id,
+                  evidencia_id: evidenciaRec.id,
+                  modalidade: modalidadeSucesso,
+                  rotina: nomeRotinaSucesso,
+                  vms_sucesso: vmsSucessoNomes,
+                })
+                $app.save(auditRec)
+              } catch (_) {}
+            }
+          }
+        } catch (resErr) {
+          console.error(
+            '[ERRO_RESOLUCAO_AUTOMATICA_OCORRENCIAS]',
+            resErr && (resErr.stack || resErr.message),
+          )
+        }
       }
 
       // Auditoria append-only

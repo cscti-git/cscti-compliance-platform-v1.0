@@ -713,7 +713,7 @@ export async function listBackupOcorrencias(
   if (!organizationId) return []
   return pb.collection('backup_ocorrencias').getFullList<BackupOcorrenciaItem>({
     filter: `organization = "${organizationId}"`,
-    expand: 'execucao,evidencia,resolvida_por',
+    expand: 'execucao,evidencia,resolvida_por,resolvida_por_execucao,resolvida_por_evidencia',
     sort: '-created',
   })
 }
@@ -749,13 +749,28 @@ export async function resolverBackupOcorrencia(
   organizationId: string,
   resolucao: string,
   personId?: string,
+  extra?: {
+    resolvida_automaticamente?: boolean
+    resolvida_por_execucao?: string
+    resolvida_por_evidencia?: string
+  },
 ): Promise<BackupOcorrenciaItem> {
-  const result = await pb.collection('backup_ocorrencias').update<BackupOcorrenciaItem>(id, {
+  const payload: Record<string, unknown> = {
     status: 'resolvida',
     resolucao,
     resolvida_em: new Date().toISOString(),
     resolvida_por: personId || null,
-  })
+  }
+  if (extra?.resolvida_automaticamente !== undefined) {
+    payload.resolvida_automaticamente = extra.resolvida_automaticamente
+  }
+  if (extra?.resolvida_por_execucao) {
+    payload.resolvida_por_execucao = extra.resolvida_por_execucao
+  }
+  if (extra?.resolvida_por_evidencia) {
+    payload.resolvida_por_evidencia = extra.resolvida_por_evidencia
+  }
+  const result = await pb.collection('backup_ocorrencias').update<BackupOcorrenciaItem>(id, payload)
   await logAudit({
     organizationId,
     action: 'BACKUP_OCORRENCIA_RESOLVE',
