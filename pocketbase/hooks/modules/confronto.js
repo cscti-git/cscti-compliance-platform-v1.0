@@ -173,14 +173,14 @@ routerAdd(
       return s
     }
 
-    // Helper: extrair array de detalhes_vms de uma execução, com fallback em backup_processamentos
+    // Helper: extrair array de detalhes_vms de uma execução, com fallback em backup_processamentos ou backup_avaliacoes
     const obterDetalhesVmsExecucao = (exRec) => {
       if (!exRec) return []
       let dVms = exRec.get('detalhes_vms')
       if (Array.isArray(dVms) && dVms.length > 0) {
         return dVms
       }
-      // Fallback: buscar em backup_processamentos se a execução não tiver persistido
+      // Fallback 1: buscar em backup_processamentos se a execução não tiver persistido
       const evidenciaId = exRec.getString('evidencia')
       if (evidenciaId) {
         try {
@@ -199,6 +199,28 @@ routerAdd(
           }
         } catch (_) {}
       }
+      // Fallback 2: buscar em backup_avaliacoes correspondente (itens_avaliados ou confronto_escopo.comprovado)
+      try {
+        const avals = $app.findRecordsByFilter(
+          'backup_avaliacoes',
+          `execucao = '${exRec.id}'`,
+          '-created',
+          1,
+          0,
+        )
+        if (avals.length > 0) {
+          const cEsc = avals[0].get('confronto_escopo')
+          if (cEsc && Array.isArray(cEsc.comprovado) && cEsc.comprovado.length > 0) {
+            return cEsc.comprovado.map((comp) => ({
+              nome: comp.ativo_nome || comp.item_comprovante,
+              status: comp.status || 'success',
+              ativo_id: comp.ativo_id,
+              status_escopo: 'coberto',
+              fora_escopo: false,
+            }))
+          }
+        }
+      } catch (_) {}
       return []
     }
 
@@ -886,15 +908,75 @@ routerAdd(
 
         const nomeJobReconciliado = extrairNomeJob(ex, rotina)
 
+        // Se a avaliação já possui confronto completo e correto com comprovado não-vazio,
+        // sincronizar diretamente para a execução (Fonte Única de Verdade)
+        let confrontoCopiadoDaAvaliacao = null
+        try {
+          const avalsExistentes = $app.findRecordsByFilter(
+            'backup_avaliacoes',
+            `execucao = '${ex.id}'`,
+            '-created',
+            1,
+            0,
+          )
+          if (avalsExistentes.length > 0) {
+            const cAval = avalsExistentes[0].get('confronto_escopo')
+            if (
+              cAval &&
+              typeof cAval === 'object' &&
+              Array.isArray(cAval.comprovado) &&
+              cAval.comprovado.length > 0 &&
+              Array.isArray(cAval.exigencias) &&
+              cAval.exigencias.length > 0
+            ) {
+              confrontoCopiadoDaAvaliacao = cAval
+            }
+          }
+        } catch (errBuscaAval) {
+          console.error(
+            '[confronto:reconciliacao] Erro ao buscar avaliação para cópia na execução #' +
+              ex.id +
+              ':',
+            errBuscaAval?.message || errBuscaAval,
+          )
+        }
+
         // Se a execução tem comprovado vazio ou inflado, ou precisa de reconciliação granular
         if (
           precisaAtualizar ||
-          (confAntigo &&
-            confAntigo.comprovado &&
-            confAntigo.comprovado.length === 0 &&
-            modalidadeEx === 'local') ||
+          confrontoCopiadoDaAvaliacao ||
+          (confAntigo && confAntigo.comprovado && confAntigo.comprovado.length === 0) ||
           temDetalhesVms
         ) {
+          if (confrontoCopiadoDaAvaliacao) {
+            try {
+              ex.set('confronto_escopo', confrontoCopiadoDaAvaliacao)
+              $app.save(ex)
+              totalExecucoesReconciliadas++
+              console.log(
+                `[confronto:reconciliacao] Confronto copiado com sucesso da avaliação para a execução #${ex.id}. Comprovados: ${confrontoCopiadoDaAvaliacao.comprovado.length}.`,
+              )
+              continue
+            } catch (errSaveCopia) {
+              console.error(
+                `[confronto:reconciliacao] FALHA LOUD ao salvar confronto copiado na execução #${ex.id}:`,
+                errSaveCopia?.message || errSaveCopia,
+              )
+              try {
+                const auditCol = $app.findCollectionByNameOrId('audit_log')
+                const auditRec = new Record(auditCol)
+                auditRec.set('organization', targetOrgId)
+                auditRec.set('action', 'BACKUP_EXECUCAO_UPDATE_ERROR')
+                auditRec.set('entity', 'Backup e Continuidade')
+                auditRec.set(
+                  'detail',
+                  `FALHA ao sincronizar confronto da avaliação para a execução #${ex.id}: ${errSaveCopia?.message || String(errSaveCopia)}`,
+                )
+                auditRec.set('metadata', { execucao_id: ex.id, error: String(errSaveCopia) })
+                $app.save(auditRec)
+              } catch (_) {}
+            }
+          }
           // Reconstruir comprovado e pendencias a partir dos ativos exigidos
           const novoComprovado = []
           const novasPendencias = []
@@ -1100,9 +1182,29 @@ routerAdd(
             total_comprovadas: novoComprovado.length,
             total_pendencias: novasPendencias.length,
           }
-          ex.set('confronto_escopo', novoConfronto)
-          $app.save(ex)
-          totalExecucoesReconciliadas++
+          try {
+            ex.set('confronto_escopo', novoConfronto)
+            $app.save(ex)
+            totalExecucoesReconciliadas++
+          } catch (errSaveEx) {
+            console.error(
+              `[confronto:reconciliacao] FALHA LOUD ao salvar confronto recalculado na execução #${ex.id}:`,
+              errSaveEx?.message || errSaveEx,
+            )
+            try {
+              const auditCol = $app.findCollectionByNameOrId('audit_log')
+              const auditRec = new Record(auditCol)
+              auditRec.set('organization', targetOrgId)
+              auditRec.set('action', 'BACKUP_EXECUCAO_UPDATE_ERROR')
+              auditRec.set('entity', 'Backup e Continuidade')
+              auditRec.set(
+                'detail',
+                `FALHA ao salvar confronto recalculado na execução #${ex.id}: ${errSaveEx?.message || String(errSaveEx)}`,
+              )
+              auditRec.set('metadata', { execucao_id: ex.id, error: String(errSaveEx) })
+              $app.save(auditRec)
+            } catch (_) {}
+          }
 
           // Atualizar avaliação correspondente
           try {
@@ -1117,22 +1219,27 @@ routerAdd(
               const avRec = avals[0]
               avRec.set('confronto_escopo', novoConfronto)
 
-              // Ajustar laudo técnico da avaliação para que não seja conflitante
-              const laudoObj = avRec.get('laudo_tecnico')
+              // Ajustar laudo técnico da avaliação para que não seja conflitante (com clone defensivo para PocketBase Go slice)
+              let laudoObj = avRec.get('laudo_tecnico')
               if (laudoObj && typeof laudoObj === 'object') {
-                const checks = laudoObj.verificacoes || []
-                for (let ci = 0; ci < checks.length; ci++) {
-                  if (checks[ci].item === 'identificacao') {
-                    checks[ci].passou = true
-                    checks[ci].status = 'conforme'
-                    checks[ci].detalhes =
-                      'Regra de identificação correspondente ao job Veeam identificada com sucesso.'
+                try {
+                  const laudoClone = JSON.parse(JSON.stringify(laudoObj))
+                  const checks = laudoClone.verificacoes || []
+                  for (let ci = 0; ci < checks.length; ci++) {
+                    if (checks[ci].item === 'identificacao') {
+                      checks[ci].passou = true
+                      checks[ci].status = 'conforme'
+                      checks[ci].detalhes =
+                        'Regra de identificação correspondente ao job Veeam identificada com sucesso.'
+                    }
                   }
+                  laudoClone.verificacoes = checks
+                  laudoClone.resultado = 'conforme'
+                  laudoClone.veredito = `Conforme: Cópia executada com sucesso. Modalidade comprovada: ${modalidadeEx.toUpperCase()}.`
+                  avRec.set('laudo_tecnico', laudoClone)
+                } catch (_) {
+                  // Se falhar o parse/clone, mantém laudo original
                 }
-                laudoObj.verificacoes = checks
-                laudoObj.resultado = 'conforme'
-                laudoObj.veredito = `Conforme: Cópia executada com sucesso. Modalidade comprovada: ${modalidadeEx.toUpperCase()}.`
-                avRec.set('laudo_tecnico', laudoObj)
                 avRec.set('resultado_conformidade', 'conforme')
                 avRec.set(
                   'detalhe',
