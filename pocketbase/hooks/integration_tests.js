@@ -2,50 +2,6 @@
 // POST /backend/v1/integrations/test-glpi
 // POST /backend/v1/integrations/test-imap
 
-routerAdd('POST', '/backend/v1/test-invoke-confronto-live', (e) => {
-  try {
-    const orgId = '8kl8n6vz64lnxgb'
-    const users = $app.findRecordsByFilter('users', `organization = '${orgId}'`, '-created', 1, 0)
-    if (users.length === 0) {
-      return e.json(404, { error: 'Nenhum usuário da org encontrado' })
-    }
-    const testUser = users[0]
-    const token = $app.newRecordAuthToken(testUser)
-
-    const testRes = $http.send({
-      url: 'http://127.0.0.1:8090/backend/v1/backup/confronto',
-      method: 'POST',
-      headers: {
-        Authorization: token,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10,
-    })
-
-    const auditCol = $app.findCollectionByNameOrId('audit_log')
-    const auditRec = new Record(auditCol)
-    auditRec.set('organization', orgId)
-    auditRec.set('user', testUser.id)
-    auditRec.set('user_name', testUser.getString('name') || testUser.getString('email'))
-    auditRec.set('user_email', testUser.getString('email'))
-    auditRec.set('action', 'TEST_LIVE_CONFRONTO_INVOKE')
-    auditRec.set('entity', 'BackupConfronto')
-    auditRec.set('detail', `Status: ${testRes.statusCode}`)
-    auditRec.set('metadata', {
-      statusCode: testRes.statusCode,
-      responseBody: testRes.json || testRes.raw,
-    })
-    $app.save(auditRec)
-
-    return e.json(200, {
-      testStatusCode: testRes.statusCode,
-      responseJson: testRes.json,
-    })
-  } catch (err) {
-    return e.json(500, { error: String(err) })
-  }
-})
-
 routerAdd(
   'GET',
   '/backend/v1/integration-tests/run',
@@ -53,31 +9,6 @@ routerAdd(
     const auth = e.auth
     if (!auth) {
       return e.forbiddenError('Não autenticado')
-    }
-
-    const queryAction = e.requestInfo().query ? e.requestInfo().query.action : ''
-    if (queryAction === 'dump-confronto') {
-      const orgId =
-        (e.requestInfo().query && e.requestInfo().query.organization) ||
-        auth.getString('organization') ||
-        '8kl8n6vz64lnxgb'
-      console.log('[test-confronto-trigger] Executando dump de confronto para org:', orgId)
-
-      // Testar execução da rota confronto gravando o resultado em audit_log
-      try {
-        const auditCol = $app.findCollectionByNameOrId('audit_log')
-        const auditRec = new Record(auditCol)
-        auditRec.set('organization', orgId)
-        auditRec.set('user', auth.id)
-        auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
-        auditRec.set('user_email', auth.getString('email'))
-        auditRec.set('action', 'TEST_CONFRONTO_DUMP')
-        auditRec.set('entity', 'Test')
-        auditRec.set('detail', 'Dump triggered via integration-tests')
-        $app.save(auditRec)
-      } catch (_) {}
-
-      return e.json(200, { ok: true, action: 'dump-confronto', org: orgId })
     }
 
     const systemRole = auth.getString('system_role') || 'usuario'
