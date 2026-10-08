@@ -27,6 +27,25 @@ routerAdd(
   'GET',
   '/backend/v1/backup/confronto',
   (e) => {
+    const normalizarJson = (valor) => {
+      if (valor === null || valor === undefined) return null
+      if (typeof valor === 'string') {
+        const s = valor.trim()
+        if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+          try {
+            return JSON.parse(s)
+          } catch (_) {
+            return valor
+          }
+        }
+        return valor
+      }
+      try {
+        return JSON.parse(JSON.stringify(valor))
+      } catch (_) {
+        return valor
+      }
+    }
     const auth = e.auth
     if (!auth) {
       return e.forbiddenError('Não autenticado.')
@@ -188,7 +207,7 @@ routerAdd(
     // Helper: extrair array de detalhes_vms de uma execução, com fallback em backup_processamentos ou backup_avaliacoes
     const obterDetalhesVmsExecucao = (exRec) => {
       if (!exRec) return []
-      let dVms = exRec.get('detalhes_vms')
+      let dVms = normalizarJson(exRec.get('detalhes_vms'))
       if (Array.isArray(dVms) && dVms.length > 0) {
         return dVms
       }
@@ -204,7 +223,7 @@ routerAdd(
             0,
           )
           if (procs.length > 0) {
-            const resProc = procs[0].get('resultado')
+            const resProc = normalizarJson(procs[0].get('resultado'))
             if (resProc && Array.isArray(resProc.vms) && resProc.vms.length > 0) {
               return resProc.vms
             }
@@ -221,7 +240,7 @@ routerAdd(
           0,
         )
         if (avals.length > 0) {
-          const cEsc = avals[0].get('confronto_escopo')
+          const cEsc = normalizarJson(avals[0].get('confronto_escopo'))
           if (cEsc && Array.isArray(cEsc.comprovado) && cEsc.comprovado.length > 0) {
             return cEsc.comprovado.map((comp) => ({
               nome: comp.ativo_nome || comp.item_comprovante,
@@ -259,7 +278,7 @@ routerAdd(
             0,
           )
           if (avals.length > 0) {
-            const itensAv = avals[0].get('itens_avaliados')
+            const itensAv = normalizarJson(avals[0].get('itens_avaliados'))
             if (itensAv && typeof itensAv === 'object' && itensAv.job_name) {
               jobNome = String(itensAv.job_name).trim()
             }
@@ -279,7 +298,7 @@ routerAdd(
               0,
             )
             if (procs.length > 0) {
-              const resProc = procs[0].get('resultado')
+              const resProc = normalizarJson(procs[0].get('resultado'))
               if (resProc && typeof resProc === 'object' && resProc.job_name) {
                 jobNome = String(resProc.job_name).trim()
               }
@@ -324,12 +343,12 @@ routerAdd(
           0,
         )
         if (avals.length > 0) {
-          const itensAv = avals[0].get('itens_avaliados')
+          const itensAv = normalizarJson(avals[0].get('itens_avaliados'))
           if (itensAv && typeof itensAv === 'object') {
             jobNameLaudo = String(itensAv.job_name || '')
             adaptadorCodigo = String(itensAv.adaptador || '')
           }
-          const laudoObj = avals[0].get('laudo_tecnico')
+          const laudoObj = normalizarJson(avals[0].get('laudo_tecnico'))
           if (laudoObj && typeof laudoObj === 'object') {
             if (
               !assuntoEvidencia &&
@@ -359,7 +378,7 @@ routerAdd(
             if (!adaptadorCodigo) {
               adaptadorCodigo = procs[0].getString('adaptador_usado') || ''
             }
-            const resProc = procs[0].get('resultado')
+            const resProc = normalizarJson(procs[0].get('resultado'))
             if (resProc && typeof resProc === 'object' && resProc.job_name) {
               if (!jobNameLaudo) jobNameLaudo = String(resProc.job_name || '')
             }
@@ -591,7 +610,105 @@ routerAdd(
             const ex = execucoes[ei]
             if (ex.getString('rotina') !== rotinaId) continue
 
-            const modalidadeProvadaPelaExecucao = inferirModalidadeComprovante(ex, cand.rotina)
+            // REGRA FUNDAMENTAL: Se a execução já possui confronto_escopo.comprovado gravado,
+            // essa É a fonte única de verdade gravada pelo processamento!
+            const confGravadoEx = normalizarJson(ex.get('confronto_escopo'))
+            let modalidadeProvadaPelaExecucao = null
+            let itemGravadoComprovado = null
+
+            if (
+              confGravadoEx &&
+              typeof confGravadoEx === 'object' &&
+              Array.isArray(confGravadoEx.comprovado) &&
+              confGravadoEx.comprovado.length > 0
+            ) {
+              // Verificar se este ativo específico consta como comprovado no confronto gravado
+              const assetNomeNormTemp = normalizarString(assetNome)
+              const assetNomeCompTemp = normalizarCompacto(assetNome)
+              for (let cidx = 0; cidx < confGravadoEx.comprovado.length; cidx++) {
+                const compItem = confGravadoEx.comprovado[cidx]
+                const itemNome = compItem.ativo_nome || compItem.item_comprovante || ''
+                const itemNorm = normalizarString(itemNome)
+                const itemComp = normalizarCompacto(itemNome)
+                const bateuAtivo =
+                  compItem.ativo_id === assetId ||
+                  (itemNorm &&
+                    (itemNorm === assetNomeNormTemp ||
+                      itemNorm.includes(assetNomeNormTemp) ||
+                      assetNomeNormTemp.includes(itemNorm))) ||
+                  (itemComp &&
+                    (itemComp === assetNomeCompTemp ||
+                      itemComp.includes(assetNomeCompTemp) ||
+                      assetNomeCompTemp.includes(itemComp)))
+
+                if (bateuAtivo && compItem.modalidade) {
+                  modalidadeProvadaPelaExecucao = compItem.modalidade
+                  itemGravadoComprovado = compItem
+                  break
+                }
+              }
+
+              // Se o ativo não bateu diretamente mas a execução inteira comprova uma modalidade homogênea
+              if (!modalidadeProvadaPelaExecucao && confGravadoEx.comprovado[0]?.modalidade) {
+                modalidadeProvadaPelaExecucao = confGravadoEx.comprovado[0].modalidade
+              }
+            }
+
+            // Fallback: se não há confronto gravado na execução, consultar a avaliação vinculada
+            if (!modalidadeProvadaPelaExecucao) {
+              try {
+                const avalsEx = $app.findRecordsByFilter(
+                  'backup_avaliacoes',
+                  `execucao = '${ex.id}'`,
+                  '-created',
+                  1,
+                  0,
+                )
+                if (avalsEx.length > 0) {
+                  const confAval = normalizarJson(avalsEx[0].get('confronto_escopo'))
+                  if (
+                    confAval &&
+                    typeof confAval === 'object' &&
+                    Array.isArray(confAval.comprovado) &&
+                    confAval.comprovado.length > 0
+                  ) {
+                    const assetNomeNormTemp = normalizarString(assetNome)
+                    const assetNomeCompTemp = normalizarCompacto(assetNome)
+                    for (let cidx = 0; cidx < confAval.comprovado.length; cidx++) {
+                      const compItem = confAval.comprovado[cidx]
+                      const itemNome = compItem.ativo_nome || compItem.item_comprovante || ''
+                      const itemNorm = normalizarString(itemNome)
+                      const itemComp = normalizarCompacto(itemNome)
+                      const bateuAtivo =
+                        compItem.ativo_id === assetId ||
+                        (itemNorm &&
+                          (itemNorm === assetNomeNormTemp ||
+                            itemNorm.includes(assetNomeNormTemp) ||
+                            assetNomeNormTemp.includes(itemNorm))) ||
+                        (itemComp &&
+                          (itemComp === assetNomeCompTemp ||
+                            itemComp.includes(assetNomeCompTemp) ||
+                            assetNomeCompTemp.includes(itemComp)))
+
+                      if (bateuAtivo && compItem.modalidade) {
+                        modalidadeProvadaPelaExecucao = compItem.modalidade
+                        itemGravadoComprovado = compItem
+                        break
+                      }
+                    }
+                    if (!modalidadeProvadaPelaExecucao && confAval.comprovado[0]?.modalidade) {
+                      modalidadeProvadaPelaExecucao = confAval.comprovado[0].modalidade
+                    }
+                  }
+                }
+              } catch (_) {}
+            }
+
+            // Fallback final: apenas se não houver confronto gravado nem na execução nem na avaliação
+            if (!modalidadeProvadaPelaExecucao) {
+              modalidadeProvadaPelaExecucao = inferirModalidadeComprovante(ex, cand.rotina)
+            }
+
             if (modalidadeProvadaPelaExecucao !== modalidadeNome) {
               continue
             }
@@ -651,11 +768,26 @@ routerAdd(
               statusIndividualAtivo = ex.getString('status') || 'sucesso'
             }
 
+            // Se o item já estava comprovado no confronto_escopo gravado, garantir match direto!
+            if (itemGravadoComprovado && itemGravadoComprovado.modalidade === modalidadeNome) {
+              cobreAtivoNaExecucao = true
+              if (itemGravadoComprovado.status) {
+                const st = String(itemGravadoComprovado.status).toLowerCase()
+                statusIndividualAtivo = st === 'success' || st === 'sucesso' ? 'sucesso' : st
+              } else {
+                statusIndividualAtivo = 'sucesso'
+              }
+            }
+
             if (cobreAtivoNaExecucao) {
-              const dtIso = extrairDataExecucao(ex)
+              const dtIso =
+                (itemGravadoComprovado && itemGravadoComprovado.comprovado_em) ||
+                extrairDataExecucao(ex)
               if (dtIso) {
                 const dtTime = new Date(dtIso).getTime()
-                const nomeJobExec = extrairNomeJob(ex, cand.rotina)
+                const nomeJobExec =
+                  (itemGravadoComprovado && itemGravadoComprovado.job_nome) ||
+                  extrairNomeJob(ex, cand.rotina)
 
                 if (dtTime > ultimaExecucaoCronologicaTime) {
                   ultimaExecucaoCronologicaTime = dtTime
@@ -874,16 +1006,57 @@ routerAdd(
         const rotinaId = ex.getString('rotina')
         const rotina = rotinasMap[rotinaId]
 
+        // Se a execução já possui confronto_escopo gravado com comprovado não-vazio,
+        // use-o como FONTE ÚNICA DE VERDADE. NUNCA re-inferir ou recalcular se já existe!
+        const confExistenteEx = normalizarJson(ex.get('confronto_escopo'))
+        const temComprovadoValidoEx =
+          confExistenteEx &&
+          typeof confExistenteEx === 'object' &&
+          Array.isArray(confExistenteEx.comprovado) &&
+          confExistenteEx.comprovado.length > 0
+
+        if (temComprovadoValidoEx) {
+          // Já está comprovado e consistente pela fonte de verdade do processamento.
+          // Sincronizar apenas com backup_avaliacoes caso ela não tenha o confronto.
+          try {
+            const avalsExistentes = $app.findRecordsByFilter(
+              'backup_avaliacoes',
+              `execucao = '${ex.id}'`,
+              '-created',
+              1,
+              0,
+            )
+            if (avalsExistentes.length > 0) {
+              const aRec = avalsExistentes[0]
+              const cAval = normalizarJson(aRec.get('confronto_escopo'))
+              if (
+                !cAval ||
+                !Array.isArray(cAval.comprovado) ||
+                cAval.comprovado.length !== confExistenteEx.comprovado.length
+              ) {
+                aRec.set('confronto_escopo', JSON.parse(JSON.stringify(confExistenteEx)))
+                $app.save(aRec)
+              }
+            }
+          } catch (errSyncAval) {
+            console.error(
+              `[confronto:reconciliacao] Falha ao sincronizar avaliação a partir da execução #${ex.id}:`,
+              errSyncAval?.message || errSyncAval,
+            )
+          }
+          continue
+        }
+
         const modalidadeEx = inferirModalidadeComprovante(ex, rotina)
         if (!modalidadeEx) continue
 
         // 1. Garantir detalhes_vms se disponíveis em outros registros
         let dVmsEx = obterDetalhesVmsExecucao(ex)
         const temDetalhesVms = Array.isArray(dVmsEx) && dVmsEx.length > 0
-        const dVmsGravados = ex.get('detalhes_vms')
+        const dVmsGravados = normalizarJson(ex.get('detalhes_vms'))
         if ((!Array.isArray(dVmsGravados) || dVmsGravados.length === 0) && temDetalhesVms) {
           try {
-            ex.set('detalhes_vms', dVmsEx)
+            ex.set('detalhes_vms', JSON.parse(JSON.stringify(dVmsEx)))
             $app.save(ex)
           } catch (errSaveDv) {
             console.error(
@@ -892,13 +1065,6 @@ routerAdd(
             )
           }
         }
-
-        const confExistenteEx = ex.get('confronto_escopo')
-        const temComprovadoValidoEx =
-          confExistenteEx &&
-          typeof confExistenteEx === 'object' &&
-          Array.isArray(confExistenteEx.comprovado) &&
-          confExistenteEx.comprovado.length > 0
 
         // 2. Buscar avaliação vinculada para sincronização (Fonte Única de Verdade)
         let avalRecEncontrada = null
@@ -913,7 +1079,7 @@ routerAdd(
           )
           if (avalsExistentes.length > 0) {
             avalRecEncontrada = avalsExistentes[0]
-            const cAval = avalRecEncontrada.get('confronto_escopo')
+            const cAval = normalizarJson(avalRecEncontrada.get('confronto_escopo'))
             if (
               cAval &&
               typeof cAval === 'object' &&
@@ -942,7 +1108,7 @@ routerAdd(
 
           if (precisaCopiar) {
             try {
-              ex.set('confronto_escopo', confrontoCopiadoDaAvaliacao)
+              ex.set('confronto_escopo', JSON.parse(JSON.stringify(confrontoCopiadoDaAvaliacao)))
               $app.save(ex)
               totalExecucoesReconciliadas++
               console.log(
@@ -1200,7 +1366,7 @@ routerAdd(
 
         // Persistir novo confronto válido na execução
         try {
-          ex.set('confronto_escopo', novoConfronto)
+          ex.set('confronto_escopo', JSON.parse(JSON.stringify(novoConfronto)))
           $app.save(ex)
           totalExecucoesReconciliadas++
         } catch (errSaveEx) {

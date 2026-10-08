@@ -3,8 +3,8 @@
 // POST /backend/v1/integrations/test-imap
 
 routerAdd(
-  'POST',
-  '/backend/v1/integrations/test-glpi',
+  'GET',
+  '/backend/v1/integration-tests/run',
   (e) => {
     const auth = e.auth
     if (!auth) {

@@ -3712,6 +3712,26 @@ routerAdd(
       return lista
     }
 
+    const normalizarJson = (valor) => {
+      if (valor === null || valor === undefined) return null
+      if (typeof valor === 'string') {
+        const s = valor.trim()
+        if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+          try {
+            return JSON.parse(s)
+          } catch (_) {
+            return valor
+          }
+        }
+        return valor
+      }
+      try {
+        return JSON.parse(JSON.stringify(valor))
+      } catch (_) {
+        return valor
+      }
+    }
+
     // Nomes a ignorar (job/rotina/aliases)
     const rotinaNome = rotinaRec.getString('nome') || ''
     const rotinaAliases = extrairAliases(rotinaRec.getString('aliases') || '')
@@ -3840,7 +3860,7 @@ routerAdd(
         }
 
         if (targetAval) {
-          const laudo = targetAval.get('laudo_tecnico') || {}
+          const laudo = normalizarJson(targetAval.get('laudo_tecnico')) || {}
           novoVeredito = `Conforme: cópia executada com sucesso com todas as fontes cadastradas na rotina "${rotinaNome}".`
           targetAval.set('resultado_conformidade', 'conforme')
           targetAval.set('detalhe', novoVeredito)
@@ -3885,7 +3905,7 @@ routerAdd(
               }
             }
 
-            targetAval.set('laudo_tecnico', laudo)
+            targetAval.set('laudo_tecnico', JSON.parse(JSON.stringify(laudo)))
             novoLaudo = laudo
           }
 
