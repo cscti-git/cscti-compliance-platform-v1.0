@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CsctiLogo } from '@/components/CsctiLogo'
+import { formatDateTime, formatDate, formatTime } from '@/lib/dateTime'
 import {
   Printer,
   ArrowLeft,
@@ -162,10 +163,8 @@ export const BackupReportPage: React.FC = () => {
               </div>
             </div>
             <div className="text-right text-[11px] text-slate-600">
-              <p className="font-semibold text-slate-900">
-                Emissão: {dataEmissao.toLocaleDateString('pt-BR')}
-              </p>
-              <p>Horário: {dataEmissao.toLocaleTimeString('pt-BR')}</p>
+              <p className="font-semibold text-slate-900">Emissão: {formatDate(dataEmissao)}</p>
+              <p>Horário: {formatTime(dataEmissao)}</p>
               <p className="font-mono text-[10px] text-slate-400">
                 DOC-BKP-{dataEmissao.getTime().toString().slice(-8)}
               </p>
@@ -547,7 +546,7 @@ export const BackupReportPage: React.FC = () => {
               {execucoes.slice(0, 10).map((exe) => (
                 <tr key={exe.id}>
                   <td className="p-2 text-slate-600">
-                    {exe.data_inicio ? new Date(exe.data_inicio).toLocaleString('pt-BR') : '—'}
+                    {exe.data_inicio ? formatDateTime(exe.data_inicio, { fallback: '—' }) : '—'}
                   </td>
                   <td className="p-2 font-semibold text-slate-900">
                     {exe.expand?.rotina?.nome || 'Geral'}
@@ -596,7 +595,7 @@ export const BackupReportPage: React.FC = () => {
                         : t.tipo === 'restauracao_parcial'
                           ? 'Restauração Parcial'
                           : 'Simulação de Desastre'}{' '}
-                      • Realizado em {new Date(t.data_teste).toLocaleDateString('pt-BR')} (
+                      • Realizado em {formatDate(t.data_teste, '—')} (
                       {t.tempo_decorrido_minutos || 0} min)
                     </strong>
                     <Badge className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900">

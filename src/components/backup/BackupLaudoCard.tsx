@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatDateTime } from '@/lib/dateTime'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { criarFontesPendentes } from '@/services/backupService'
@@ -105,7 +106,7 @@ export function BackupLaudoCard({
               <span className="text-[11px] text-slate-500">
                 Emitido em:{' '}
                 <strong className="text-slate-700 font-mono">
-                  {new Date(laudo.gerado_em).toLocaleString('pt-BR')}
+                  {formatDateTime(laudo.gerado_em)}
                 </strong>
               </span>
             )}

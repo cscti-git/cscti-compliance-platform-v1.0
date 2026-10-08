@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { formatDateTime, formatDate } from '@/lib/dateTime'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1058,9 +1059,9 @@ Lista de atividades (1 dia):
                   Status do conector:{' '}
                   <strong className="text-slate-800">
                     {lastFetchResult?.last_check
-                      ? new Date(lastFetchResult.last_check).toLocaleString('pt-BR')
+                      ? formatDateTime(lastFetchResult.last_check)
                       : emailConnector?.last_sync
-                        ? new Date(emailConnector.last_sync).toLocaleString('pt-BR')
+                        ? formatDateTime(emailConnector.last_sync)
                         : 'Aguardando agente local'}
                   </strong>
                 </span>
@@ -1163,7 +1164,7 @@ Lista de atividades (1 dia):
                           </td>
                           <td className="py-2.5 px-3 text-slate-600">
                             {item.data_recebida
-                              ? new Date(item.data_recebida).toLocaleString('pt-BR')
+                              ? formatDateTime(item.data_recebida, { fallback: '—' })
                               : '—'}
                           </td>
                           <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">
@@ -1260,9 +1261,7 @@ Lista de atividades (1 dia):
                     monitoramentos.map((mon) => (
                       <tr key={mon.id} className="hover:bg-slate-50/70 transition">
                         <td className="py-2.5 px-3 text-slate-700 font-medium">
-                          {mon.data_monitoramento
-                            ? new Date(mon.data_monitoramento).toLocaleDateString('pt-BR')
-                            : '—'}
+                          {mon.data_monitoramento ? formatDate(mon.data_monitoramento, '—') : '—'}
                         </td>
                         <td className="py-2.5 px-3">
                           <span className="font-bold text-slate-900 block truncate max-w-xs">
@@ -1717,8 +1716,8 @@ Lista de atividades (1 dia):
                       </span>
                       <span>
                         {selectedEvidencia.data_recebida
-                          ? new Date(selectedEvidencia.data_recebida).toLocaleString('pt-BR')
-                          : '—'}
+                          ? formatDateTime(selectedEvidencia.data_recebida, { fallback: '—' })
+                          : '—'}{' '}
                       </span>
                     </div>
                   </div>
@@ -2043,8 +2042,8 @@ Lista de atividades (1 dia):
                       </span>
                       <span>
                         {selectedMonit.data_monitoramento
-                          ? new Date(selectedMonit.data_monitoramento).toLocaleDateString('pt-BR')
-                          : '—'}
+                          ? formatDate(selectedMonit.data_monitoramento, '—')
+                          : '—'}{' '}
                       </span>
                     </div>
                   </div>
@@ -2181,7 +2180,7 @@ Lista de atividades (1 dia):
                   <p className="text-slate-700">
                     <strong>Data Recebida:</strong>{' '}
                     {evidenciaParaExcluir.data_recebida
-                      ? new Date(evidenciaParaExcluir.data_recebida).toLocaleString('pt-BR')
+                      ? formatDateTime(evidenciaParaExcluir.data_recebida, { fallback: '—' })
                       : '—'}
                   </p>
                   <p className="text-slate-700 flex items-center gap-1 font-mono text-[11px]">

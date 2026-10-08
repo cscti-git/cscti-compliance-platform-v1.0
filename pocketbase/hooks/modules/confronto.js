@@ -548,7 +548,8 @@ routerAdd(
         fontesDoAtivo = todasFontes
       }
 
-      const avaliarModalidade = (modalidadeNome) => {
+      const avaliarModalidade = (modalidadeNomeParam) => {
+        const modalidadeNome = String(modalidadeNomeParam || '').toLowerCase()
         const fontesCandidatas = []
         for (let fi = 0; fi < fontesDoAtivo.length; fi++) {
           const f = fontesDoAtivo[fi]
@@ -666,7 +667,7 @@ routerAdd(
               confGravadoEx.comprovado.length > 0
             ) {
               const matched = verificarMatchAtivo(confGravadoEx.comprovado)
-              if (matched && matched.modalidade === modalidadeNome) {
+              if (matched && String(matched.modalidade || '').toLowerCase() === modalidadeNome) {
                 itemGravadoComprovado = matched
               }
             }
@@ -690,7 +691,10 @@ routerAdd(
                     confAval.comprovado.length > 0
                   ) {
                     const matched = verificarMatchAtivo(confAval.comprovado)
-                    if (matched && matched.modalidade === modalidadeNome) {
+                    if (
+                      matched &&
+                      String(matched.modalidade || '').toLowerCase() === modalidadeNome
+                    ) {
                       itemGravadoComprovado = matched
                     }
                   }
@@ -712,7 +716,7 @@ routerAdd(
               // Recálculo ao vivo (inferência de modalidade + casamento de fonte) só roda
               // quando o campo gravado está vazio ou ausente para o ativo.
               let modalidadeRecalculada = inferirModalidadeComprovante(ex, cand.rotina)
-              if (modalidadeRecalculada === modalidadeNome) {
+              if (String(modalidadeRecalculada || '').toLowerCase() === modalidadeNome) {
                 const dVms = obterDetalhesVmsExecucao(ex)
                 const assetNomeNorm = normalizarString(assetNome)
                 const assetNomeComp = normalizarCompacto(assetNome)
@@ -1157,9 +1161,10 @@ routerAdd(
             }
           }
 
+          const modalidadeExNorm = String(modalidadeEx || '').toLowerCase()
           for (let mi = 0; mi < mods.length; mi++) {
-            const m = mods[mi]
-            if (m === modalidadeEx && vmComSucesso) {
+            const m = String(mods[mi] || '').toLowerCase()
+            if (m === modalidadeExNorm && vmComSucesso) {
               novoComprovado.push({
                 ativo_id: aId,
                 ativo_nome: aNome,
@@ -1179,7 +1184,7 @@ routerAdd(
             } else {
               const modLabel = m === 'local' ? 'Local' : m === 'nuvem' ? 'Nuvem' : 'Replicação'
               let motivoPend = `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`
-              if (m === modalidadeEx) {
+              if (m === modalidadeExNorm) {
                 if (!vmPresente) {
                   motivoPend = `Ativo não mencionado neste comprovante (pode ser coberto por outra rotina/job).`
                 } else if (!vmComSucesso) {
@@ -1197,7 +1202,7 @@ routerAdd(
                 item_comprovante: aNome,
                 motivo: motivoPend,
                 job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
-                atendivel_por_outra_rotina: m !== modalidadeEx,
+                atendivel_por_outra_rotina: m !== modalidadeExNorm,
               })
             }
           }

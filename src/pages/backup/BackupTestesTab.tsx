@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { formatDate } from '@/lib/dateTime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -247,7 +248,7 @@ export const BackupTestesTab: React.FC<BackupTestesTabProps> = ({
                       Resultado: {teste.resultado}
                     </Badge>
                     <span className="text-[11px] text-slate-500 font-medium">
-                      {new Date(teste.data_teste).toLocaleDateString('pt-BR')}
+                      {formatDate(teste.data_teste, '—')}
                     </span>
                   </div>
                   <CardTitle className="text-sm font-bold text-slate-900 leading-snug">

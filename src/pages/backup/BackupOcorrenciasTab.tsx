@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { formatDateTime, formatDate } from '@/lib/dateTime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -297,7 +298,7 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
                     <p className="text-xs">{oco.resolucao}</p>
                     {oco.resolvida_em && (
                       <span className="block text-[10px] text-emerald-700 mt-1 font-mono">
-                        Resolvido em {new Date(oco.resolvida_em).toLocaleString('pt-BR')}
+                        Resolvido em {formatDateTime(oco.resolvida_em)}
                       </span>
                     )}
                   </div>
@@ -305,8 +306,7 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
 
                 <div className="pt-2 flex items-center justify-between border-t border-slate-100 text-slate-500">
                   <span className="text-[11px]">
-                    Aberta em:{' '}
-                    {oco.created ? new Date(oco.created).toLocaleDateString('pt-BR') : '—'}
+                    Aberta em: {oco.created ? formatDate(oco.created, '—') : '—'}
                   </span>
 
                   <div className="flex items-center gap-1.5">

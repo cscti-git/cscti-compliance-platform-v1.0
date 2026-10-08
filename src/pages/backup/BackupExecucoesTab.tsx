@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { formatDateTime } from '@/lib/dateTime'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -368,7 +369,7 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
                       </td>
                       <td className="py-2.5 px-3 text-slate-600">
                         {exec.data_inicio
-                          ? new Date(exec.data_inicio).toLocaleString('pt-BR')
+                          ? formatDateTime(exec.data_inicio, { fallback: '—' })
                           : '—'}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[11px] text-slate-800">
@@ -452,7 +453,7 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
               {selectedExecucaoParaLaudo?.expand?.rotina?.nome
                 ? `Rotina: ${selectedExecucaoParaLaudo.expand.rotina.nome} • Registrada em ${
                     selectedExecucaoParaLaudo.data_inicio
-                      ? new Date(selectedExecucaoParaLaudo.data_inicio).toLocaleString('pt-BR')
+                      ? formatDateTime(selectedExecucaoParaLaudo.data_inicio, { fallback: '—' })
                       : '—'
                   }`
                 : 'Parecer técnico automatizado baseado nas políticas e planos cadastrados.'}
@@ -780,7 +781,7 @@ export const BackupExecucoesTab: React.FC<BackupExecucoesTabProps> = ({
                       <span>
                         Data:{' '}
                         {e.data_inicio
-                          ? new Date(e.data_inicio).toLocaleString('pt-BR')
+                          ? formatDateTime(e.data_inicio, { fallback: 'Data n/d' })
                           : 'Data n/d'}
                       </span>
                       <span>•</span>
