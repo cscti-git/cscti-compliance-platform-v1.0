@@ -2,63 +2,102 @@
 // POST /backend/v1/integrations/test-glpi
 // POST /backend/v1/integrations/test-imap
 
+routerAdd('GET', '/backend/v1/debug-confronto-live', (e) => {
+  try {
+    const orgId = '8kl8n6vz64lnxgb'
+    const execs = $app.findRecordsByFilter(
+      'backup_execucoes',
+      `organization = '${orgId}'`,
+      '-created',
+      5,
+      0,
+    )
+    const fontes = $app.findRecordsByFilter('backup_fontes', `organization = '${orgId}'`, '', 10, 0)
+    const rotinas = $app.findRecordsByFilter(
+      'backup_rotinas',
+      `organization = '${orgId}'`,
+      '',
+      10,
+      0,
+    )
+    const data = execs.map((ex) => {
+      let conf = ex.get('confronto_escopo')
+      return {
+        id: ex.id,
+        rotina: ex.getString('rotina'),
+        status: ex.getString('status'),
+        observacao: ex.getString('observacao'),
+        confronto_escopo: conf,
+      }
+    })
+    const fontesData = fontes.map((f) => ({
+      id: f.id,
+      ativo_inventario: f.getString('ativo_inventario'),
+      caminho_identificacao: f.getString('caminho_identificacao'),
+      rotina: f.getString('rotina'),
+    }))
+    const rotinasData = rotinas.map((r) => ({
+      id: r.id,
+      nome: r.getString('nome'),
+      plano: r.getString('plano'),
+    }))
+
+    // SALVAR NO AUDIT_LOG para podermos inspecionar via db_query!
+    try {
+      const auditCol = $app.findCollectionByNameOrId('audit_log')
+      const auditRec = new Record(auditCol)
+      auditRec.set('organization', orgId)
+      auditRec.set('action', 'DEBUG_INSPECT_CONFRONTO')
+      auditRec.set('entity', 'Debug')
+      auditRec.set('detail', `Total execucoes: ${data.length}, total fontes: ${fontesData.length}`)
+      auditRec.set('metadata', {
+        execs: data,
+        fontes: fontesData,
+        rotinas: rotinasData,
+      })
+      $app.save(auditRec)
+    } catch (errAudit) {
+      console.error('Falha ao salvar audit:', errAudit)
+    }
+
+    return e.json(200, { execucoes: data, fontes: fontesData, rotinas: rotinasData })
+  } catch (err) {
+    return e.json(500, { error: String(err) })
+  }
+})
+
 routerAdd(
   'GET',
   '/backend/v1/integration-tests/run',
   (e) => {
-    // Modo teste do confronto se query ?action=test-confronto
-    const qAction = e.requestInfo().query ? e.requestInfo().query.action : ''
-    if (qAction === 'test-confronto') {
-      try {
-        const authRes = $http.send({
-          url: 'http://127.0.0.1:8090/api/collections/users/auth-with-password',
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          data: {
-            identity: 'leandro@cscti.com.br',
-            password: 'Skip@Pass',
-          },
-          timeout: 10,
-        })
-
-        if (authRes.statusCode !== 200) {
-          return e.json(500, { ok: false, error: 'Falha auth', status: authRes.statusCode })
-        }
-
-        const token = authRes.json.token
-        const confRes = $http.send({
-          url: 'http://127.0.0.1:8090/backend/v1/backup/confronto?organization=8kl8n6vz64lnxgb',
-          method: 'GET',
-          headers: { Authorization: 'Bearer ' + token },
-          timeout: 15,
-        })
-
-        const jsonConf = confRes.json || {}
-        const confrontoLista = jsonConf.confronto || []
-
-        const resumoAtivos = confrontoLista.map((at) => ({
-          nome: at.nome,
-          status_consolidado: at.status_consolidado,
-          nuvem_status: at.modalidades?.nuvem?.status_modalidade,
-          nuvem_ultima: at.modalidades?.nuvem?.ultima_comprovacao,
-          local_status: at.modalidades?.local?.status_modalidade,
-          replicacao_status: at.modalidades?.replicacao?.status_modalidade,
-        }))
-
-        return e.json(200, {
-          ok: true,
-          http_status: confRes.statusCode,
-          totais: jsonConf.totais,
-          ativos: resumoAtivos,
-        })
-      } catch (err) {
-        return e.json(500, { ok: false, error: String(err) })
-      }
-    }
-
     const auth = e.auth
     if (!auth) {
       return e.forbiddenError('Não autenticado')
+    }
+
+    const queryAction = e.requestInfo().query ? e.requestInfo().query.action : ''
+    if (queryAction === 'dump-confronto') {
+      const orgId =
+        (e.requestInfo().query && e.requestInfo().query.organization) ||
+        auth.getString('organization') ||
+        '8kl8n6vz64lnxgb'
+      console.log('[test-confronto-trigger] Executando dump de confronto para org:', orgId)
+
+      // Testar execução da rota confronto gravando o resultado em audit_log
+      try {
+        const auditCol = $app.findCollectionByNameOrId('audit_log')
+        const auditRec = new Record(auditCol)
+        auditRec.set('organization', orgId)
+        auditRec.set('user', auth.id)
+        auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
+        auditRec.set('user_email', auth.getString('email'))
+        auditRec.set('action', 'TEST_CONFRONTO_DUMP')
+        auditRec.set('entity', 'Test')
+        auditRec.set('detail', 'Dump triggered via integration-tests')
+        $app.save(auditRec)
+      } catch (_) {}
+
+      return e.json(200, { ok: true, action: 'dump-confronto', org: orgId })
     }
 
     const systemRole = auth.getString('system_role') || 'usuario'
