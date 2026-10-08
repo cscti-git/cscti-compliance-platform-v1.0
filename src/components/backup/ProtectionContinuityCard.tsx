@@ -240,8 +240,16 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
   const percentualConfronto = confrontoData?.totais?.percentual_protegido ?? 0
   const temDadosConfronto = confrontoData !== null && totalExigidosConfronto > 0
 
-  // Ativos 100% protegidos pelas regras da serventia vs exigidos
-  const honestoProtegidos = temDadosConfronto ? totalProtegidosConfronto : 0
+  // Ativos com proteção efetiva / parcial pelas regras da serventia vs exigidos
+  const totalParcialConfronto = confrontoData?.totais?.total_parcial ?? 0
+  const totalComProtecao =
+    confrontoData?.totais?.total_parcialmente_protegidos ??
+    (confrontoData?.confronto
+      ? confrontoData.confronto.filter((a) => (a.total_atendidas || 0) > 0).length
+      : totalProtegidosConfronto + totalParcialConfronto)
+
+  const honestoProtegidos = temDadosConfronto ? totalComProtecao : 0
+  const honestoCompletos = temDadosConfronto ? totalProtegidosConfronto : 0
   const honestoExigidos = temDadosConfronto ? totalExigidosConfronto : totalMonitorados
   const honestoPercentual = temDadosConfronto ? percentualConfronto : 0
 
@@ -399,21 +407,21 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
                 </p>
               </Link>
 
-              {/* Métrica 2: Ativos com backup (Substituído pela validação honesta do confronto) */}
+              {/* Métrica 2: Ativos com backup (Proteção efetiva/parcial no RPO) */}
               <Link
                 to="/backup"
                 className="group p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition block"
-                title="Protegido = todas as modalidades exigidas comprovadas dentro do RPO"
+                title="Proteção efetiva = ativos com rotinas e modalidades comprovadas no RPO"
               >
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
                   <span className="font-semibold uppercase tracking-wider text-[11px]">
-                    Protegidos no RPO
+                    Proteção Efetiva
                   </span>
                   <HardDriveDownload className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                 </div>
                 <div className="text-2xl font-bold text-[#0B2545]">{honestoProtegidos}</div>
                 <p className="text-[11px] text-slate-500 mt-0.5 group-hover:text-indigo-700 inline-flex items-center">
-                  de {honestoExigidos} ativos exigidos{' '}
+                  de {honestoExigidos} com proteção parcial{' '}
                   <ArrowRight className="w-3 h-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </p>
               </Link>
@@ -421,11 +429,11 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
               {/* Métrica 3: Percentual Protegidos (destaque visual honesto estilo Veeam ONE) */}
               <div
                 className="p-3.5 rounded-xl border border-slate-200/80 bg-white shadow-2xs flex flex-col justify-between"
-                title="Confronto honesto: protege = prova recente dentro do RPO. Sem prova recente = desprotegido."
+                title="Confronto por ativo e modalidade: contabiliza proteção efetiva perante as rotinas comprovadas."
               >
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
                   <span className="font-semibold uppercase tracking-wider text-[11px]">
-                    Conformidade
+                    Proteção Efetiva
                   </span>
                   <Badge
                     variant="outline"
@@ -442,10 +450,11 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
                   {honestoExigidos > 0 ? `${honestoPercentual}%` : '—'}
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  {honestoProtegidos} de {honestoExigidos} protegidos no RPO
+                  {honestoProtegidos > 0
+                    ? `${honestoProtegidos} de ${honestoExigidos} com proteção completa`
+                    : `${confrontoData?.totais?.total_parcialmente_protegidos ?? honestoExigidos} de ${honestoExigidos} parcialmente protegidos`}
                 </p>
               </div>
-
               {/* Métrica 4: Última evidência */}
               <Link
                 to="/backup?aba=evidencias"

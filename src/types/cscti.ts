@@ -769,24 +769,31 @@ export interface ConfrontoAtivoItem {
   }
   status_consolidado: ConfrontoStatusConsolidado
   total_atendidas: number
-  tem_falha_recente?: boolean
-  falha_detalhe?: string | null
-  ocorrencias_abertas_count?: number
+  percentual_protecao?: number
+  tem_falha_recente: boolean
+  falha_detalhe: string | null
+  ocorrencias_abertas_count: number
+}
+
+export interface BackupConfrontoTotais {
+  total_ativos_inventario: number
+  total_ativos_exigidos: number
+  total_protegidos: number
+  total_protegidos_completo?: number
+  total_parcial: number
+  total_parcialmente_protegidos?: number
+  total_nao_protegido: number
+  total_nao_cadastrado: number
+  percentual_protegido: number
+  percentual_protegido_efetivo?: number
+  percentual_protegido_completo?: number
 }
 
 export interface BackupConfrontoResponse {
   ok: boolean
   data_analise: string
   organization: string
-  totais: {
-    total_ativos_inventario: number
-    total_ativos_exigidos: number
-    total_protegidos: number
-    total_parcial: number
-    total_nao_protegido: number
-    total_nao_cadastrado: number
-    percentual_protegido: number
-  }
+  totais: BackupConfrontoTotais
   confronto: ConfrontoAtivoItem[]
   alerta_falha_recente?: {
     tem_falha: boolean

@@ -170,11 +170,42 @@ export const BackupOverviewPage: React.FC = () => {
   const taxaSucesso =
     execucoes.length > 0 ? Math.round((execucoesSucesso / execucoes.length) * 100) : null
 
-  // Métricas do confronto centrado no ativo (número honesto)
+  // Métricas do confronto centrado no ativo (número honesto e proteção efetiva/parcial)
   const confrontoTotais = confrontoData?.totais
   const totalExigidosConfronto = confrontoTotais?.total_ativos_exigidos ?? ativosExigemBackupCount
   const totalProtegidosConfronto = confrontoTotais?.total_protegidos ?? 0
-  const percentualProtegidoConfronto = confrontoTotais?.percentual_protegido ?? 0
+  const totalParcialConfronto = confrontoTotais?.total_parcial ?? 0
+  const totalProtegidosCompleto =
+    confrontoTotais?.total_protegidos_completo ??
+    (confrontoData?.confronto
+      ? confrontoData.confronto.filter((a) => a.status_consolidado === 'PROTEGIDO').length
+      : 0)
+  const totalComProtecao =
+    confrontoTotais?.total_parcialmente_protegidos ??
+    (confrontoData?.confronto
+      ? confrontoData.confronto.filter((a) => (a.total_atendidas || 0) > 0).length
+      : totalProtegidosConfronto + totalParcialConfronto)
+
+  // Percentual geral de proteção efetiva perante as rotinas
+  const percentualProtegidoConfronto = useMemo(() => {
+    if (typeof confrontoTotais?.percentual_protegido_efetivo === 'number') {
+      return confrontoTotais.percentual_protegido_efetivo
+    }
+    if (confrontoData?.confronto && confrontoData.confronto.length > 0) {
+      const comExigencia = confrontoData.confronto.filter(
+        (a) => (a.exigencias?.total_exigidas || 0) > 0,
+      )
+      if (comExigencia.length > 0) {
+        const soma = comExigencia.reduce((acc, a) => {
+          const exig = a.exigencias.total_exigidas
+          const atend = a.total_atendidas || 0
+          return acc + atend / exig
+        }, 0)
+        return Math.round((soma / comExigencia.length) * 100)
+      }
+    }
+    return confrontoTotais?.percentual_protegido ?? 0
+  }, [confrontoTotais, confrontoData])
 
   return (
     <div className="space-y-6">
@@ -530,12 +561,12 @@ export const BackupOverviewPage: React.FC = () => {
 
           {/* Métricas Principais em Cards com métrica honesta do confronto */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {/* Métrica Honesta 1: Protegidos no Confronto */}
+            {/* Card Proteção Efetiva / Ativos Protegidos */}
             <Card className="border-slate-200 shadow-2xs bg-gradient-to-br from-white to-blue-50/40">
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    Ativos Protegidos
+                    Proteção Efetiva
                     <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1 py-0.2 rounded">
                       RPO
                     </span>
@@ -550,18 +581,30 @@ export const BackupOverviewPage: React.FC = () => {
                             : 'text-red-600'
                       }
                     >
-                      {totalProtegidosConfronto}
+                      {percentualProtegidoConfronto}%
                     </span>
-                    <span className="text-xs font-normal text-slate-500">
-                      {' '}
-                      / {totalExigidosConfronto} exigidos
-                    </span>
+                    <span className="text-xs font-semibold text-slate-600 ml-1.5">protegido</span>
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    {totalExigidosConfronto > 0
-                      ? `${percentualProtegidoConfronto}% atendem 100% no RPO`
-                      : 'Sem exigências marcadas'}
-                  </p>
+                  <p className="text-[11px] text-slate-700 font-medium mt-0.5">
+  {totalExigidosConfronto > 0 ? (
+    totalProtegidosCompleto === totalExigidosConfronto ? (
+      <span>
+        {totalProtegidosCompleto} de {totalExigidosConfronto} ativos protegidos (100%)
+      </span>
+    ) : (
+      <span>
+        {totalComProtecao} de {totalExigidosConfronto} ativos parcialmente protegidos · {totalProtegidosCompleto} com proteção completa
+      </span>
+    )
+  ) : (
+    'Sem exigências marcadas'
+  )}
+</p>
+{totalExigidosConfronto > 0 && totalProtegidosCompleto < totalExigidosConfronto && (
+  <p className="text-[10px] text-slate-500">
+    Rotina perante as exigências: Local ✓ e Nuvem ✓ comprovadas, falta a replicação
+  </p>
+)}
                 </div>
                 <div
                   className={`p-2.5 rounded-lg ${

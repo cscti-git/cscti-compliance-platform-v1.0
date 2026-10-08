@@ -400,16 +400,26 @@ export const BackupConfrontoTable: React.FC<BackupConfrontoTableProps> = ({
                         : 'text-red-400'
                   }
                 >
-                  {totalProtegidos} de {totalExigidos} ativos exigidos
-                </span>{' '}
-                100% protegidos pelas regras da empresa
+                  {percentual}% protegido
+                </span>
+                <span className="text-slate-300 text-sm sm:text-base font-normal ml-1.5">
+                  perante a rotina
+                </span>
+              </p>
+              <p className="text-[11px] text-slate-300 font-medium">
+                {totalExigidos > 0
+                  ? `${totais?.total_parcialmente_protegidos ?? totalProtegidos + (totais?.total_parcial ?? 0)} de ${totalExigidos} ativos parcialmente protegidos · ${totais?.total_protegidos_completo ?? totalProtegidos} com proteção completa`
+                  : 'Nenhum ativo exigido'}
+              </p>
+              <p className="text-[10px] text-slate-400">
+                Rotina perante as exigências: Local ✓ e Nuvem ✓ comprovadas, falta a replicação
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4 flex-wrap text-xs">
             <div className="text-right">
-              <span className="text-[11px] text-slate-400 block">Conformidade Global</span>
+              <span className="text-[11px] text-slate-400 block">Proteção Efetiva</span>
               <span className="text-xl font-extrabold text-white">{percentual}%</span>
             </div>
 
@@ -500,6 +510,17 @@ export const BackupConfrontoTable: React.FC<BackupConfrontoTableProps> = ({
                         <div className="text-[11px] text-slate-500 mt-0.5">
                           {item.total_atendidas} de {item.exigencias.total_exigidas} modalidades
                           atendidas no RPO
+                          {item.exigencias.total_exigidas > 0 && (
+                            <span className="ml-1 font-semibold text-slate-700">
+                              (
+                              {item.percentual_protecao ??
+                                Math.round(
+                                  ((item.total_atendidas || 0) / item.exigencias.total_exigidas) *
+                                    100,
+                                )}
+                              %)
+                            </span>
+                          )}
                           {hasFailure && (
                             <span className="text-red-700 font-semibold ml-1">
                               • Proteção suspensa

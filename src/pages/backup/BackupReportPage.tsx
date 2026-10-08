@@ -234,9 +234,7 @@ export const BackupReportPage: React.FC = () => {
           </h3>
           <div className="grid grid-cols-4 gap-2 text-center text-xs">
             <div className="p-2 border rounded bg-slate-50">
-              <span className="text-[10px] text-slate-500 block uppercase">
-                Ativos 100% Protegidos
-              </span>
+              <span className="text-[10px] text-slate-500 block uppercase">Proteção Efetiva</span>
               <strong
                 className={`text-sm ${
                   (confronto?.totais?.percentual_protegido ?? 100) === 100
@@ -244,8 +242,12 @@ export const BackupReportPage: React.FC = () => {
                     : 'text-amber-700'
                 }`}
               >
-                {confronto?.totais?.total_protegidos ?? '—'} /{' '}
-                {confronto?.totais?.total_ativos_exigidos ?? '—'}
+                {confronto?.totais?.total_parcialmente_protegidos ??
+                  (confronto?.totais
+                    ? (confronto.totais.total_protegidos || 0) +
+                      (confronto.totais.total_parcial || 0)
+                    : '—')}{' '}
+                / {confronto?.totais?.total_ativos_exigidos ?? '—'}
               </strong>
             </div>
             <div className="p-2 border rounded bg-slate-50">

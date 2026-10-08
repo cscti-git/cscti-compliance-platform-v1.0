@@ -826,8 +826,36 @@ routerAdd(
       })
     }
 
-    const percentualProtegido =
+    // Cálculo de proteção efetiva perante as rotinas:
+    // Percentual por ativo = modalidades comprovadas / modalidades exigidas
+    // Percentual geral efetivo = média ponderada / média sobre ativos com exigência
+    let somaPercentuaisAtivos = 0
+    let totalParcialmenteProtegidos = 0
+    let totalCompletamenteProtegidos = 0
+
+    for (let cI = 0; cI < confrontoList.length; cI++) {
+      const item = confrontoList[cI]
+      const totalExig = item.exigencias?.total_exigidas || 0
+      const totalAtend = item.total_atendidas || 0
+      const pctAtivo = totalExig > 0 ? Math.round((totalAtend / totalExig) * 100) : 0
+      item.percentual_protecao = pctAtivo
+
+      if (totalExig > 0) {
+        somaPercentuaisAtivos += totalAtend / totalExig
+        if (totalAtend === totalExig) {
+          totalCompletamenteProtegidos++
+        }
+        if (totalAtend > 0) {
+          totalParcialmenteProtegidos++
+        }
+      }
+    }
+
+    const percentualProtegidoCompleto =
       totalExigidos > 0 ? Math.round((totalProtegidos / totalExigidos) * 100) : 0
+
+    const percentualProtegidoEfetivo =
+      totalExigidos > 0 ? Math.round((somaPercentuaisAtivos / totalExigidos) * 100) : 0
 
     const payload = {
       ok: true,
@@ -837,10 +865,14 @@ routerAdd(
         total_ativos_inventario: allAssets.length,
         total_ativos_exigidos: totalExigidos,
         total_protegidos: totalProtegidos,
+        total_protegidos_completo: totalCompletamenteProtegidos,
         total_parcial: totalParcial,
+        total_parcialmente_protegidos: totalParcialmenteProtegidos,
         total_nao_protegido: totalNaoProtegido,
         total_nao_cadastrado: totalNaoCadastrado,
-        percentual_protegido: percentualProtegido,
+        percentual_protegido: percentualProtegidoEfetivo,
+        percentual_protegido_efetivo: percentualProtegidoEfetivo,
+        percentual_protegido_completo: percentualProtegidoCompleto,
       },
       confronto: confrontoList,
       alerta_falha_recente: alertaFalhaGlobal,
@@ -1675,8 +1707,36 @@ routerAdd(
       })
     }
 
-    const percentualProtegido =
+    // Cálculo de proteção efetiva perante as rotinas:
+    // Percentual por ativo = modalidades comprovadas / modalidades exigidas
+    // Percentual geral efetivo = média ponderada / média sobre ativos com exigência
+    let somaPercentuaisAtivos = 0
+    let totalParcialmenteProtegidos = 0
+    let totalCompletamenteProtegidos = 0
+
+    for (let cI = 0; cI < confrontoList.length; cI++) {
+      const item = confrontoList[cI]
+      const totalExig = item.exigencias?.total_exigidas || 0
+      const totalAtend = item.total_atendidas || 0
+      const pctAtivo = totalExig > 0 ? Math.round((totalAtend / totalExig) * 100) : 0
+      item.percentual_protecao = pctAtivo
+
+      if (totalExig > 0) {
+        somaPercentuaisAtivos += totalAtend / totalExig
+        if (totalAtend === totalExig) {
+          totalCompletamenteProtegidos++
+        }
+        if (totalAtend > 0) {
+          totalParcialmenteProtegidos++
+        }
+      }
+    }
+
+    const percentualProtegidoCompleto =
       totalExigidos > 0 ? Math.round((totalProtegidos / totalExigidos) * 100) : 0
+
+    const percentualProtegidoEfetivo =
+      totalExigidos > 0 ? Math.round((somaPercentuaisAtivos / totalExigidos) * 100) : 0
 
     const payload = {
       ok: true,
@@ -1686,10 +1746,14 @@ routerAdd(
         total_ativos_inventario: allAssets.length,
         total_ativos_exigidos: totalExigidos,
         total_protegidos: totalProtegidos,
+        total_protegidos_completo: totalCompletamenteProtegidos,
         total_parcial: totalParcial,
+        total_parcialmente_protegidos: totalParcialmenteProtegidos,
         total_nao_protegido: totalNaoProtegido,
         total_nao_cadastrado: totalNaoCadastrado,
-        percentual_protegido: percentualProtegido,
+        percentual_protegido: percentualProtegidoEfetivo,
+        percentual_protegido_efetivo: percentualProtegidoEfetivo,
+        percentual_protegido_completo: percentualProtegidoCompleto,
       },
       confronto: confrontoList,
       alerta_falha_recente: alertaFalhaGlobal,
