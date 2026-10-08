@@ -29,22 +29,115 @@ routerAdd(
   (e) => {
     const normalizarJson = (valor) => {
       if (valor === null || valor === undefined) return null
+
+      // Helper para converter array de bytes (números) em string UTF-8 por chunks seguros
+      const bytesParaString = (bytesArr) => {
+        try {
+          const CHUNK_SIZE = 8192
+          let res = ''
+          for (let i = 0; i < bytesArr.length; i += CHUNK_SIZE) {
+            const pedaco = bytesArr.slice(i, i + CHUNK_SIZE)
+            res += String.fromCharCode.apply(null, pedaco)
+          }
+          return res
+        } catch (_) {
+          return null
+        }
+      }
+
+      // Caso A: Array de números/bytes (ex.: [123, 34, ...]) vindo do Goja/PocketBase para campos JSON
+      if (Array.isArray(valor)) {
+        if (valor.length > 0 && typeof valor[0] === 'number') {
+          const strDecodificada = bytesParaString(valor)
+          if (strDecodificada) {
+            const sTrim = strDecodificada.trim()
+            if (
+              (sTrim.startsWith('{') && sTrim.endsWith('}')) ||
+              (sTrim.startsWith('[') && sTrim.endsWith(']'))
+            ) {
+              try {
+                return JSON.parse(sTrim)
+              } catch (eParseByteArr) {
+                console.error(
+                  '[normalizarJson] Falha ao fazer JSON.parse de array de bytes:',
+                  'tam=' + valor.length,
+                  sTrim.substring(0, 80),
+                  eParseByteArr?.message || eParseByteArr,
+                )
+                return null
+              }
+            }
+          }
+        }
+        // Array comum já deserializado (ex.: lista de objetos) -> clonagem profunda
+        try {
+          return JSON.parse(JSON.stringify(valor))
+        } catch (_) {
+          return valor
+        }
+      }
+
+      // Caso B: String JSON normal
       if (typeof valor === 'string') {
         const s = valor.trim()
         if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
           try {
             return JSON.parse(s)
-          } catch (_) {
-            return valor
+          } catch (eStr) {
+            console.error(
+              '[normalizarJson] Falha ao fazer JSON.parse de string JSON:',
+              'tipo=' + typeof valor,
+              s.substring(0, 80),
+              eStr?.message || eStr,
+            )
+            return null
           }
         }
         return valor
       }
-      try {
-        return JSON.parse(JSON.stringify(valor))
-      } catch (_) {
-        return valor
+
+      // Caso C: Objeto Go / JSONRaw com método .string() antes de desistir
+      if (typeof valor === 'object') {
+        if (typeof valor.string === 'function') {
+          try {
+            const rawStr = valor.string()
+            if (typeof rawStr === 'string') {
+              const sTrim = rawStr.trim()
+              if (
+                (sTrim.startsWith('{') && sTrim.endsWith('}')) ||
+                (sTrim.startsWith('[') && sTrim.endsWith(']'))
+              ) {
+                return JSON.parse(sTrim)
+              }
+            }
+          } catch (eGoRaw) {
+            console.error(
+              '[normalizarJson] Falha ao ler objeto Go via .string():',
+              eGoRaw?.message || eGoRaw,
+            )
+          }
+        }
+        // Objeto JS normal -> clonagem profunda
+        try {
+          return JSON.parse(JSON.stringify(valor))
+        } catch (eObj) {
+          console.error(
+            '[normalizarJson] Falha ao clonar objeto normal:',
+            'tipo=' + typeof valor,
+            String(valor).substring(0, 80),
+            eObj?.message || eObj,
+          )
+          return null
+        }
       }
+
+      // Qualquer outro tipo inesperado que falhar
+      console.error(
+        '[normalizarJson] Tipo não reconhecido para campo JSON:',
+        'tipo=' + typeof valor,
+        String(valor).substring(0, 80),
+      )
+      return null
     }
     const auth = e.auth
     if (!auth) {
@@ -998,6 +1091,27 @@ routerAdd(
         const ex = execucoes[ei]
         const rotinaId = ex.getString('rotina')
         const rotina = rotinasMap[rotinaId]
+
+        // Log de diagnóstico TEMPORÁRIO para a execução vjqzacdotk6v1xr
+        if (ex.id === 'vjqzacdotk6v1xr') {
+          const rawEscopo = ex.get('confronto_escopo')
+          const isArr = Array.isArray(rawEscopo)
+          let preview = ''
+          try {
+            if (isArr) {
+              preview = `[array len=${rawEscopo.length}, first=${rawEscopo[0]}, sample=${JSON.stringify(rawEscopo.slice(0, 20))}]`
+            } else if (typeof rawEscopo === 'object' && rawEscopo !== null) {
+              preview = JSON.stringify(rawEscopo).substring(0, 80)
+            } else {
+              preview = String(rawEscopo).substring(0, 80)
+            }
+          } catch (_) {
+            preview = String(rawEscopo).substring(0, 80)
+          }
+          console.log(
+            `[confronto:debug] vjqzacdotk6v1xr raw typeof=${typeof rawEscopo} isArray=${isArr} preview=${preview}`,
+          )
+        }
 
         // 1. Verificar FONTE PRIMÁRIA gravada na execução
         const confExistenteEx = normalizarJson(ex.get('confronto_escopo'))
