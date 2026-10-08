@@ -1980,33 +1980,83 @@ routerAdd(
       }
 
       // -------------------------------------------------------------
-      // ITEM 2: RESOLUÇÃO DEFENSIVA DA CADEIA DE ESCOPO E CONFRONTO
-      // Cadeia defensiva: rotina → plano → escopo → lista de ativos vinculados ao escopo
+      // ITEM 2: RESOLUÇÃO AUTOMÁTICA E DEFENSIVA DA CADEIA DE ESCOPO
+      // Cadeia: rotina (rotinaFinalId) → plano → escopo → lista de ativos do escopo
       // -------------------------------------------------------------
       let escopoRec = null
-      if (escopoIdRef) {
-        try {
-          escopoRec = $app.findRecordById('backup_escopo', escopoIdRef)
-        } catch (_) {}
-      }
+      let planoEncontradoId = ''
+      let planoEncontradoNome = ''
+      let modalidadesPlanoEncontradas = []
 
-      // Se a rotina tem plano e o plano tem escopo mas escopoIdRef não estava preenchido
-      if (!escopoRec && rotinaRecObj) {
+      // 1. Sempre resolver a partir de rotinaFinalId se disponível
+      if (rotinaFinalId) {
         try {
+          if (!rotinaRecObj) {
+            rotinaRecObj = $app.findRecordById('backup_rotinas', rotinaFinalId)
+          }
+        } catch (errRotina) {
+          console.error(
+            '[backup:processar] Falha ao carregar rotina',
+            rotinaFinalId,
+            ':',
+            errRotina,
+          )
+        }
+
+        if (rotinaRecObj) {
+          if (!rotinaNomeReal) rotinaNomeReal = rotinaRecObj.getString('nome') || ''
           const pId = rotinaRecObj.getString('plano')
           if (pId) {
-            const pRec = planoRecObj || $app.findRecordById('backup_planos', pId)
-            if (pRec) {
-              const escId = pRec.getString('escopo')
+            try {
+              if (!planoRecObj || planoRecObj.id !== pId) {
+                planoRecObj = $app.findRecordById('backup_planos', pId)
+              }
+            } catch (errPlano) {
+              console.error(
+                '[backup:processar] Falha ao carregar plano da rotina',
+                pId,
+                ':',
+                errPlano,
+              )
+            }
+
+            if (planoRecObj) {
+              planoEncontradoId = planoRecObj.id
+              planoEncontradoNome = planoRecObj.getString('nome') || ''
+              if (!planoNomeReal) planoNomeReal = planoEncontradoNome
+              const escId = planoRecObj.getString('escopo')
               if (escId) {
-                escopoRec = $app.findRecordById('backup_escopo', escId)
+                try {
+                  escopoRec = $app.findRecordById('backup_escopo', escId)
+                } catch (errEsc) {
+                  console.error(
+                    '[backup:processar] Falha ao carregar escopo do plano',
+                    escId,
+                    ':',
+                    errEsc,
+                  )
+                }
               }
             }
           }
-        } catch (_) {}
+        }
       }
 
-      // Fallback se ainda não achou escopo direto: tentar localizar escopo ativo da organização
+      // 2. Se ainda não achou e havia escopoIdRef
+      if (!escopoRec && escopoIdRef) {
+        try {
+          escopoRec = $app.findRecordById('backup_escopo', escopoIdRef)
+        } catch (errEscRef) {
+          console.error(
+            '[backup:processar] Falha ao carregar escopoIdRef',
+            escopoIdRef,
+            ':',
+            errEscRef,
+          )
+        }
+      }
+
+      // 3. Fallback: escopo ativo da organização
       if (!escopoRec) {
         try {
           const escoposOrg = $app.findRecordsByFilter(
@@ -2019,7 +2069,43 @@ routerAdd(
           if (escoposOrg.length > 0) {
             escopoRec = escoposOrg[0]
           }
+        } catch (errEscOrg) {
+          console.error(
+            '[backup:processar] Falha ao carregar escopos da org',
+            organizationId,
+            ':',
+            errEscOrg,
+          )
+        }
+      }
+
+      // Se planoRecObj estiver resolvido, atualizar destinos do plano caso lista esteja vazia
+      if (planoRecObj && planoDestinoValores.length === 0) {
+        try {
+          const rawDest = planoRecObj.get('destino')
+          if (Array.isArray(rawDest)) {
+            modalidadesPlanoEncontradas = rawDest.map((d) => String(d).toLowerCase().trim())
+          } else if (typeof rawDest === 'string') {
+            try {
+              const parsed = JSON.parse(rawDest)
+              if (Array.isArray(parsed)) {
+                modalidadesPlanoEncontradas = parsed.map((d) => String(d).toLowerCase().trim())
+              } else if (parsed) {
+                modalidadesPlanoEncontradas = [String(parsed).toLowerCase().trim()]
+              }
+            } catch (_) {
+              if (rawDest.trim()) {
+                modalidadesPlanoEncontradas = rawDest
+                  .split(',')
+                  .map((s) => s.trim().toLowerCase())
+                  .filter(Boolean)
+              }
+            }
+          }
         } catch (_) {}
+        if (modalidadesPlanoEncontradas.length > 0) {
+          planoDestinoValores = modalidadesPlanoEncontradas
+        }
       }
 
       // Expandir ativos do escopo tratando array, string JSON e string simples
@@ -2096,8 +2182,8 @@ routerAdd(
         escopo_nome: escopoRec ? escopoRec.getString('nome') || 'Escopo Geral' : null,
         rotina_id: rotinaFinalId || null,
         rotina_nome: rotinaNomeReal || null,
-        plano_id: planoRecObj ? planoRecObj.id : null,
-        plano_nome: planoNomeReal || null,
+        plano_id: planoRecObj ? planoRecObj.id : planoEncontradoId || null,
+        plano_nome: planoNomeReal || planoEncontradoNome || null,
         modalidades_plano: planoDestinoValores,
         exigencias: [],
         comprovado: [],
@@ -2348,7 +2434,7 @@ routerAdd(
           confrontoEscopo.total_pendencias = confrontoEscopo.pendencias.length
         }
       } catch (errEscopo) {
-        // Falha tolerante na montagem do confronto
+        console.error('[backup:processar] Falha na montagem do confronto_escopo:', errEscopo)
       }
       // Marcar nos detalhesVms se o item está fora do escopo cadastrado
       if (detalhesVms && detalhesVms.length > 0) {

@@ -936,9 +936,75 @@ routerAdd(
             }
           }
 
+          // Resolução robusta de escopo para o confronto reconciliado
+          let escIdReconciliado = confAntigo && confAntigo.escopo_id ? confAntigo.escopo_id : null
+          let escNomeReconciliado =
+            confAntigo && confAntigo.escopo_nome ? confAntigo.escopo_nome : null
+
+          if (!escIdReconciliado && rotina) {
+            const pId = rotina.getString('plano')
+            const pRec = pId ? planosMap[pId] : null
+            if (pRec) {
+              const eId = pRec.getString('escopo')
+              if (eId) {
+                try {
+                  const eRec = $app.findRecordById('backup_escopo', eId)
+                  if (eRec) {
+                    escIdReconciliado = eRec.id
+                    escNomeReconciliado = eRec.getString('nome')
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+
+          if (!escIdReconciliado) {
+            try {
+              const escOrg = $app.findRecordsByFilter(
+                'backup_escopo',
+                `organization = '${targetOrgId}' && status = 'ativo'`,
+                '+created',
+                1,
+                0,
+              )
+              if (escOrg.length > 0) {
+                escIdReconciliado = escOrg[0].id
+                escNomeReconciliado = escOrg[0].getString('nome')
+              }
+            } catch (_) {}
+          }
+
+          // Montar lista completa de exigências com os 4 ativos se estiver vazio
+          let exigenciasReconciliadas =
+            confAntigo && Array.isArray(confAntigo.exigencias) && confAntigo.exigencias.length > 0
+              ? confAntigo.exigencias
+              : []
+
+          if (exigenciasReconciliadas.length === 0) {
+            for (let ai = 0; ai < assetsExigidos.length; ai++) {
+              const a = assetsExigidos[ai]
+              const exLoc = Boolean(a.getBool('exige_backup_local'))
+              const exNuv = Boolean(a.getBool('exige_backup_nuvem'))
+              const exRep = Boolean(a.getBool('exige_backup_replicacao'))
+              const mods = []
+              if (exLoc) mods.push('local')
+              if (exNuv) mods.push('nuvem')
+              if (exRep) mods.push('replicacao')
+              exigenciasReconciliadas.push({
+                ativo_id: a.id,
+                ativo_nome: a.getString('name'),
+                ativo_tipo: a.getString('tipo') || '',
+                local: exLoc,
+                nuvem: exNuv,
+                replicacao: exRep,
+                modalidades: mods,
+              })
+            }
+          }
+
           const novoConfronto = {
-            escopo_id: confAntigo ? confAntigo.escopo_id : null,
-            escopo_nome: confAntigo ? confAntigo.escopo_nome : 'Escopo do Inventário',
+            escopo_id: escIdReconciliado,
+            escopo_nome: escNomeReconciliado || 'Base Principal dos Sistemas da Serventia',
             rotina_id: rotinaId,
             rotina_nome: rotina ? rotina.getString('nome') : null,
             job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
@@ -948,11 +1014,14 @@ routerAdd(
                 ? planosMap[rotina.getString('plano')].getString('nome')
                 : null,
             modalidades_plano: [modalidadeEx],
-            exigencias: confAntigo && confAntigo.exigencias ? confAntigo.exigencias : [],
+            exigencias: exigenciasReconciliadas,
             comprovado: novoComprovado,
             pendencias: novasPendencias,
             total_ativos_escopo: assetsExigidos.length,
-            total_exigencias_modalidade: novoComprovado.length + novasPendencias.length,
+            total_exigencias_modalidade: exigenciasReconciliadas.reduce(
+              (acc, cur) => acc + (cur.modalidades ? cur.modalidades.length : 3),
+              0,
+            ),
             total_comprovadas: novoComprovado.length,
             total_pendencias: novasPendencias.length,
           }
