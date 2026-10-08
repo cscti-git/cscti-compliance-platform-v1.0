@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-08T18:57:07.830Z",
+  "generatedAt": "2026-10-08T19:10:59.817Z",
   "collections": [
     {
       "name": "users",
@@ -2170,6 +2170,32 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "resolvida_automaticamente",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolvida_por_execucao",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_execucoes"
+        },
+        {
+          "name": "resolvida_por_evidencia",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "backup_evidencias"
+        },
+        {
+          "name": "fato_real",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
