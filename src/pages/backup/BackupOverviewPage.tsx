@@ -347,9 +347,11 @@ export const BackupOverviewPage: React.FC = () => {
             // Agrupar falhas factuais por rotina/modalidade para o bloco "Últimas falhas"
             interface FalhaAgrupada {
               rotina: string
+              jobNome?: string
               modalidade: string
               dataHoraSp: string
               vmsFalhadas: string[]
+              vmsSucesso: string[]
             }
             const falhasAgrupadasMap = new Map<string, FalhaAgrupada>()
 
@@ -365,36 +367,42 @@ export const BackupOverviewPage: React.FC = () => {
                   info &&
                   (info.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' || info.ultima_execucao_falha)
                 ) {
-                  const rotinaNome = info.job_nome || info.rotina_nome || 'Rotina de Backup'
+                  const rotinaNome = info.rotina_nome || info.job_nome || 'Rotina de Backup'
+                  const jobNome = info.job_nome || ''
                   const chave = `${rotinaNome}__${mod}`
                   const dataIso = info.ultima_execucao_data || info.ultima_comprovacao || ''
                   let dataHoraSp = ''
                   if (dataIso) {
                     try {
-                      dataHoraSp = formatDateTime(dataIso)
+                      dataHoraSp = formatDateTime(dataIso, { includeSeconds: false })
                     } catch (_) {
                       dataHoraSp = dataIso
                     }
                   }
 
-                  const infoAny = info as unknown as { vms_falhas?: string[] }
-                  const vmsLista =
-                    infoAny.vms_falhas && infoAny.vms_falhas.length > 0
-                      ? infoAny.vms_falhas
-                      : [ativo.nome]
+                  const vmsFalhasLista =
+                    info.vms_falhas && info.vms_falhas.length > 0 ? info.vms_falhas : [ativo.nome]
+                  const vmsSucessoLista = info.vms_sucesso || []
 
                   if (!falhasAgrupadasMap.has(chave)) {
                     falhasAgrupadasMap.set(chave, {
                       rotina: rotinaNome,
+                      jobNome,
                       modalidade: mod,
                       dataHoraSp,
-                      vmsFalhadas: [...vmsLista],
+                      vmsFalhadas: [...vmsFalhasLista],
+                      vmsSucesso: [...vmsSucessoLista],
                     })
                   } else {
                     const existente = falhasAgrupadasMap.get(chave)!
-                    vmsLista.forEach((vm) => {
+                    vmsFalhasLista.forEach((vm) => {
                       if (!existente.vmsFalhadas.includes(vm)) {
                         existente.vmsFalhadas.push(vm)
+                      }
+                    })
+                    vmsSucessoLista.forEach((vm) => {
+                      if (!existente.vmsSucesso.includes(vm)) {
+                        existente.vmsSucesso.push(vm)
                       }
                     })
                   }
@@ -478,14 +486,39 @@ export const BackupOverviewPage: React.FC = () => {
                               {falha.dataHoraSp || 'Recente'}
                             </strong>
                           </div>
-                          <div className="mt-1 text-[11px] text-red-900 bg-red-50 p-1.5 rounded border border-red-200/60">
-                            <span className="font-semibold block text-[10px] uppercase text-red-700">
+                          <div className="mt-1.5 text-[11px] text-red-900 bg-red-50/80 p-1.5 rounded border border-red-200/60">
+                            <span className="font-semibold block text-[10px] uppercase text-red-700 mb-1">
                               VM(s) com falha ({falha.vmsFalhadas.length}):
                             </span>
-                            <span className="font-mono text-xs font-bold text-red-950 break-words">
-                              {falha.vmsFalhadas.join(', ')}
-                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {falha.vmsFalhadas.map((vm, vIdx) => (
+                                <Badge
+                                  key={vIdx}
+                                  className="bg-red-700 text-white font-mono text-[10px] px-1.5 py-0"
+                                >
+                                  {vm}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
+
+                          {falha.vmsSucesso && falha.vmsSucesso.length > 0 && (
+                            <div className="mt-1.5 text-[11px] text-emerald-900 bg-emerald-50/80 p-1.5 rounded border border-emerald-200/60">
+                              <span className="font-semibold block text-[10px] uppercase text-emerald-700 mb-1">
+                                VM(s) com sucesso ({falha.vmsSucesso.length}):
+                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {falha.vmsSucesso.map((vm, sIdx) => (
+                                  <Badge
+                                    key={sIdx}
+                                    className="bg-emerald-700 text-white font-mono text-[10px] px-1.5 py-0"
+                                  >
+                                    {vm}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

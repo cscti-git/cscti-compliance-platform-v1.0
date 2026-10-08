@@ -746,6 +746,8 @@ export interface ConfrontoModalidadeInfo {
   ultima_execucao_data?: string | null
   ultima_execucao_status?: string | null
   ultima_execucao_obs?: string | null
+  vms_falhas?: string[]
+  vms_sucesso?: string[]
   ocorrencias_abertas?: number
 }
 

@@ -6,6 +6,56 @@ routerAdd(
   'GET',
   '/backend/v1/integration-tests/run',
   (e) => {
+    // Modo teste do confronto se query ?action=test-confronto
+    const qAction = e.requestInfo().query ? e.requestInfo().query.action : ''
+    if (qAction === 'test-confronto') {
+      try {
+        const authRes = $http.send({
+          url: 'http://127.0.0.1:8090/api/collections/users/auth-with-password',
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          data: {
+            identity: 'leandro@cscti.com.br',
+            password: 'Skip@Pass',
+          },
+          timeout: 10,
+        })
+
+        if (authRes.statusCode !== 200) {
+          return e.json(500, { ok: false, error: 'Falha auth', status: authRes.statusCode })
+        }
+
+        const token = authRes.json.token
+        const confRes = $http.send({
+          url: 'http://127.0.0.1:8090/backend/v1/backup/confronto?organization=8kl8n6vz64lnxgb',
+          method: 'GET',
+          headers: { Authorization: 'Bearer ' + token },
+          timeout: 15,
+        })
+
+        const jsonConf = confRes.json || {}
+        const confrontoLista = jsonConf.confronto || []
+
+        const resumoAtivos = confrontoLista.map((at) => ({
+          nome: at.nome,
+          status_consolidado: at.status_consolidado,
+          nuvem_status: at.modalidades?.nuvem?.status_modalidade,
+          nuvem_ultima: at.modalidades?.nuvem?.ultima_comprovacao,
+          local_status: at.modalidades?.local?.status_modalidade,
+          replicacao_status: at.modalidades?.replicacao?.status_modalidade,
+        }))
+
+        return e.json(200, {
+          ok: true,
+          http_status: confRes.statusCode,
+          totais: jsonConf.totais,
+          ativos: resumoAtivos,
+        })
+      } catch (err) {
+        return e.json(500, { ok: false, error: String(err) })
+      }
+    }
+
     const auth = e.auth
     if (!auth) {
       return e.forbiddenError('Não autenticado')

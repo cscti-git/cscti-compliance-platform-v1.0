@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { formatDateTime } from '@/lib/dateTime'
 import type {
   BackupConfrontoResponse,
   ConfrontoAtivoItem,
@@ -49,6 +50,16 @@ function formatRelativeTime(isoString: string | null): string {
     return `há ${diffDay} dias`
   } catch (_) {
     return 'data inválida'
+  }
+}
+
+/** Formata data e hora no fuso America/Sao_Paulo com fallback */
+function formatShortDateTimeSp(isoString: string | null | undefined): string {
+  if (!isoString) return ''
+  try {
+    return formatDateTime(isoString, { includeSeconds: false })
+  } catch (_) {
+    return isoString
   }
 }
 
@@ -100,32 +111,16 @@ function ModalidadeSelo({
   } = modalidade
 
   if (status_modalidade === 'FALHA_ULTIMA_EXECUCAO' || modalidade.ultima_execucao_falha) {
+    const rotinaCompleta = modalidade.rotina_nome || modalidade.job_nome || ''
     const jobNomeCompleto = modalidade.job_nome || modalidade.rotina_nome || ''
-    const jobNomeExibicao =
-      jobNomeCompleto.length > 25 ? `${jobNomeCompleto.slice(0, 22)}…` : jobNomeCompleto
+    const rotinaExibicao =
+      rotinaCompleta.length > 25 ? `${rotinaCompleta.slice(0, 22)}…` : rotinaCompleta
 
-    let dataHoraFormatada = ''
     const dataRefIso = modalidade.ultima_execucao_data || modalidade.ultima_comprovacao
-    if (dataRefIso) {
-      try {
-        const d = new Date(dataRefIso)
-        // America/Sao_Paulo (UTC-3)
-        const ano = d.getUTCFullYear()
-        const mes = d.getUTCMonth()
-        const dia = d.getUTCDate()
-        const hora = d.getUTCHours()
-        const min = d.getUTCMinutes()
-        const dSp = new Date(Date.UTC(ano, mes, dia, hora - 3, min))
-        const pad2 = (n: number) => (n < 10 ? '0' + n : String(n))
-        dataHoraFormatada = `${pad2(dSp.getUTCDate())}/${pad2(dSp.getUTCMonth() + 1)}/${dSp.getUTCFullYear()} ${pad2(dSp.getUTCHours())}:${pad2(dSp.getUTCMinutes())}`
-      } catch (_) {
-        dataHoraFormatada = formatRelativeTime(dataRefIso)
-      }
-    } else {
-      dataHoraFormatada = 'recente'
-    }
+    const dataHoraSp = formatShortDateTimeSp(dataRefIso) || 'recente'
 
-    const vmsFalhasLista = (modalidade as unknown as { vms_falhas?: string[] }).vms_falhas || []
+    const vmsFalhasLista = modalidade.vms_falhas || []
+    const vmsSucessoLista = modalidade.vms_sucesso || []
 
     return (
       <TooltipProvider>
@@ -133,35 +128,72 @@ function ModalidadeSelo({
           <TooltipTrigger asChild>
             <span
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold text-red-950 bg-red-100 border border-red-500 shadow-2xs cursor-help max-w-full hover:bg-red-200 transition-colors"
-              title={jobNomeCompleto ? `Job: ${jobNomeCompleto}` : undefined}
+              title={rotinaCompleta ? `Rotina: ${rotinaCompleta}` : undefined}
             >
               <AlertTriangle className="w-3.5 h-3.5 text-red-700 shrink-0" />
               <span className="truncate">
-                {label}: Falha em {dataHoraFormatada}
-                {jobNomeExibicao ? ` (${jobNomeExibicao})` : ''}
+                {label}: Falha em {dataHoraSp}
+                {rotinaExibicao ? ` • ${rotinaExibicao}` : ''}
               </span>
             </span>
           </TooltipTrigger>
-          <TooltipContent className="max-w-sm text-xs bg-slate-900 text-white p-3 shadow-lg border border-red-500/30">
+          <TooltipContent className="max-w-md text-xs bg-slate-900 text-white p-3 shadow-xl border border-red-500/40">
             <div className="flex items-center gap-1.5 font-bold text-red-400">
               <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-              <span>Falha de Backup em {dataHoraFormatada}</span>
+              <span>
+                Falha de Backup ({label}) em {dataHoraSp}
+              </span>
             </div>
-            {jobNomeCompleto && (
+
+            {rotinaCompleta && (
               <p className="mt-1.5 text-slate-100 font-semibold break-words">
-                Rotina/Job: &ldquo;{jobNomeCompleto}&rdquo;
+                Rotina: &ldquo;{rotinaCompleta}&rdquo;
               </p>
             )}
+            {jobNomeCompleto && jobNomeCompleto !== rotinaCompleta && (
+              <p className="text-slate-300 text-[11px] break-words">
+                Job: &ldquo;{jobNomeCompleto}&rdquo;
+              </p>
+            )}
+
+            {/* VMs com Falha (badges vermelhas) */}
             {vmsFalhasLista.length > 0 && (
-              <div className="mt-2 p-1.5 rounded bg-red-950/60 border border-red-800/60 text-red-200">
-                <span className="font-semibold block text-[11px] text-red-300">
-                  VMs com falha nesta execução:
+              <div className="mt-2.5 p-2 rounded bg-red-950/70 border border-red-800/70 text-red-200">
+                <span className="font-semibold block text-[11px] text-red-300 mb-1">
+                  VMs com falha nesta execução ({vmsFalhasLista.length}):
                 </span>
-                <span className="text-[11px] font-mono break-words">
-                  {vmsFalhasLista.join(', ')}
-                </span>
+                <div className="flex flex-wrap gap-1">
+                  {vmsFalhasLista.map((vm, idx) => (
+                    <Badge
+                      key={idx}
+                      className="bg-red-700 hover:bg-red-800 text-white font-mono text-[10px] px-1.5 py-0 border border-red-500/50"
+                    >
+                      {vm}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* VMs com Sucesso (badges verdes) */}
+            {vmsSucessoLista.length > 0 && (
+              <div className="mt-2 p-2 rounded bg-emerald-950/60 border border-emerald-800/60 text-emerald-200">
+                <span className="font-semibold block text-[11px] text-emerald-300 mb-1">
+                  VMs com sucesso nesta execução ({vmsSucessoLista.length}):
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {vmsSucessoLista.map((vm, idx) => (
+                    <Badge
+                      key={idx}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-mono text-[10px] px-1.5 py-0 border border-emerald-500/50"
+                    >
+                      {vm}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <p className="mt-2 text-slate-300 text-[11px]">
               {modalidade.ultima_execucao_obs ||
                 'A última execução desta modalidade foi encerrada com erro.'}
@@ -196,6 +228,7 @@ function ModalidadeSelo({
   }
 
   if (status_modalidade === 'FORA_RPO') {
+    const dataHoraSp = formatShortDateTimeSp(ultima_comprovacao)
     return (
       <TooltipProvider>
         <Tooltip>
@@ -206,28 +239,29 @@ function ModalidadeSelo({
             </span>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs text-xs">
-            Última comprovação real ocorreu {formatRelativeTime(ultima_comprovacao)} (
-            {horas_desde_ultima}h atrás), ultrapassando a meta de RPO configurada de{' '}
-            {rpo_horas_configurado}h.
+            Última comprovação real ocorreu em {dataHoraSp} ({horas_desde_ultima}h atrás),
+            ultrapassando a meta de RPO configurada de {rpo_horas_configurado}h.
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     )
   }
 
-  // ATENDIDA
+  // ATENDIDA: exibir data/hora da última comprovação no fuso America/Sao_Paulo
+  const dataHoraComprovacaoSp = formatShortDateTimeSp(ultima_comprovacao)
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 cursor-help">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            {label}: {formatRelativeTime(ultima_comprovacao)}
+            {label}: {dataHoraComprovacaoSp || formatRelativeTime(ultima_comprovacao)}
           </span>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-xs">
-          Comprovada com sucesso {formatRelativeTime(ultima_comprovacao)} via rotina &ldquo;
-          {rotina_nome}&rdquo;. Dentro do RPO de {rpo_horas_configurado}h.
+          Comprovada com sucesso em {dataHoraComprovacaoSp} (
+          {formatRelativeTime(ultima_comprovacao)}) via rotina &ldquo;{rotina_nome}&rdquo;. Dentro
+          do RPO de {rpo_horas_configurado}h.
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
