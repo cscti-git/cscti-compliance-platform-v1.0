@@ -28,9 +28,24 @@ import {
   X,
   FileCheck2,
   ShieldAlert,
+  Trash2,
 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
-import { saveBackupOcorrencia, resolverBackupOcorrencia } from '@/services/backupService'
+import {
+  saveBackupOcorrencia,
+  resolverBackupOcorrencia,
+  deleteBackupOcorrencia,
+} from '@/services/backupService'
 import type { BackupOcorrenciaItem } from '@/types/cscti'
 
 interface BackupOcorrenciasTabProps {
@@ -68,6 +83,11 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
   const [resolverModalOpen, setResolverModalOpen] = useState(false)
   const [resolvendoItem, setResolvendoItem] = useState<BackupOcorrenciaItem | null>(null)
   const [resolucaoTexto, setResolucaoTexto] = useState('')
+
+  // Modal Remover Ocorrência
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingItem, setDeletingItem] = useState<BackupOcorrenciaItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const openNova = () => {
     setTitulo('')
@@ -135,6 +155,34 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
       })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const openDeleteDialog = (item: BackupOcorrenciaItem) => {
+    setDeletingItem(item)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return
+    setDeleting(true)
+    try {
+      await deleteBackupOcorrencia(deletingItem.id, orgId)
+      toast({
+        title: 'Ocorrência removida',
+        description: 'A ocorrência foi excluída com sucesso.',
+      })
+      setDeleteDialogOpen(false)
+      setDeletingItem(null)
+      onReload()
+    } catch (err: unknown) {
+      toast({
+        title: 'Erro ao remover ocorrência',
+        description: err instanceof Error ? err.message : 'Falha ao excluir.',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -261,15 +309,30 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
                     {oco.created ? new Date(oco.created).toLocaleDateString('pt-BR') : '—'}
                   </span>
 
-                  {canOperate && oco.status !== 'resolvida' && (
-                    <Button
-                      size="sm"
-                      onClick={() => openResolver(oco)}
-                      className="h-7 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
-                    >
-                      <Check className="w-3.5 h-3.5 mr-1" /> Resolver Ocorrência
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {canOperate && oco.status !== 'resolvida' && (
+                      <Button
+                        size="sm"
+                        onClick={() => openResolver(oco)}
+                        className="h-7 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1" /> Resolver Ocorrência
+                      </Button>
+                    )}
+
+                    {canOperate && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDeleteDialog(oco)}
+                        className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Remover ocorrência"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="sr-only">Remover</span>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -448,6 +511,33 @@ export const BackupOcorrenciasTab: React.FC<BackupOcorrenciasTabProps> = ({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog de Confirmação para Remover Ocorrência */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              Remover Ocorrência #{deletingItem?.id}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-slate-600">
+              Deseja remover esta ocorrência? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting} className="text-xs">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs"
+            >
+              {deleting ? 'Removendo...' : 'Sim, remover'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

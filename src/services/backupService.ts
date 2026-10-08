@@ -766,6 +766,18 @@ export async function resolverBackupOcorrencia(
   return result
 }
 
+export async function deleteBackupOcorrencia(id: string, organizationId: string): Promise<boolean> {
+  await pb.collection('backup_ocorrencias').delete(id)
+  await logAudit({
+    organizationId,
+    action: 'BACKUP_OCORRENCIA_DELETED',
+    entity: 'Backup e Continuidade',
+    detail: `Ocorrência #${id} removida do painel de continuidade.`,
+    metadata: { ocorrencia_id: id },
+  })
+  return true
+}
+
 // -------------------------------------------------------------
 // 11. Testes de Recuperação
 // -------------------------------------------------------------

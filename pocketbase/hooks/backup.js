@@ -2231,23 +2231,24 @@ routerAdd(
           if (adaptadorUsado === 'ACRONIS_PDF') {
             modalidadesComprovadasPorEsta.add('nuvem')
           } else {
-            const textoIdentidade = `${assunto} ${jobName} ${rotinaNomeReal}`.toLowerCase()
+            // Regra única de identidade de modalidade (PARTE 1-A):
+            // A modalidade vem EXCLUSIVAMENTE do prefixo declarado no assunto da evidência e no nome/prefixo da rotina.
+            // NUNCA incluir job_name na string de identidade. REMOVIDO totalmente includes('to cloud').
+            // job_name/caminho é apenas para exibição humana.
+            const textoIdentidade = `${assunto} ${rotinaNomeReal}`.toLowerCase()
 
             if (
               textoIdentidade.includes('backup copy job:') ||
-              textoIdentidade.includes('copy job:') ||
-              textoIdentidade.includes('to cloud')
+              textoIdentidade.includes('copy job:')
             ) {
               modalidadesComprovadasPorEsta.add('nuvem')
             } else if (textoIdentidade.includes('replication job:')) {
               modalidadesComprovadasPorEsta.add('replicacao')
             } else if (
               (textoIdentidade.includes('backup job:') ||
-                textoIdentidade.includes('backup vms') ||
                 (rotinaNomeReal && rotinaNomeReal.toLowerCase().startsWith('backup job:'))) &&
               !textoIdentidade.includes('copy') &&
-              !textoIdentidade.includes('replication') &&
-              !textoIdentidade.includes('cloud')
+              !textoIdentidade.includes('replication')
             ) {
               modalidadesComprovadasPorEsta.add('local')
             }

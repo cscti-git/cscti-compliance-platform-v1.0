@@ -7,14 +7,11 @@
  * Uma máquina cadastrada em rotina cuja última evidência ocorreu além do RPO
  * (ou que nunca teve evidência) está DESPROTEGIDA / FORA DO RPO.
  *
- * Mapeamento Modalidade -> Comprovação:
- * Uma execução de backup bem-sucedida (status === 'sucesso') comprova a(s) modalidade(s)
- * indicadas pelo DESTINO do plano da cadeia da rotina.
- * - Destino 'local' -> comprova 'local'
- * - Destino 'nuvem' -> comprova 'nuvem'
- * - Destino 'externo' -> comprova 'replicacao' (cópia externa / replicação offsite)
- * Planos com múltiplos destinos (ex.: ['local', 'nuvem'] ou ['local', 'externo'])
- * comprovam simultaneamente as modalidades configuradas em seu array de destinos.
+ * Regra de Ouro (Fonte única de verdade):
+ * Cada execução comprova SOMENTE a modalidade que a evidência/rotina demonstra
+ * ("backup copy job:" ou "copy job:" -> 'nuvem'; "replication job:" -> 'replicacao';
+ * "backup job:" -> 'local'; ambíguo -> null). O plano NÃO transfere modalidades.
+ * job_name e caminho de pasta Veeam NUNCA determinam modalidade.
  *
  * Regras inegociáveis:
  * - Multi-tenant: isolamento estrito por organization;
@@ -369,16 +366,19 @@ routerAdd(
         return 'nuvem'
       }
 
-      // Construir string de identidade do job contendo SOMENTE assunto da evidência e nomes de job/rotina
-      const textoIdentidade = `${assuntoEvidencia} ${jobNameLaudo} ${rotinaNome}`.toLowerCase()
+      // Regra única de identidade de modalidade (PARTE 1-A):
+      // A modalidade vem EXCLUSIVAMENTE do prefixo declarado no assunto da evidência e no nome/prefixo da rotina:
+      // "backup copy job:" ou "copy job:" -> 'nuvem'
+      // "replication job:" -> 'replicacao'
+      // "backup job:" (sem copy/replication no prefixo) -> 'local'
+      // ambíguo -> null (não comprova nada)
+      // NUNCA incluir job_name na string de identidade. REMOVIDO totalmente includes('to cloud').
+      // job_name/caminho é apenas para exibição humana.
+      const textoIdentidade = `${assuntoEvidencia} ${rotinaNome}`.toLowerCase()
 
       // Ordem rigorosa:
-      // 1. "backup copy job:" ou "copy job:" ou "to cloud" -> 'nuvem'
-      if (
-        textoIdentidade.includes('backup copy job:') ||
-        textoIdentidade.includes('copy job:') ||
-        textoIdentidade.includes('to cloud')
-      ) {
+      // 1. "backup copy job:" ou "copy job:" -> 'nuvem'
+      if (textoIdentidade.includes('backup copy job:') || textoIdentidade.includes('copy job:')) {
         return 'nuvem'
       }
 
@@ -387,14 +387,12 @@ routerAdd(
         return 'replicacao'
       }
 
-      // 3. "backup job:" ou "backup vms" -> 'local' (garantindo ausência de copy/replication/cloud)
+      // 3. "backup job:" -> 'local' (garantindo ausência de copy/replication)
       if (
         (textoIdentidade.includes('backup job:') ||
-          textoIdentidade.includes('backup vms') ||
           (rotinaNome && rotinaNome.toLowerCase().startsWith('backup job:'))) &&
         !textoIdentidade.includes('copy') &&
-        !textoIdentidade.includes('replication') &&
-        !textoIdentidade.includes('cloud')
+        !textoIdentidade.includes('replication')
       ) {
         return 'local'
       }
@@ -845,7 +843,12 @@ routerAdd(
           try {
             ex.set('detalhes_vms', dVmsEx)
             $app.save(ex)
-          } catch (_) {}
+          } catch (errSaveDv) {
+            console.error(
+              '[confronto:reconciliacao] Falha ao salvar detalhes_vms na execução #' + ex.id + ':',
+              errSaveDv?.message || errSaveDv,
+            )
+          }
         }
 
         const nomeJobReconciliado = extrairNomeJob(ex, rotina)
@@ -973,7 +976,12 @@ routerAdd(
                     escIdReconciliado = eRec.id
                     escNomeReconciliado = eRec.getString('nome')
                   }
-                } catch (_) {}
+                } catch (errEsc) {
+                  console.error(
+                    '[confronto:reconciliacao] Erro ao buscar backup_escopo #' + eId + ':',
+                    errEsc?.message || errEsc,
+                  )
+                }
               }
             }
           }
@@ -991,7 +999,21 @@ routerAdd(
                 escIdReconciliado = escOrg[0].id
                 escNomeReconciliado = escOrg[0].getString('nome')
               }
-            } catch (_) {}
+            } catch (errEscOrg) {
+              console.error(
+                '[confronto:reconciliacao] Erro ao buscar escopo ativo da org ' + targetOrgId + ':',
+                errEscOrg?.message || errEscOrg,
+              )
+            }
+          }
+
+          if (!escIdReconciliado) {
+            console.error(
+              '[confronto:reconciliacao] Não foi possível resolver escopo para rotina ' +
+                rotinaId +
+                ' e execução #' +
+                ex.id,
+            )
           }
 
           // Montar lista completa de exigências com os 4 ativos se estiver vazio
@@ -1087,7 +1109,14 @@ routerAdd(
 
               $app.save(avRec)
             }
-          } catch (_) {}
+          } catch (errAv) {
+            console.error(
+              '[confronto:reconciliacao] Falha ao atualizar backup_avaliacoes da execução #' +
+                ex.id +
+                ':',
+              errAv?.message || errAv,
+            )
+          }
         }
       }
 
@@ -1113,9 +1142,37 @@ routerAdd(
             percentual_protegido: percentualProtegido,
           })
           $app.save(auditRec)
-        } catch (_) {}
+        } catch (errAudit) {
+          console.error(
+            '[confronto:reconciliacao] Falha ao registrar log de auditoria de reconciliação:',
+            errAudit?.message || errAudit,
+          )
+        }
       }
-    } catch (_) {}
+    } catch (errReconciliacao) {
+      console.error(
+        '[confronto:reconciliacao] Exceção durante a reconciliação paralela:',
+        errReconciliacao?.message || errReconciliacao,
+      )
+      try {
+        const auditCol = $app.findCollectionByNameOrId('audit_log')
+        const auditRec = new Record(auditCol)
+        auditRec.set('organization', targetOrgId)
+        auditRec.set('user', auth.id)
+        auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
+        auditRec.set('user_email', auth.getString('email'))
+        auditRec.set('action', 'BACKUP_CONFRONTO_RECONCILE_FAILED')
+        auditRec.set('entity', 'Backup e Continuidade')
+        auditRec.set(
+          'detail',
+          `Falha durante a reconciliação de confronto de proteção por ativo: ${errReconciliacao?.message || String(errReconciliacao)}.`,
+        )
+        auditRec.set('metadata', {
+          error: String(errReconciliacao),
+        })
+        $app.save(auditRec)
+      } catch (_) {}
+    }
 
     return e.json(200, {
       ok: true,
