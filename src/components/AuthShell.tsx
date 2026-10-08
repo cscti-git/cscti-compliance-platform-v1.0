@@ -35,9 +35,9 @@ export const AuthShell: React.FC<AuthShellProps> = ({
 }) => {
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#061628] selection:bg-[#D4AF37]/30 selection:text-white">
-      {/* ======================================================== */}
+      {/* -------------------------------------------------------- */}
       {/* PAINEL INSTITUCIONAL CSCTI (Esquerda / Topo no mobile)  */}
-      {/* ======================================================== */}
+      {/* -------------------------------------------------------- */}
       <div className="lg:w-[52%] xl:w-[50%] relative flex flex-col justify-between p-6 sm:p-10 lg:p-14 xl:p-16 text-white overflow-hidden bg-gradient-to-br from-[#061628] via-[#0B2545] to-[#040D18] border-b lg:border-b-0 lg:border-r border-slate-800/80">
         {/* Padrão Gráfico Tecnológico de Fundo (Grid sutil com nós + radial glow) */}
         <div
@@ -152,9 +152,9 @@ export const AuthShell: React.FC<AuthShellProps> = ({
         </div>
       </div>
 
-      {/* ======================================================== */}
+      {/* -------------------------------------------------------- */}
       {/* ÁREA DO FORMULÁRIO (Direita / Abaixo no mobile)          */}
-      {/* ======================================================== */}
+      {/* -------------------------------------------------------- */}
       <div className="lg:w-[48%] xl:w-[50%] flex items-center justify-center p-4 sm:p-8 lg:p-12 xl:p-16 bg-[#F8FAFC]">
         <div className="w-full max-w-md">
           {/* Card Principal */}

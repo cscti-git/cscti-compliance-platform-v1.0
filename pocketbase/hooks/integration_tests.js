@@ -2,65 +2,45 @@
 // POST /backend/v1/integrations/test-glpi
 // POST /backend/v1/integrations/test-imap
 
-routerAdd('GET', '/backend/v1/debug-confronto-live', (e) => {
+routerAdd('POST', '/backend/v1/test-invoke-confronto-live', (e) => {
   try {
     const orgId = '8kl8n6vz64lnxgb'
-    const execs = $app.findRecordsByFilter(
-      'backup_execucoes',
-      `organization = '${orgId}'`,
-      '-created',
-      5,
-      0,
-    )
-    const fontes = $app.findRecordsByFilter('backup_fontes', `organization = '${orgId}'`, '', 10, 0)
-    const rotinas = $app.findRecordsByFilter(
-      'backup_rotinas',
-      `organization = '${orgId}'`,
-      '',
-      10,
-      0,
-    )
-    const data = execs.map((ex) => {
-      let conf = ex.get('confronto_escopo')
-      return {
-        id: ex.id,
-        rotina: ex.getString('rotina'),
-        status: ex.getString('status'),
-        observacao: ex.getString('observacao'),
-        confronto_escopo: conf,
-      }
-    })
-    const fontesData = fontes.map((f) => ({
-      id: f.id,
-      ativo_inventario: f.getString('ativo_inventario'),
-      caminho_identificacao: f.getString('caminho_identificacao'),
-      rotina: f.getString('rotina'),
-    }))
-    const rotinasData = rotinas.map((r) => ({
-      id: r.id,
-      nome: r.getString('nome'),
-      plano: r.getString('plano'),
-    }))
-
-    // SALVAR NO AUDIT_LOG para podermos inspecionar via db_query!
-    try {
-      const auditCol = $app.findCollectionByNameOrId('audit_log')
-      const auditRec = new Record(auditCol)
-      auditRec.set('organization', orgId)
-      auditRec.set('action', 'DEBUG_INSPECT_CONFRONTO')
-      auditRec.set('entity', 'Debug')
-      auditRec.set('detail', `Total execucoes: ${data.length}, total fontes: ${fontesData.length}`)
-      auditRec.set('metadata', {
-        execs: data,
-        fontes: fontesData,
-        rotinas: rotinasData,
-      })
-      $app.save(auditRec)
-    } catch (errAudit) {
-      console.error('Falha ao salvar audit:', errAudit)
+    const users = $app.findRecordsByFilter('users', `organization = '${orgId}'`, '-created', 1, 0)
+    if (users.length === 0) {
+      return e.json(404, { error: 'Nenhum usuário da org encontrado' })
     }
+    const testUser = users[0]
+    const token = $app.newRecordAuthToken(testUser)
 
-    return e.json(200, { execucoes: data, fontes: fontesData, rotinas: rotinasData })
+    const testRes = $http.send({
+      url: 'http://127.0.0.1:8090/backend/v1/backup/confronto',
+      method: 'POST',
+      headers: {
+        Authorization: token,
+        'Content-Type': 'application/json',
+      },
+      timeout: 10,
+    })
+
+    const auditCol = $app.findCollectionByNameOrId('audit_log')
+    const auditRec = new Record(auditCol)
+    auditRec.set('organization', orgId)
+    auditRec.set('user', testUser.id)
+    auditRec.set('user_name', testUser.getString('name') || testUser.getString('email'))
+    auditRec.set('user_email', testUser.getString('email'))
+    auditRec.set('action', 'TEST_LIVE_CONFRONTO_INVOKE')
+    auditRec.set('entity', 'BackupConfronto')
+    auditRec.set('detail', `Status: ${testRes.statusCode}`)
+    auditRec.set('metadata', {
+      statusCode: testRes.statusCode,
+      responseBody: testRes.json || testRes.raw,
+    })
+    $app.save(auditRec)
+
+    return e.json(200, {
+      testStatusCode: testRes.statusCode,
+      responseJson: testRes.json,
+    })
   } catch (err) {
     return e.json(500, { error: String(err) })
   }
