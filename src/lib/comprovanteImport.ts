@@ -335,10 +335,72 @@ export async function extrairConteudoArquivo(file: File): Promise<ExtractedCompr
     tipoDetectado: 'outro',
   }
 
+  // Função auxiliar para decodificar string base64 se detectada
+  const decodeBase64IfDetected = (rawStr: string): string => {
+    if (!rawStr) return ''
+    let trimmed = rawStr.trim()
+    // Caso 1: Data URL (ex: data:text/html;base64,...)
+    if (trimmed.startsWith('data:') && trimmed.includes(';base64,')) {
+      const parts = trimmed.split(';base64,')
+      if (parts[1]) {
+        try {
+          const bin = atob(parts[1].trim())
+          const bytes = new Uint8Array(bin.length)
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+          return new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+        } catch {
+          /* fallback */
+        }
+      }
+    }
+    // Caso 2: String longa sem tags html/xml/table que decodifica para texto estruturado
+    if (
+      !trimmed.includes('<html') &&
+      !trimmed.includes('<table') &&
+      !trimmed.includes('<?xml') &&
+      trimmed.length >= 20 &&
+      /^[A-Za-z0-9+/=\s\r\n]+$/.test(trimmed)
+    ) {
+      try {
+        const cleanB64 = trimmed.replace(/\s+/g, '')
+        const bin = atob(cleanB64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        const dec = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+        if (
+          dec.includes('<?xml') ||
+          dec.includes('<html') ||
+          dec.includes('<table') ||
+          dec.includes('Backup') ||
+          dec.includes('backup')
+        ) {
+          return dec
+        }
+      } catch {
+        /* fallback */
+      }
+    }
+    return trimmed
+  }
+
   // 1. Arquivos HTML (.html, .htm) - CASO PRINCIPAL
   if (extension === 'html' || extension === 'htm') {
     extracted.tipoDetectado = 'html'
-    const htmlText = await file.text()
+    // Leitura garantida em texto decodificado UTF-8
+    let htmlText = ''
+    try {
+      htmlText = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsText(file, 'utf-8')
+      })
+    } catch {
+      htmlText = await file.text()
+    }
+
+    // Detecção defensiva se o conteúdo ainda veio em base64
+    htmlText = decodeBase64IfDetected(htmlText)
 
     // O arquivo HTML salvo do Gmail contém a estrutura completa de tabelas.
     // Preservamos o HTML em si (para que o parser backend utilize regex sobre <table>/<tr>/<td>)
@@ -376,16 +438,37 @@ export async function extrairConteudoArquivo(file: File): Promise<ExtractedCompr
   // 2. Arquivos de texto (.txt, .log, .csv)
   if (extension === 'txt' || extension === 'log' || extension === 'csv') {
     extracted.tipoDetectado = 'txt'
-    const text = await file.text()
-    extracted.conteudo = text.trim()
+    let text = ''
+    try {
+      text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsText(file, 'utf-8')
+      })
+    } catch {
+      text = await file.text()
+    }
+    extracted.conteudo = decodeBase64IfDetected(text).trim()
     return extracted
   }
 
   // 3. Arquivos de e-mail (.eml, .msg)
   if (extension === 'eml' || extension === 'msg') {
     extracted.tipoDetectado = 'eml'
-    const raw = await file.text()
-    const emlRes = extractFromEml(raw)
+    let raw = ''
+    try {
+      raw = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsText(file, 'utf-8')
+      })
+    } catch {
+      raw = await file.text()
+    }
+    const cleanRaw = decodeBase64IfDetected(raw)
+    const emlRes = extractFromEml(cleanRaw)
     extracted.conteudo = emlRes.conteudo
     extracted.assunto = emlRes.assunto
     extracted.remetente = emlRes.remetente

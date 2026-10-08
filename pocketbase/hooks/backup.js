@@ -56,6 +56,131 @@ routerAdd(
       const tipoEvidencia = body.tipo || 'upload_manual' // 'upload_manual' | 'e_mail'
       let nomeArquivoAnexo = String(body.nome_arquivo || '').trim()
 
+      // -------------------------------------------------------------
+      // DETECÇÃO DEFENSIVA DE CONTEÚDO BASE64 NO BACKEND
+      // Suporta: data:*;base64,... OU string Base64 UTF-8/UTF-16
+      // (ex.: "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTE2Ij8+PGh0bWw+...")
+      // Se detectado, decodifica para UTF-8 ANTES de qualquer parse.
+      // -------------------------------------------------------------
+      const tentarDecodificarBase64 = (texto) => {
+        if (!texto) return texto
+        let s = String(texto).trim()
+
+        // 1. Prefixo data URL
+        if (s.startsWith('data:') && s.includes(';base64,')) {
+          const p = s.split(';base64,')
+          if (p[1]) s = p[1].trim()
+        }
+
+        // Se já contém tags HTML explícitas, não é base64 puro
+        if (s.includes('<html') || s.includes('<table') || s.includes('<body')) {
+          return texto
+        }
+
+        // Heurística de base64: pelo menos 20 caracteres compostos apenas de A-Za-z0-9+/=\s
+        if (s.length < 20 || !/^[A-Za-z0-9+/=\s\r\n]+$/.test(s)) {
+          return texto
+        }
+
+        try {
+          const clean = s.replace(/\s+/g, '')
+          // Decodificar Base64 puro em bytes
+          const b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+          let pad = 0
+          if (clean.endsWith('==')) pad = 2
+          else if (clean.endsWith('=')) pad = 1
+          const cleanLen = clean.length
+          const byteLen = Math.floor((cleanLen * 3) / 4) - pad
+          if (byteLen <= 0) return texto
+
+          const bytes = []
+          let i = 0
+          while (i < cleanLen) {
+            const c0 = b64chars.indexOf(clean.charAt(i++))
+            const c1 = b64chars.indexOf(clean.charAt(i++))
+            const c2 = i < cleanLen ? b64chars.indexOf(clean.charAt(i++)) : -1
+            const c3 = i < cleanLen ? b64chars.indexOf(clean.charAt(i++)) : -1
+            if (c0 === -1 || c1 === -1) break
+
+            const b0 = (c0 << 2) | (c1 >> 4)
+            bytes.push(b0)
+            if (c2 !== -1 && c2 !== 64) {
+              const b1 = ((c1 & 15) << 4) | (c2 >> 2)
+              bytes.push(b1)
+              if (c3 !== -1 && c3 !== 64) {
+                const b2 = ((c2 & 3) << 6) | c3
+                bytes.push(b2)
+              }
+            }
+          }
+
+          // Testar UTF-16LE / UTF-16BE (muito comum em XML salvo do Windows/Outlook: bytes alternados com 0)
+          let decodificado = ''
+          let temMuitosNulos = false
+          let contNulos = 0
+          for (let k = 0; k < Math.min(bytes.length, 200); k++) {
+            if (bytes[k] === 0) contNulos++
+          }
+          if (contNulos > 20) {
+            temMuitosNulos = true
+          }
+
+          if (temMuitosNulos) {
+            // Decodificação UTF-16LE: descartar bytes 0 nulos de ASCII
+            const chars = []
+            for (let bIdx = 0; bIdx < bytes.length; bIdx += 2) {
+              const code = bytes[bIdx] | ((bytes[bIdx + 1] || 0) << 8)
+              if (code !== 0) {
+                chars.push(String.fromCharCode(code))
+              }
+            }
+            decodificado = chars.join('')
+          } else {
+            // Decodificação UTF-8 padrão
+            const chars = []
+            let bI = 0
+            while (bI < bytes.length) {
+              const b = bytes[bI++]
+              if (b < 0x80) {
+                chars.push(String.fromCharCode(b))
+              } else if (b >= 0xc0 && b < 0xe0 && bI < bytes.length) {
+                const b2 = bytes[bI++]
+                chars.push(String.fromCharCode(((b & 0x1f) << 6) | (b2 & 0x3f)))
+              } else if (b >= 0xe0 && b < 0xf0 && bI + 1 < bytes.length) {
+                const b2 = bytes[bI++]
+                const b3 = bytes[bI++]
+                chars.push(
+                  String.fromCharCode(((b & 0x0f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f)),
+                )
+              } else {
+                chars.push(String.fromCharCode(b))
+              }
+            }
+            decodificado = chars.join('')
+          }
+
+          // Se o resultado decodificado contém marcadores reconhecíveis de HTML/XML/Backup
+          const decLower = decodificado.toLowerCase()
+          if (
+            decLower.includes('<?xml') ||
+            decLower.includes('<html') ||
+            decLower.includes('<!doctype') ||
+            decLower.includes('<table') ||
+            decLower.includes('backup job') ||
+            decLower.includes('details') ||
+            decLower.includes('veeam')
+          ) {
+            return decodificado
+          }
+        } catch (_) {
+          /* em caso de erro, manter texto original */
+        }
+        return texto
+      }
+
+      // Aplicar decodificação defensiva em rawConteudo
+      rawConteudo = tentarDecodificarBase64(rawConteudo)
+
       // Verificar se foi enviado arquivo PDF anexado via multipart
       let pdfExtraidoTexto = ''
       let pdfParseError = ''
