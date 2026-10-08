@@ -586,25 +586,29 @@ export const BackupOverviewPage: React.FC = () => {
                     <span className="text-xs font-semibold text-slate-600 ml-1.5">protegido</span>
                   </p>
                   <p className="text-[11px] text-slate-700 font-medium mt-0.5">
-  {totalExigidosConfronto > 0 ? (
-    totalProtegidosCompleto === totalExigidosConfronto ? (
-      <span>
-        {totalProtegidosCompleto} de {totalExigidosConfronto} ativos protegidos (100%)
-      </span>
-    ) : (
-      <span>
-        {totalComProtecao} de {totalExigidosConfronto} ativos parcialmente protegidos · {totalProtegidosCompleto} com proteção completa
-      </span>
-    )
-  ) : (
-    'Sem exigências marcadas'
-  )}
-</p>
-{totalExigidosConfronto > 0 && totalProtegidosCompleto < totalExigidosConfronto && (
-  <p className="text-[10px] text-slate-500">
-    Rotina perante as exigências: Local ✓ e Nuvem ✓ comprovadas, falta a replicação
-  </p>
-)}
+                    {totalExigidosConfronto > 0 ? (
+                      totalProtegidosCompleto === totalExigidosConfronto ? (
+                        <span>
+                          {totalProtegidosCompleto} de {totalExigidosConfronto} ativos protegidos
+                          (100%)
+                        </span>
+                      ) : (
+                        <span>
+                          {totalComProtecao} de {totalExigidosConfronto} ativos parcialmente
+                          protegidos · {totalProtegidosCompleto} com proteção completa
+                        </span>
+                      )
+                    ) : (
+                      'Sem exigências marcadas'
+                    )}
+                  </p>
+                  {totalExigidosConfronto > 0 &&
+                    totalProtegidosCompleto < totalExigidosConfronto && (
+                      <p className="text-[10px] text-slate-500">
+                        Rotina perante as exigências: Local ✓ e Nuvem ✓ comprovadas, falta a
+                        replicação
+                      </p>
+                    )}
                 </div>
                 <div
                   className={`p-2.5 rounded-lg ${
