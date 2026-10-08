@@ -278,11 +278,16 @@ routerAdd(
       if (!execRec) return null
 
       let assuntoEvidencia = ''
+      let corpoEvidencia = ''
       let adaptadorCodigo = ''
       let jobNameLaudo = ''
 
       // 1. Buscar dados da avaliação técnica vinculada (laudo / adaptador / job_name)
       let evidenciaId = ''
+      try {
+        evidenciaId = execRec.getString('evidencia') || ''
+      } catch (_) {}
+
       try {
         const avals = $app.findRecordsByFilter(
           'backup_avaliacoes',
@@ -314,37 +319,40 @@ routerAdd(
       } catch (_) {}
 
       // 2. Se temos evidencia vinculada na execução ou através de backup_ocorrencias / backup_processamentos
-      try {
-        const procs = $app.findRecordsByFilter(
-          'backup_processamentos',
-          `execucao = '${execRec.id}'`,
-          '-created',
-          1,
-          0,
-        )
-        if (procs.length > 0) {
-          evidenciaId = procs[0].getString('evidencia')
-          if (!adaptadorCodigo) {
-            adaptadorCodigo = procs[0].getString('adaptador_usado') || ''
-          }
-          const resProc = procs[0].get('resultado')
-          if (resProc && typeof resProc === 'object' && resProc.job_name) {
-            if (!jobNameLaudo) jobNameLaudo = String(resProc.job_name || '')
-          }
-        }
-      } catch (_) {}
-
-      if (evidenciaId && !assuntoEvidencia) {
+      if (!evidenciaId || !adaptadorCodigo) {
         try {
-          const evRec = $app.findRecordById('backup_evidencias', evidenciaId)
-          if (evRec) {
-            assuntoEvidencia = evRec.getString('assunto') || ''
+          const procs = $app.findRecordsByFilter(
+            'backup_processamentos',
+            `execucao = '${execRec.id}'`,
+            '-created',
+            1,
+            0,
+          )
+          if (procs.length > 0) {
+            if (!evidenciaId) evidenciaId = procs[0].getString('evidencia')
+            if (!adaptadorCodigo) {
+              adaptadorCodigo = procs[0].getString('adaptador_usado') || ''
+            }
+            const resProc = procs[0].get('resultado')
+            if (resProc && typeof resProc === 'object' && resProc.job_name) {
+              if (!jobNameLaudo) jobNameLaudo = String(resProc.job_name || '')
+            }
           }
         } catch (_) {}
       }
 
-      // Se ainda não temos assunto, buscar qualquer evidência com mesma rotina
-      if (!assuntoEvidencia && rotinaRec) {
+      if (evidenciaId) {
+        try {
+          const evRec = $app.findRecordById('backup_evidencias', evidenciaId)
+          if (evRec) {
+            if (!assuntoEvidencia) assuntoEvidencia = evRec.getString('assunto') || ''
+            corpoEvidencia = evRec.getString('conteudo') || ''
+          }
+        } catch (_) {}
+      }
+
+      // Se ainda não temos assunto/corpo, buscar evidência vinculada à rotina
+      if ((!assuntoEvidencia || !corpoEvidencia) && rotinaRec) {
         try {
           const evList = $app.findRecordsByFilter(
             'backup_evidencias',
@@ -354,7 +362,8 @@ routerAdd(
             0,
           )
           if (evList.length > 0) {
-            assuntoEvidencia = evList[0].getString('assunto') || ''
+            if (!assuntoEvidencia) assuntoEvidencia = evList[0].getString('assunto') || ''
+            if (!corpoEvidencia) corpoEvidencia = evList[0].getString('conteudo') || ''
           }
         } catch (_) {}
       }
@@ -366,38 +375,62 @@ routerAdd(
         return 'nuvem'
       }
 
-      // Regra única de identidade de modalidade (PARTE 1-A):
-      // A modalidade vem EXCLUSIVAMENTE do prefixo declarado no assunto da evidência e no nome/prefixo da rotina:
-      // "backup copy job:" ou "copy job:" -> 'nuvem'
-      // "replication job:" -> 'replicacao'
-      // "backup job:" (sem copy/replication no prefixo) -> 'local'
-      // ambíguo -> null (não comprova nada)
-      // NUNCA incluir job_name na string de identidade. REMOVIDO totalmente includes('to cloud').
-      // job_name/caminho é apenas para exibição humana.
-      const textoIdentidade = `${assuntoEvidencia} ${rotinaNome}`.toLowerCase()
+      // Regra de Ouro de Inferência de Modalidade (Ordem de Precedência Estrita):
+      // a) Prefixo declarado no ASSUNTO da evidência ("backup copy job:"/"copy job:" -> nuvem, "replication job:" -> replicacao, "backup job:" -> local)
+      // b) Prefixo declarado no CORPO do comprovante na linha de cabeçalho do job Veeam ("Backup Copy Job:" -> nuvem, "Replication Job:" -> replicacao, "Backup job:" -> local)
+      // c) Marcador explícito no NOME DA ROTINA (- LOCAL -> local, - NUVEM/- NUVENS -> nuvem, - REPLICA/- REPLICAS/- REPLICACAO -> replicacao)
+      // d) Se nada declarar -> null (fail-closed)
+      // NUNCA usar job_name/caminho de pasta ("to Cloud") nem a assinatura do e-mail.
 
-      // Ordem rigorosa:
-      // 1. "backup copy job:" ou "copy job:" -> 'nuvem'
-      if (textoIdentidade.includes('backup copy job:') || textoIdentidade.includes('copy job:')) {
+      // a) Prefixo no ASSUNTO (deve ser prefixo / início do assunto após tags como [Success])
+      const assuntoLimpo = String(assuntoEvidencia || '')
+        .replace(/^(\s*\[[^\]]+\]\s*)+/i, '')
+        .trim()
+        .toLowerCase()
+      if (assuntoLimpo.startsWith('backup copy job:') || assuntoLimpo.startsWith('copy job:')) {
         return 'nuvem'
       }
-
-      // 2. "replication job:" -> 'replicacao'
-      if (textoIdentidade.includes('replication job:')) {
+      if (assuntoLimpo.startsWith('replication job:')) {
         return 'replicacao'
       }
-
-      // 3. "backup job:" -> 'local' (garantindo ausência de copy/replication)
-      if (
-        (textoIdentidade.includes('backup job:') ||
-          (rotinaNome && rotinaNome.toLowerCase().startsWith('backup job:'))) &&
-        !textoIdentidade.includes('copy') &&
-        !textoIdentidade.includes('replication')
-      ) {
+      if (assuntoLimpo.startsWith('backup job:')) {
         return 'local'
       }
 
-      // Ambíguo ou não identificado com precisão -> null (não comprova nada)
+      // b) Prefixo no CORPO do comprovante (linha de cabeçalho Veeam)
+      if (corpoEvidencia) {
+        const headerVeeamRegex =
+          /(?:^|[\r\n]|<[^>]*>)\s*(Backup Copy [Jj]ob|Copy [Jj]ob|Replication [Jj]ob|Backup [Jj]ob)\s*:\s*([^<\r\n]+?)(?=\s*Created by|\s*Success|\s*Warning|\s*Failed|\s*Error|[\r\n]|<|$)/i
+        const matchCorpo = corpoEvidencia.match(headerVeeamRegex)
+        if (matchCorpo && matchCorpo[1]) {
+          const prefixoCorpo = matchCorpo[1].trim().toLowerCase()
+          if (prefixoCorpo.startsWith('backup copy') || prefixoCorpo.startsWith('copy')) {
+            return 'nuvem'
+          }
+          if (prefixoCorpo.startsWith('replication')) {
+            return 'replicacao'
+          }
+          if (prefixoCorpo.startsWith('backup')) {
+            return 'local'
+          }
+        }
+      }
+
+      // c) Marcador explícito no NOME DA ROTINA (- LOCAL, - NUVEM/- NUVENS, - REPLICA/- REPLICAS/- REPLICACAO)
+      if (rotinaNome) {
+        const rNome = rotinaNome.trim().toLowerCase()
+        if (/(?:^|\s|-)\s*(?:replicas?|replicacao|replica[çc][aã]o)\s*$/i.test(rNome)) {
+          return 'replicacao'
+        }
+        if (/(?:^|\s|-)\s*nuvens?\s*$/i.test(rNome)) {
+          return 'nuvem'
+        }
+        if (/(?:^|\s|-)\s*local\s*$/i.test(rNome)) {
+          return 'local'
+        }
+      }
+
+      // d) Ambíguo ou não identificado com precisão -> null (não comprova nada - fail closed)
       return null
     }
 

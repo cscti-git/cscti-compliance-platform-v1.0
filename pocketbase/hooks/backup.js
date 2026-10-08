@@ -2231,26 +2231,61 @@ routerAdd(
           if (adaptadorUsado === 'ACRONIS_PDF') {
             modalidadesComprovadasPorEsta.add('nuvem')
           } else {
-            // Regra única de identidade de modalidade (PARTE 1-A):
-            // A modalidade vem EXCLUSIVAMENTE do prefixo declarado no assunto da evidência e no nome/prefixo da rotina.
-            // NUNCA incluir job_name na string de identidade. REMOVIDO totalmente includes('to cloud').
-            // job_name/caminho é apenas para exibição humana.
-            const textoIdentidade = `${assunto} ${rotinaNomeReal}`.toLowerCase()
+            // Regra de Ouro de Inferência de Modalidade (Ordem de Precedência Estrita):
+            // a) Prefixo declarado no ASSUNTO da evidência ("backup copy job:"/"copy job:" -> nuvem, "replication job:" -> replicacao, "backup job:" -> local)
+            // b) Prefixo declarado no CORPO do comprovante na linha de cabeçalho do job Veeam ("Backup Copy Job:" -> nuvem, "Replication Job:" -> replicacao, "Backup job:" -> local)
+            // c) Marcador explícito no NOME DA ROTINA (- LOCAL -> local, - NUVEM/- NUVENS -> nuvem, - REPLICA/- REPLICAS/- REPLICACAO -> replicacao)
+            // d) Se nada declarar -> null (fail-closed)
+            // NUNCA usar job_name/caminho de pasta ("to Cloud") nem a assinatura do e-mail.
+            let modInferida = null
 
+            // a) Prefixo no ASSUNTO (deve ser prefixo / início do assunto após eventuais tags como [Success])
+            const assuntoLimpo = String(assunto || '')
+              .replace(/^(\s*\[[^\]]+\]\s*)+/i, '')
+              .trim()
+              .toLowerCase()
             if (
-              textoIdentidade.includes('backup copy job:') ||
-              textoIdentidade.includes('copy job:')
+              assuntoLimpo.startsWith('backup copy job:') ||
+              assuntoLimpo.startsWith('copy job:')
             ) {
-              modalidadesComprovadasPorEsta.add('nuvem')
-            } else if (textoIdentidade.includes('replication job:')) {
-              modalidadesComprovadasPorEsta.add('replicacao')
-            } else if (
-              (textoIdentidade.includes('backup job:') ||
-                (rotinaNomeReal && rotinaNomeReal.toLowerCase().startsWith('backup job:'))) &&
-              !textoIdentidade.includes('copy') &&
-              !textoIdentidade.includes('replication')
-            ) {
-              modalidadesComprovadasPorEsta.add('local')
+              modInferida = 'nuvem'
+            } else if (assuntoLimpo.startsWith('replication job:')) {
+              modInferida = 'replicacao'
+            } else if (assuntoLimpo.startsWith('backup job:')) {
+              modInferida = 'local'
+            }
+
+            // b) Prefixo no CORPO do comprovante (linha de cabeçalho Veeam)
+            if (!modInferida && rawConteudo) {
+              const headerVeeamRegex =
+                /(?:^|[\r\n]|<[^>]*>)\s*(Backup Copy [Jj]ob|Copy [Jj]ob|Replication [Jj]ob|Backup [Jj]ob)\s*:\s*([^<\r\n]+?)(?=\s*Created by|\s*Success|\s*Warning|\s*Failed|\s*Error|[\r\n]|<|$)/i
+              const matchCorpo = rawConteudo.match(headerVeeamRegex)
+              if (matchCorpo && matchCorpo[1]) {
+                const prefixoCorpo = matchCorpo[1].trim().toLowerCase()
+                if (prefixoCorpo.startsWith('backup copy') || prefixoCorpo.startsWith('copy')) {
+                  modInferida = 'nuvem'
+                } else if (prefixoCorpo.startsWith('replication')) {
+                  modInferida = 'replicacao'
+                } else if (prefixoCorpo.startsWith('backup')) {
+                  modInferida = 'local'
+                }
+              }
+            }
+
+            // c) Marcador explícito no NOME DA ROTINA (- LOCAL, - NUVEM/- NUVENS, - REPLICA/- REPLICAS/- REPLICACAO)
+            if (!modInferida && rotinaNomeReal) {
+              const rNome = rotinaNomeReal.trim().toLowerCase()
+              if (/(?:^|\s|-)\s*(?:replicas?|replicacao|replica[çc][aã]o)\s*$/i.test(rNome)) {
+                modInferida = 'replicacao'
+              } else if (/(?:^|\s|-)\s*nuvens?\s*$/i.test(rNome)) {
+                modInferida = 'nuvem'
+              } else if (/(?:^|\s|-)\s*local\s*$/i.test(rNome)) {
+                modInferida = 'local'
+              }
+            }
+
+            if (modInferida) {
+              modalidadesComprovadasPorEsta.add(modInferida)
             }
           }
 
