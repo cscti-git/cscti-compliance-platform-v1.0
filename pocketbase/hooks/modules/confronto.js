@@ -297,6 +297,29 @@ routerAdd(
         .replace(/[^a-z0-9]/g, '')
     }
 
+    // Helper: normalizar string de data ISO ou espaço ("2026-10-08 18:32:20.353Z" -> "2026-10-08T18:32:20.353Z")
+    const normalizarDataIso = (dtStr) => {
+      if (!dtStr) return null
+      let s = String(dtStr).trim()
+      if (!s) return null
+      // Se possui formato YYYY-MM-DD HH:mm:ss... converter espaço para 'T'
+      if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(s)) {
+        s = s.replace(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}.*)$/, '$1T$2')
+      }
+      return s
+    }
+
+    const parseDataTimestamp = (dtStr) => {
+      const norm = normalizarDataIso(dtStr)
+      if (!norm) return 0
+      try {
+        const t = new Date(norm).getTime()
+        return isNaN(t) ? 0 : t
+      } catch (_) {
+        return 0
+      }
+    }
+
     // Helper: extrair array de detalhes_vms de uma execução, com fallback em backup_processamentos ou backup_avaliacoes
     const obterDetalhesVmsExecucao = (exRec) => {
       if (!exRec) return []
@@ -323,7 +346,7 @@ routerAdd(
           }
         } catch (_) {}
       }
-      // Fallback 2: buscar em backup_avaliacoes correspondente (itens_avaliados ou confronto_escopo.comprovado)
+      // Fallback 2: buscar em backup_avaliacoes correspondente (itens_avaliados ou confronto_escopo)
       try {
         const avals = $app.findRecordsByFilter(
           'backup_avaliacoes',
@@ -334,20 +357,62 @@ routerAdd(
         )
         if (avals.length > 0) {
           const cEsc = normalizarJson(avals[0].get('confronto_escopo'))
+          const list = []
           if (cEsc && Array.isArray(cEsc.comprovado) && cEsc.comprovado.length > 0) {
-            return cEsc.comprovado.map((comp) => ({
-              nome: comp.ativo_nome || comp.item_comprovante,
-              status: comp.status || 'success',
-              ativo_id: comp.ativo_id,
-              status_escopo: 'coberto',
-              fora_escopo: false,
-            }))
+            for (let ci = 0; ci < cEsc.comprovado.length; ci++) {
+              const comp = cEsc.comprovado[ci]
+              list.push({
+                nome: comp.ativo_nome || comp.item_comprovante || comp.fonte_casada,
+                status: comp.status || 'success',
+                ativo_id: comp.ativo_id,
+                status_escopo: 'coberto',
+                fora_escopo: false,
+              })
+            }
           }
+          if (cEsc && Array.isArray(cEsc.falhas) && cEsc.falhas.length > 0) {
+            for (let fi = 0; fi < cEsc.falhas.length; fi++) {
+              const fl = cEsc.falhas[fi]
+              list.push({
+                nome: fl.ativo_nome || fl.item_comprovante,
+                status: 'failed',
+                ativo_id: fl.ativo_id,
+                status_escopo: 'coberto',
+                fora_escopo: false,
+              })
+            }
+          }
+          if (list.length > 0) return list
         }
       } catch (_) {}
       return []
     }
 
+    // Helper: extrair array de VMs com sucesso de uma execução
+    const obterVmsSucessoExecucao = (exRec) => {
+      if (!exRec) return []
+      const list = []
+      const dVms = obterDetalhesVmsExecucao(exRec)
+      if (Array.isArray(dVms) && dVms.length > 0) {
+        for (let i = 0; i < dVms.length; i++) {
+          const st = String(dVms[i].status || '').toLowerCase()
+          const vNome = dVms[i].nome
+          if (vNome && (st === 'success' || st === 'sucesso')) {
+            if (!list.includes(vNome)) list.push(vNome)
+          }
+        }
+      }
+      if (list.length === 0) {
+        const cEsc = normalizarJson(exRec.get('confronto_escopo'))
+        if (cEsc && Array.isArray(cEsc.comprovado) && cEsc.comprovado.length > 0) {
+          for (let i = 0; i < cEsc.comprovado.length; i++) {
+            const cNome = cEsc.comprovado[i].ativo_nome || cEsc.comprovado[i].item_comprovante
+            if (cNome && !list.includes(cNome)) list.push(cNome)
+          }
+        }
+      }
+      return list
+    }
     // Helper: extrair nome amigável do Job para exibição
     const extrairNomeJob = (execRec, rotinaRec) => {
       if (!execRec) return ''
@@ -407,15 +472,35 @@ routerAdd(
       return jobNome
     }
 
-    // Helper: inferir modalidade comprovada pelo conteúdo REAL em 4 camadas (FIX 4):
-    // a) Assinatura da ferramenta / adaptador no comprovante/avaliação
-    // b) Modalidade pelo TIPO DO JOB no CORPO: "Backup job:" -> 'local'; "Backup Copy job:" -> 'nuvem'; "Replication job:" -> 'replicacao'
-    //    ou Adaptador ACRONIS_PDF -> 'nuvem'
-    //    NUNCA usar o caminho da pasta do job (ex. "to Cloud" em "Backup VMs to Cloud\...") e NUNCA depender do assunto.
-    // c) Fallback pelo nome da rotina vinculada (- LOCAL, - NUVEM, - REPLICA)
-    // d) Ambíguo -> null (fail-closed mantido)
+    // Helper: inferir modalidade comprovada pelo conteúdo REAL em 5 camadas:
+    // a) Assinatura da ferramenta / adaptador no comprovante/avaliação (ex: ACRONIS_PDF -> 'nuvem')
+    // b) Prefixo declarado NO ASSUNTO ou CORPO do comprovante:
+    //    "Backup Copy job:" / "Copy job:" -> 'nuvem'; "Replication job:" -> 'replicacao'; "Backup job:" -> 'local'
+    // c) Campo observação da execução gravada ("Veeam backup_copy" -> 'nuvem'; "Veeam backup"/"Veeam backup_job" -> 'local'; "Veeam replication" -> 'replicacao')
+    // d) Marcador explícito no NOME DA ROTINA vinculada (- LOCAL, - NUVEM/- NUVENS, - REPLICA/- REPLICAS/- REPLICACAO)
+    // e) Ambíguo -> null (fail-closed mantido; "to Cloud" no caminho da pasta NUNCA decide sozinho)
     const inferirModalidadeComprovante = (execRec, rotinaRec) => {
       if (!execRec) return null
+
+      // CAMADA 0 (NOVO): Campo observacao da execução ("Veeam backup_copy", "Veeam backup", "Veeam replication")
+      const obsExec = execRec.getString('observacao') || ''
+      if (obsExec) {
+        const obsLower = obsExec.toLowerCase()
+        if (obsLower.includes('backup_copy') || obsLower.includes('backup copy')) {
+          return 'nuvem'
+        }
+        if (obsLower.includes('replication')) {
+          return 'replicacao'
+        }
+        if (
+          obsLower.includes('backup_job') ||
+          (obsLower.includes('veeam backup') &&
+            !obsLower.includes('backup_copy') &&
+            !obsLower.includes('backup copy'))
+        ) {
+          return 'local'
+        }
+      }
 
       let assuntoEvidencia = ''
       let corpoEvidencia = ''
@@ -512,8 +597,24 @@ routerAdd(
         return 'nuvem'
       }
 
-      // CAMADA B (Prioridade máxima de conteúdo): Tipo declarado NO CORPO do comprovante
-      // NUNCA usar pasta de job ("to Cloud") nem assinatura da ferramenta ("Backup & Replication").
+      // CAMADA B: Prefixo declarado NO ASSUNTO ou NO CORPO do comprovante
+      // (ex.: "Backup Copy job:", "Copy job:", "Replication job:", "Backup job:")
+      if (assuntoEvidencia) {
+        const assuntoLimpo = String(assuntoEvidencia)
+          .replace(/^(\s*\[[^\]]+\]\s*)+/i, '')
+          .trim()
+          .toLowerCase()
+        if (assuntoLimpo.startsWith('backup copy job:') || assuntoLimpo.startsWith('copy job:')) {
+          return 'nuvem'
+        }
+        if (assuntoLimpo.startsWith('replication job:')) {
+          return 'replicacao'
+        }
+        if (assuntoLimpo.startsWith('backup job:')) {
+          return 'local'
+        }
+      }
+
       if (corpoEvidencia) {
         const headerVeeamRegex =
           /(?:^|[\r\n]|<[^>]*>)\s*(Backup Copy [Jj]ob|Copy [Jj]ob|Replication [Jj]ob|Backup [Jj]ob)\s*:\s*([^<\r\n]+?)(?=\s*Created by|\s*Success|\s*Warning|\s*Failed|\s*Error|[\r\n]|<|$)/i
@@ -556,34 +657,17 @@ routerAdd(
         }
       }
 
-      // CAMADA A/Fallback de assunto (só se corpo e rotina não definiram)
-      if (assuntoEvidencia) {
-        const assuntoLimpo = String(assuntoEvidencia)
-          .replace(/^(\s*\[[^\]]+\]\s*)+/i, '')
-          .trim()
-          .toLowerCase()
-        if (assuntoLimpo.startsWith('backup copy job:') || assuntoLimpo.startsWith('copy job:')) {
-          return 'nuvem'
-        }
-        if (assuntoLimpo.startsWith('replication job:')) {
-          return 'replicacao'
-        }
-        if (assuntoLimpo.startsWith('backup job:')) {
-          return 'local'
-        }
-      }
-
       // CAMADA D: Ambíguo -> null (fail-closed mantido)
       return null
     }
 
-    // Helper: extrair data ISO de execução
+    // Helper: extrair data ISO normalizada de execução
     const extrairDataExecucao = (execRec) => {
       const dt =
         execRec.getString('data_inicio') ||
         execRec.getString('data_fim') ||
         execRec.getString('created')
-      return dt || null
+      return normalizarDataIso(dt) || null
     }
 
     // Construção dos resultados por ativo
@@ -892,11 +976,12 @@ routerAdd(
               }
             }
             if (cobreAtivoNaExecucao) {
-              const dtIso =
+              const dtRaw =
                 (itemGravadoComprovado && itemGravadoComprovado.comprovado_em) ||
                 extrairDataExecucao(ex)
-              if (dtIso) {
-                const dtTime = new Date(dtIso).getTime()
+              const dtIso = normalizarDataIso(dtRaw)
+              const dtTime = parseDataTimestamp(dtIso)
+              if (dtIso && dtTime > 0) {
                 const nomeJobExec =
                   (itemGravadoComprovado &&
                     (itemGravadoComprovado.job_nome || itemGravadoComprovado.rotina_nome)) ||
@@ -943,8 +1028,9 @@ routerAdd(
 
         if (ultimaFalhou) {
           const horasDesdeFalha = (nowTime - ultimaExecucaoCronologicaTime) / (1000 * 60 * 60)
-          // Coletar VMs com falha da execução falhada para exibir em tooltip/detalhe
+          // Coletar VMs com falha e VMs com sucesso da execução falhada para exibir na Visão Geral
           let vmsFalhasLista = []
+          let vmsSucessoLista = []
           try {
             if (ultimaExecucaoCronologica && ultimaExecucaoCronologica.execucaoId) {
               const exRecFalha = $app.findRecordById(
@@ -954,19 +1040,35 @@ routerAdd(
               const dVmsF = obterDetalhesVmsExecucao(exRecFalha)
               if (Array.isArray(dVmsF) && dVmsF.length > 0) {
                 for (let vfi = 0; vfi < dVmsF.length; vfi++) {
-                  const stV = String(dVmsF[vfi].status || '').toLowerCase()
+                  const vmItem = dVmsF[vfi]
+                  const stV = String(vmItem.status || '').toLowerCase()
+                  const vmNome = vmItem.nome || ''
+                  if (!vmNome) continue
                   if (stV === 'failed' || stV === 'error' || stV === 'erro' || stV === 'falha') {
-                    vmsFalhasLista.push(dVmsF[vfi].nome)
+                    if (!vmsFalhasLista.includes(vmNome)) vmsFalhasLista.push(vmNome)
+                  } else if (stV === 'success' || stV === 'sucesso') {
+                    if (!vmsSucessoLista.includes(vmNome)) vmsSucessoLista.push(vmNome)
                   }
                 }
-              } else {
-                // Verificar campo falhas gravado no confronto_escopo
+              }
+
+              // Se não preencheu pelos detalhes_vms, verificar campo falhas e comprovado do confronto_escopo
+              if (vmsFalhasLista.length === 0) {
                 const cEscF = normalizarJson(exRecFalha.get('confronto_escopo'))
                 if (cEscF && Array.isArray(cEscF.falhas) && cEscF.falhas.length > 0) {
                   for (let ffi = 0; ffi < cEscF.falhas.length; ffi++) {
                     const fnome = cEscF.falhas[ffi].ativo_nome || cEscF.falhas[ffi].item_comprovante
                     if (fnome && !vmsFalhasLista.includes(fnome)) {
                       vmsFalhasLista.push(fnome)
+                    }
+                  }
+                }
+                if (cEscF && Array.isArray(cEscF.comprovado) && cEscF.comprovado.length > 0) {
+                  for (let cci = 0; cci < cEscF.comprovado.length; cci++) {
+                    const cnome =
+                      cEscF.comprovado[cci].ativo_nome || cEscF.comprovado[cci].item_comprovante
+                    if (cnome && !vmsSucessoLista.includes(cnome)) {
+                      vmsSucessoLista.push(cnome)
                     }
                   }
                 }
@@ -994,6 +1096,7 @@ routerAdd(
             ultima_execucao_obs: ultimaExecucaoCronologica.observacao,
             job_nome: ultimaExecucaoCronologica.jobNome || candReferencia.rotina.getString('nome'),
             vms_falhas: vmsFalhasLista.length > 0 ? vmsFalhasLista : [assetNome],
+            vms_sucesso: vmsSucessoLista,
             ocorrencias_abertas: ocorrenciasAbertas.length,
           }
         }
@@ -1022,6 +1125,17 @@ routerAdd(
         const horasDesde = (nowTime - melhorDataTime) / (1000 * 60 * 60)
         const dentroRpo = horasDesde <= rpoHoras
 
+        let vmsSucessoListaAtendida = []
+        try {
+          if (melhorComprovacao && melhorComprovacao.execucaoId) {
+            const exRecSucesso = $app.findRecordById(
+              'backup_execucoes',
+              melhorComprovacao.execucaoId,
+            )
+            vmsSucessoListaAtendida = obterVmsSucessoExecucao(exRecSucesso)
+          }
+        } catch (_) {}
+
         return {
           cadastrada: true,
           ultima_comprovacao: melhorComprovacao.dataIso,
@@ -1040,6 +1154,7 @@ routerAdd(
           ultima_execucao_data: melhorComprovacao.dataIso,
           ultima_execucao_status: 'sucesso',
           job_nome: melhorComprovacao.jobNome || candReferencia.rotina.getString('nome'),
+          vms_sucesso: vmsSucessoListaAtendida.length > 0 ? vmsSucessoListaAtendida : [assetNome],
           ocorrencias_abertas: 0,
         }
       }
@@ -1152,27 +1267,6 @@ routerAdd(
         const ex = execucoes[ei]
         const rotinaId = ex.getString('rotina')
         const rotina = rotinasMap[rotinaId]
-
-        // Log de diagnóstico TEMPORÁRIO para a execução vjqzacdotk6v1xr
-        if (ex.id === 'vjqzacdotk6v1xr') {
-          const rawEscopo = ex.get('confronto_escopo')
-          const isArr = Array.isArray(rawEscopo)
-          let preview = ''
-          try {
-            if (isArr) {
-              preview = `[array len=${rawEscopo.length}, first=${rawEscopo[0]}, sample=${JSON.stringify(rawEscopo.slice(0, 20))}]`
-            } else if (typeof rawEscopo === 'object' && rawEscopo !== null) {
-              preview = JSON.stringify(rawEscopo).substring(0, 80)
-            } else {
-              preview = String(rawEscopo).substring(0, 80)
-            }
-          } catch (_) {
-            preview = String(rawEscopo).substring(0, 80)
-          }
-          console.log(
-            `[confronto:debug] vjqzacdotk6v1xr raw typeof=${typeof rawEscopo} isArray=${isArr} preview=${preview}`,
-          )
-        }
 
         // 1. Verificar FONTE PRIMÁRIA gravada na execução
         const confExistenteEx = normalizarJson(ex.get('confronto_escopo'))
@@ -1305,9 +1399,11 @@ routerAdd(
           if (temDetalhesVms) {
             for (let vi = 0; vi < dVmsEx.length; vi++) {
               const vmObj = dVmsEx[vi]
-              const vmNorm = normalizarString(vmObj.nome)
-              const vmComp = normalizarCompacto(vmObj.nome)
+              const vmNomeRaw = vmObj.nome || vmObj.item_comprovante || ''
+              const vmNorm = normalizarString(vmNomeRaw)
+              const vmComp = normalizarCompacto(vmNomeRaw)
               const bateuVm =
+                (vmObj.ativo_id && vmObj.ativo_id === aId) ||
                 (vmNorm &&
                   (vmNorm === aNomeNorm ||
                     vmNorm.includes(aNomeNorm) ||
