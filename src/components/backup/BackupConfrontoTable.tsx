@@ -102,43 +102,71 @@ function ModalidadeSelo({
   if (status_modalidade === 'FALHA_ULTIMA_EXECUCAO' || modalidade.ultima_execucao_falha) {
     const jobNomeCompleto = modalidade.job_nome || modalidade.rotina_nome || ''
     const jobNomeExibicao =
-      jobNomeCompleto.length > 30 ? `${jobNomeCompleto.slice(0, 27)}…` : jobNomeCompleto
+      jobNomeCompleto.length > 25 ? `${jobNomeCompleto.slice(0, 22)}…` : jobNomeCompleto
+
+    let dataHoraFormatada = ''
+    const dataRefIso = modalidade.ultima_execucao_data || modalidade.ultima_comprovacao
+    if (dataRefIso) {
+      try {
+        const d = new Date(dataRefIso)
+        // America/Sao_Paulo (UTC-3)
+        const ano = d.getUTCFullYear()
+        const mes = d.getUTCMonth()
+        const dia = d.getUTCDate()
+        const hora = d.getUTCHours()
+        const min = d.getUTCMinutes()
+        const dSp = new Date(Date.UTC(ano, mes, dia, hora - 3, min))
+        const pad2 = (n: number) => (n < 10 ? '0' + n : String(n))
+        dataHoraFormatada = `${pad2(dSp.getUTCDate())}/${pad2(dSp.getUTCMonth() + 1)}/${dSp.getUTCFullYear()} ${pad2(dSp.getUTCHours())}:${pad2(dSp.getUTCMinutes())}`
+      } catch (_) {
+        dataHoraFormatada = formatRelativeTime(dataRefIso)
+      }
+    } else {
+      dataHoraFormatada = 'recente'
+    }
+
+    const vmsFalhasLista = (modalidade as unknown as { vms_falhas?: string[] }).vms_falhas || []
 
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <span
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold text-red-900 bg-red-100 border border-red-400 shadow-xs cursor-help animate-pulse max-w-full"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold text-red-950 bg-red-100 border border-red-500 shadow-2xs cursor-help max-w-full hover:bg-red-200 transition-colors"
               title={jobNomeCompleto ? `Job: ${jobNomeCompleto}` : undefined}
             >
               <AlertTriangle className="w-3.5 h-3.5 text-red-700 shrink-0" />
               <span className="truncate">
-                {label}: FALHA na última execução
-                {jobNomeExibicao ? ` — ${jobNomeExibicao}` : ''} (
-                {formatRelativeTime(
-                  modalidade.ultima_execucao_data || modalidade.ultima_comprovacao,
-                )}
-                )
+                {label}: Falha em {dataHoraFormatada}
+                {jobNomeExibicao ? ` (${jobNomeExibicao})` : ''}
               </span>
             </span>
           </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs bg-slate-900 text-white">
-            <p className="font-bold text-red-300">
-              Falha na última execução (
-              {formatRelativeTime(modalidade.ultima_execucao_data || modalidade.ultima_comprovacao)}
-              )
-            </p>
+          <TooltipContent className="max-w-sm text-xs bg-slate-900 text-white p-3 shadow-lg border border-red-500/30">
+            <div className="flex items-center gap-1.5 font-bold text-red-400">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>Falha de Backup em {dataHoraFormatada}</span>
+            </div>
             {jobNomeCompleto && (
-              <p className="mt-1 text-slate-100 font-semibold break-words">
-                Job: &ldquo;{jobNomeCompleto}&rdquo;
+              <p className="mt-1.5 text-slate-100 font-semibold break-words">
+                Rotina/Job: &ldquo;{jobNomeCompleto}&rdquo;
               </p>
             )}
-            <p className="mt-1 text-slate-200">
+            {vmsFalhasLista.length > 0 && (
+              <div className="mt-2 p-1.5 rounded bg-red-950/60 border border-red-800/60 text-red-200">
+                <span className="font-semibold block text-[11px] text-red-300">
+                  VMs com falha nesta execução:
+                </span>
+                <span className="text-[11px] font-mono break-words">
+                  {vmsFalhasLista.join(', ')}
+                </span>
+              </div>
+            )}
+            <p className="mt-2 text-slate-300 text-[11px]">
               {modalidade.ultima_execucao_obs ||
                 'A última execução desta modalidade foi encerrada com erro.'}
             </p>
-            <p className="mt-1 text-[10px] text-amber-300">
+            <p className="mt-2 text-[10px] text-amber-300 border-t border-slate-800 pt-1.5">
               A proteção desta regra está suspensa até nova execução bem-sucedida comprovada.
             </p>
           </TooltipContent>

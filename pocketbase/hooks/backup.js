@@ -2196,7 +2196,7 @@ routerAdd(
       const fontesNaoCobertas = matchResult.fontesNaoCobertas
 
       const confrontoEscopo = {
-        escopo_id: escopoRec ? escopoRec.id : escopoIdRef || null,
+        escopo_id: escopoRec ? escopoRec.id : null,
         escopo_nome: escopoRec ? escopoRec.getString('nome') || 'Escopo Geral' : null,
         rotina_id: rotinaFinalId || null,
         rotina_nome: rotinaNomeReal || null,
@@ -2206,12 +2206,13 @@ routerAdd(
         exigencias: [],
         comprovado: [],
         pendencias: [],
+        falhas: [],
         total_ativos_escopo: 0,
         total_exigencias_modalidade: 0,
         total_comprovadas: 0,
+        total_falhas: 0,
         total_pendencias: 0,
       }
-
       try {
         if (escopoRec) {
           confrontoEscopo.escopo_id = escopoRec.id
@@ -2461,6 +2462,27 @@ routerAdd(
                   comprovado_em: nowIso,
                 })
               } else {
+                // Se esta rotina/job atende à modalidade e o ativo estava presente mas falhou:
+                // registrar no array falhas explicitamente
+                if (
+                  ativoComprovadoNestaEvidencia &&
+                  modalidadeAtendidaPorEstaRotina &&
+                  !itemVmComSucesso
+                ) {
+                  confrontoEscopo.falhas.push({
+                    ativo_id: aId,
+                    ativo_nome: aNome,
+                    ativo_tipo: aTipo,
+                    modalidade: mod,
+                    rotina: rotinaFinalId || null,
+                    rotina_nome: rotinaNomeReal || null,
+                    job_nome: jobName || rotinaNomeReal || null,
+                    data_execucao: nowIso,
+                    status: statusIndividualVm || 'erro',
+                    motivo: `VM ${itemCasadoNome || aNome} constou com status "${statusIndividualVm}" na execução. Modalidade não homologada.`,
+                  })
+                }
+
                 // (c) PENDÊNCIAS
                 // Regra de Ouro E: Nota pedagógica clara quando atendível por outra rotina/job
                 let motivoPendencia = ''
@@ -2492,6 +2514,7 @@ routerAdd(
 
           confrontoEscopo.job_nome = jobName || rotinaNomeReal || null
           confrontoEscopo.total_comprovadas = confrontoEscopo.comprovado.length
+          confrontoEscopo.total_falhas = (confrontoEscopo.falhas || []).length
           confrontoEscopo.total_pendencias = confrontoEscopo.pendencias.length
         }
       } catch (errEscopo) {
@@ -2896,25 +2919,124 @@ routerAdd(
       // Ocorrência se erro ou parcial
       if (statusDetectado === 'erro' || statusDetectado === 'parcial') {
         try {
-          const ocCol = $app.findCollectionByNameOrId('backup_ocorrencias')
-          const oc = new Record(ocCol)
-          oc.set('organization', organizationId)
-          oc.set('tipo', 'falha_de_backup')
-          oc.set('severidade', statusDetectado === 'erro' ? 'alta' : 'media')
-          oc.set('status', 'aberta')
-          oc.set(
-            'titulo',
-            statusDetectado === 'erro'
-              ? `Falha identificada no trabalho "${jobName}"`
-              : `Execução parcial com alertas no trabalho "${jobName}"`,
-          )
-          oc.set(
-            'descricao',
-            `O adaptador ${adaptadorUsado} detectou ${statusDetectado} a partir do comprovante enviado por ${remetente}. Requer averiguação da equipe técnica.`,
-          )
-          oc.set('execucao', execRec.id)
-          oc.set('evidencia', evidenciaRec.id)
-          $app.save(oc)
+          // Prevenção de duplicatas: não recriar ocorrência aberta para a mesma evidência ou execução
+          let ocorrenciaJaExiste = false
+          try {
+            const existentes = $app.findRecordsByFilter(
+              'backup_ocorrencias',
+              `organization = '${organizationId}' && status = 'aberta' && (execucao = '${execRec.id}' || evidencia = '${evidenciaRec.id}')`,
+              '-created',
+              1,
+              0,
+            )
+            if (existentes && existentes.length > 0) {
+              ocorrenciaJaExiste = true
+            }
+          } catch (_) {}
+
+          if (!ocorrenciaJaExiste) {
+            // Formatação factual da data/hora no fuso America/Sao_Paulo (UTC-3)
+            let dataExecucaoSp = ''
+            try {
+              const dtRefIso = execRec.getString('data_inicio') || nowIso
+              const dObj = new Date(dtRefIso)
+              const ano = dObj.getUTCFullYear()
+              const mes = dObj.getUTCMonth()
+              const dia = dObj.getUTCDate()
+              const hora = dObj.getUTCHours()
+              const min = dObj.getUTCMinutes()
+              const sec = dObj.getUTCSeconds()
+              // America/Sao_Paulo é UTC-3
+              const dSp = new Date(Date.UTC(ano, mes, dia, hora - 3, min, sec))
+              const pad2 = (n) => (n < 10 ? '0' + n : String(n))
+              dataExecucaoSp = `${pad2(dSp.getUTCDate())}/${pad2(dSp.getUTCMonth() + 1)}/${dSp.getUTCFullYear()} ${pad2(dSp.getUTCHours())}:${pad2(dSp.getUTCMinutes())}`
+            } catch (_) {
+              dataExecucaoSp = nowIso
+            }
+
+            // Identificação amigável da modalidade (Local / Nuvem / Replicação)
+            let modalidadeLabel = 'Local'
+            if (
+              confrontoEscopo &&
+              Array.isArray(confrontoEscopo.modalidades_plano) &&
+              confrontoEscopo.modalidades_plano.length > 0
+            ) {
+              const mPrimeira = String(confrontoEscopo.modalidades_plano[0] || '').toLowerCase()
+              modalidadeLabel =
+                mPrimeira === 'nuvem'
+                  ? 'Nuvem'
+                  : mPrimeira === 'replicacao'
+                    ? 'Replicação'
+                    : 'Local'
+            } else if (rotinaNomeReal) {
+              const rLower = rotinaNomeReal.toLowerCase()
+              if (rLower.includes('nuvem') || rLower.includes('cloud')) modalidadeLabel = 'Nuvem'
+              else if (rLower.includes('replica')) modalidadeLabel = 'Replicação'
+              else modalidadeLabel = 'Local'
+            }
+
+            // Listas nominais de VMs com falha e com sucesso
+            const vmsFalhadas = []
+            const vmsSucesso = []
+            let veeamErrorMessage = ''
+
+            if (Array.isArray(detalhesVms) && detalhesVms.length > 0) {
+              for (let vi = 0; vi < detalhesVms.length; vi++) {
+                const vmItem = detalhesVms[vi]
+                const stVm = String(vmItem.status || '').toLowerCase()
+                const nomeVm = vmItem.nome || `Item ${vi + 1}`
+                if (stVm === 'failed' || stVm === 'error' || stVm === 'erro' || stVm === 'falha') {
+                  vmsFalhadas.push(nomeVm)
+                  if (!veeamErrorMessage && (vmItem.motivo || vmItem.mensagem || vmItem.error)) {
+                    veeamErrorMessage = String(
+                      vmItem.motivo || vmItem.mensagem || vmItem.error,
+                    ).trim()
+                  }
+                } else if (stVm === 'success' || stVm === 'sucesso') {
+                  vmsSucesso.push(nomeVm)
+                }
+              }
+            }
+
+            const totalVmsCount =
+              vmsFalhadas.length + vmsSucesso.length ||
+              contadores.total_vms ||
+              (Array.isArray(detalhesVms) ? detalhesVms.length : 0)
+            const nomeRotinaFinal = rotinaNomeReal || jobName || 'Rotina de Backup'
+
+            let descricaoFactual = ''
+            if (vmsFalhadas.length > 0) {
+              descricaoFactual = `Backup com falha: a rotina '${nomeRotinaFinal}' (modalidade ${modalidadeLabel}) executou em ${dataExecucaoSp} e ${vmsFalhadas.length} das ${totalVmsCount} VMs NÃO receberam backup: ${vmsFalhadas.join(', ')}.`
+              if (vmsSucesso.length > 0) {
+                descricaoFactual += ` VMs com sucesso: ${vmsSucesso.join(', ')}.`
+              }
+            } else if (statusDetectado === 'erro') {
+              descricaoFactual = `Backup com falha: a rotina '${nomeRotinaFinal}' (modalidade ${modalidadeLabel}) executou em ${dataExecucaoSp} e reportou falha crítica na execução.`
+            } else {
+              descricaoFactual = `Execução parcial com alertas: a rotina '${nomeRotinaFinal}' (modalidade ${modalidadeLabel}) executou em ${dataExecucaoSp} com ${contadores.warning || 0} aviso(s)/alerta(s).`
+            }
+
+            if (veeamErrorMessage) {
+              descricaoFactual += ` Detalhe do erro: ${veeamErrorMessage.slice(0, 300)}.`
+            }
+
+            const ocCol = $app.findCollectionByNameOrId('backup_ocorrencias')
+            const oc = new Record(ocCol)
+            oc.set('organization', organizationId)
+            oc.set('tipo', 'falha_de_backup')
+            oc.set('severidade', statusDetectado === 'erro' ? 'alta' : 'media')
+            oc.set('status', 'aberta')
+            oc.set(
+              'titulo',
+              statusDetectado === 'erro'
+                ? `Falha identificada no trabalho "${jobName}"`
+                : `Execução parcial com alertas no trabalho "${jobName}"`,
+            )
+            oc.set('descricao', descricaoFactual)
+            oc.set('execucao', execRec.id)
+            oc.set('evidencia', evidenciaRec.id)
+            $app.save(oc)
+          }
         } catch (_) {}
       }
 

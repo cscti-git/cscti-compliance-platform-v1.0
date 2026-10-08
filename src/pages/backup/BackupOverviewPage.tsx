@@ -324,7 +324,7 @@ export const BackupOverviewPage: React.FC = () => {
 
         {/* 1. VISÃO GERAL */}
         <TabsContent value="visao_geral" className="space-y-6">
-          {/* Banner de Alerta Crítico quando houver falha de backup na última execução */}
+          {/* Banner de Alerta Crítico & Bloco Factual de Últimas Falhas */}
           {(() => {
             const ativosComFalha = (confrontoData?.confronto || []).filter(
               (item) =>
@@ -343,43 +343,153 @@ export const BackupOverviewPage: React.FC = () => {
 
             if (!temFalha) return null
 
+            // Agrupar falhas factuais por rotina/modalidade para o bloco "Últimas falhas"
+            interface FalhaAgrupada {
+              rotina: string
+              modalidade: string
+              dataHoraSp: string
+              vmsFalhadas: string[]
+            }
+            const falhasAgrupadasMap = new Map<string, FalhaAgrupada>()
+
+            ativosComFalha.forEach((ativo) => {
+              const mods = [
+                { mod: 'Local', info: ativo.modalidades?.local },
+                { mod: 'Nuvem', info: ativo.modalidades?.nuvem },
+                { mod: 'Replicação', info: ativo.modalidades?.replicacao },
+              ]
+
+              mods.forEach(({ mod, info }) => {
+                if (
+                  info &&
+                  (info.status_modalidade === 'FALHA_ULTIMA_EXECUCAO' || info.ultima_execucao_falha)
+                ) {
+                  const rotinaNome = info.job_nome || info.rotina_nome || 'Rotina de Backup'
+                  const chave = `${rotinaNome}__${mod}`
+                  const dataIso = info.ultima_execucao_data || info.ultima_comprovacao || ''
+                  let dataHoraSp = ''
+                  if (dataIso) {
+                    try {
+                      dataHoraSp = formatDateTime(dataIso)
+                    } catch (_) {
+                      dataHoraSp = dataIso
+                    }
+                  }
+
+                  const infoAny = info as unknown as { vms_falhas?: string[] }
+                  const vmsLista =
+                    infoAny.vms_falhas && infoAny.vms_falhas.length > 0
+                      ? infoAny.vms_falhas
+                      : [ativo.nome]
+
+                  if (!falhasAgrupadasMap.has(chave)) {
+                    falhasAgrupadasMap.set(chave, {
+                      rotina: rotinaNome,
+                      modalidade: mod,
+                      dataHoraSp,
+                      vmsFalhadas: [...vmsLista],
+                    })
+                  } else {
+                    const existente = falhasAgrupadasMap.get(chave)!
+                    vmsLista.forEach((vm) => {
+                      if (!existente.vmsFalhadas.includes(vm)) {
+                        existente.vmsFalhadas.push(vm)
+                      }
+                    })
+                  }
+                }
+              })
+            })
+
+            const listaFalhasAgrupadas = Array.from(falhasAgrupadasMap.values())
+
             return (
-              <div className="p-4 rounded-xl border-2 border-red-500 bg-red-50/95 text-red-950 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-in fade-in duration-300">
-                <div className="flex items-start gap-3">
-                  <div className="p-2.5 rounded-lg bg-red-600 text-white shrink-0 mt-0.5">
-                    <AlertTriangle className="w-6 h-6 animate-pulse" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-extrabold text-red-950 uppercase tracking-wide">
-                        Backup com falha detectado
-                      </h3>
-                      <Badge className="bg-red-700 text-white font-bold text-[10px]">
-                        NÃO 100% PROTEGIDO
-                      </Badge>
+              <div className="p-4 rounded-xl border-2 border-red-500 bg-red-50/95 text-red-950 flex flex-col gap-3.5 shadow-sm animate-in fade-in duration-300">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-red-600 text-white shrink-0 mt-0.5">
+                      <AlertTriangle className="w-6 h-6 animate-pulse" />
                     </div>
-                    <p className="text-xs text-red-900 mt-1 leading-relaxed">
-                      <strong>Atenção:</strong> {countFalhas} ativo(s) com uma das regras de backup
-                      falhadas na última execução. A proteção foi suspensa até nova execução
-                      bem-sucedida.
-                    </p>
-                    <p className="text-[11px] text-red-800/80 mt-0.5">
-                      Conformidade e cobertura RPO recalculadas para baixo de forma honesta
-                      (fail-closed).
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-extrabold text-red-950 uppercase tracking-wide">
+                          Backup com falha detectado
+                        </h3>
+                        <Badge className="bg-red-700 text-white font-bold text-[10px]">
+                          NÃO 100% PROTEGIDO
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-red-900 mt-1 leading-relaxed">
+                        <strong>Atenção:</strong> {countFalhas} ativo(s) com falha registrada na
+                        última execução de backup. A proteção desses itens fica suspensa até nova
+                        execução bem-sucedida comprovada.
+                      </p>
+                      <p className="text-[11px] text-red-800/80 mt-0.5">
+                        Conformidade e cobertura RPO recalculadas para baixo de forma honesta
+                        (fail-closed).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      onClick={() => setSearchParams({ tab: 'ocorrencias' })}
+                      size="sm"
+                      className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs gap-1.5 shadow-sm"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Ver Ocorrências Abertas ({ocorrenciasAbertas})
+                    </Button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    onClick={() => setSearchParams({ tab: 'ocorrencias' })}
-                    size="sm"
-                    className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs gap-1.5 shadow-sm"
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Ver Ocorrências Abertas ({ocorrenciasAbertas})
-                  </Button>
-                </div>
+                {/* Bloco Factual: Últimas falhas nominais */}
+                {listaFalhasAgrupadas.length > 0 && (
+                  <div className="mt-1 pt-3 border-t border-red-200/80">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-red-900">
+                        Últimas falhas registradas (horário de Brasília — America/Sao_Paulo):
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {listaFalhasAgrupadas.map((falha, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 rounded-lg bg-white/80 border border-red-300 text-xs shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className="font-bold text-slate-900 truncate"
+                              title={falha.rotina}
+                            >
+                              {falha.rotina}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="border-red-400 bg-red-100 text-red-800 text-[10px] font-bold shrink-0"
+                            >
+                              {falha.modalidade}
+                            </Badge>
+                          </div>
+                          <div className="text-[11px] text-slate-600 mt-1">
+                            Executou em:{' '}
+                            <strong className="text-slate-800">
+                              {falha.dataHoraSp || 'Recente'}
+                            </strong>
+                          </div>
+                          <div className="mt-1 text-[11px] text-red-900 bg-red-50 p-1.5 rounded border border-red-200/60">
+                            <span className="font-semibold block text-[10px] uppercase text-red-700">
+                              VM(s) com falha ({falha.vmsFalhadas.length}):
+                            </span>
+                            <span className="font-mono text-xs font-bold text-red-950 break-words">
+                              {falha.vmsFalhadas.join(', ')}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })()}

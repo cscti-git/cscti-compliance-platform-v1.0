@@ -753,20 +753,31 @@ routerAdd(
             }
 
             // 1. FONTE PRIMÁRIA: confronto_escopo gravado na execução
-            if (
-              confGravadoEx &&
-              typeof confGravadoEx === 'object' &&
-              Array.isArray(confGravadoEx.comprovado) &&
-              confGravadoEx.comprovado.length > 0
-            ) {
-              const matched = verificarMatchAtivo(confGravadoEx.comprovado)
-              if (matched && String(matched.modalidade || '').toLowerCase() === modalidadeNome) {
-                itemGravadoComprovado = matched
+            let itemGravadoFalha = null
+            if (confGravadoEx && typeof confGravadoEx === 'object') {
+              if (Array.isArray(confGravadoEx.comprovado) && confGravadoEx.comprovado.length > 0) {
+                const matched = verificarMatchAtivo(confGravadoEx.comprovado)
+                if (matched && String(matched.modalidade || '').toLowerCase() === modalidadeNome) {
+                  itemGravadoComprovado = matched
+                }
+              }
+              if (
+                !itemGravadoComprovado &&
+                Array.isArray(confGravadoEx.falhas) &&
+                confGravadoEx.falhas.length > 0
+              ) {
+                const matchedFalha = verificarMatchAtivo(confGravadoEx.falhas)
+                if (
+                  matchedFalha &&
+                  String(matchedFalha.modalidade || '').toLowerCase() === modalidadeNome
+                ) {
+                  itemGravadoFalha = matchedFalha
+                }
               }
             }
 
             // 2. FONTE SECUNDÁRIA (Fallback se gravado na execução estiver vazio/ausente): backup_avaliacoes
-            if (!itemGravadoComprovado) {
+            if (!itemGravadoComprovado && !itemGravadoFalha) {
               try {
                 const avalsEx = $app.findRecordsByFilter(
                   'backup_avaliacoes',
@@ -777,18 +788,28 @@ routerAdd(
                 )
                 if (avalsEx.length > 0) {
                   const confAval = normalizarJson(avalsEx[0].get('confronto_escopo'))
-                  if (
-                    confAval &&
-                    typeof confAval === 'object' &&
-                    Array.isArray(confAval.comprovado) &&
-                    confAval.comprovado.length > 0
-                  ) {
-                    const matched = verificarMatchAtivo(confAval.comprovado)
+                  if (confAval && typeof confAval === 'object') {
+                    if (Array.isArray(confAval.comprovado) && confAval.comprovado.length > 0) {
+                      const matched = verificarMatchAtivo(confAval.comprovado)
+                      if (
+                        matched &&
+                        String(matched.modalidade || '').toLowerCase() === modalidadeNome
+                      ) {
+                        itemGravadoComprovado = matched
+                      }
+                    }
                     if (
-                      matched &&
-                      String(matched.modalidade || '').toLowerCase() === modalidadeNome
+                      !itemGravadoComprovado &&
+                      Array.isArray(confAval.falhas) &&
+                      confAval.falhas.length > 0
                     ) {
-                      itemGravadoComprovado = matched
+                      const matchedF = verificarMatchAtivo(confAval.falhas)
+                      if (
+                        matchedF &&
+                        String(matchedF.modalidade || '').toLowerCase() === modalidadeNome
+                      ) {
+                        itemGravadoFalha = matchedF
+                      }
                     }
                   }
                 }
@@ -805,9 +826,13 @@ routerAdd(
               cobreAtivoNaExecucao = true
               const st = String(itemGravadoComprovado.status || '').toLowerCase()
               statusIndividualAtivo = st === 'success' || st === 'sucesso' || !st ? 'sucesso' : st
+            } else if (itemGravadoFalha) {
+              cobreAtivoNaExecucao = true
+              statusIndividualAtivo = 'erro'
+              motivoIndividualAtivo =
+                itemGravadoFalha.motivo || `Item reportou falha na execução gravada.`
             } else {
-              // Recálculo ao vivo (inferência de modalidade + casamento de fonte) só roda
-              // quando o campo gravado está vazio ou ausente para o ativo.
+              // Recálculo ao vivo (inferência de modalidade + casamento de fonte)
               let modalidadeRecalculada = inferirModalidadeComprovante(ex, cand.rotina)
               if (String(modalidadeRecalculada || '').toLowerCase() === modalidadeNome) {
                 const dVms = obterDetalhesVmsExecucao(ex)
@@ -858,11 +883,14 @@ routerAdd(
                   }
                 } else {
                   cobreAtivoNaExecucao = true
-                  statusIndividualAtivo = ex.getString('status') || 'sucesso'
+                  const stEx = ex.getString('status')
+                  statusIndividualAtivo = stEx === 'sucesso' ? 'sucesso' : 'erro'
+                  if (statusIndividualAtivo !== 'sucesso') {
+                    motivoIndividualAtivo = `Execução reportou status "${stEx}".`
+                  }
                 }
               }
             }
-
             if (cobreAtivoNaExecucao) {
               const dtIso =
                 (itemGravadoComprovado && itemGravadoComprovado.comprovado_em) ||
@@ -906,6 +934,8 @@ routerAdd(
           (ultimaExecucaoCronologica && ultimaExecucaoCronologica.candidato) || melhorCandidato
         const rpoHoras = candReferencia.plano.getInt('rpo_horas') || 24
 
+        // Se a execução mais recente aplicável ao ativo falhou para esta modalidade
+        // e não há comprovação posterior válida dentro da janela cronológica:
         const ultimaFalhou =
           ultimaExecucaoCronologica &&
           ultimaExecucaoCronologica.status !== 'sucesso' &&
@@ -913,6 +943,37 @@ routerAdd(
 
         if (ultimaFalhou) {
           const horasDesdeFalha = (nowTime - ultimaExecucaoCronologicaTime) / (1000 * 60 * 60)
+          // Coletar VMs com falha da execução falhada para exibir em tooltip/detalhe
+          let vmsFalhasLista = []
+          try {
+            if (ultimaExecucaoCronologica && ultimaExecucaoCronologica.execucaoId) {
+              const exRecFalha = $app.findRecordById(
+                'backup_execucoes',
+                ultimaExecucaoCronologica.execucaoId,
+              )
+              const dVmsF = obterDetalhesVmsExecucao(exRecFalha)
+              if (Array.isArray(dVmsF) && dVmsF.length > 0) {
+                for (let vfi = 0; vfi < dVmsF.length; vfi++) {
+                  const stV = String(dVmsF[vfi].status || '').toLowerCase()
+                  if (stV === 'failed' || stV === 'error' || stV === 'erro' || stV === 'falha') {
+                    vmsFalhasLista.push(dVmsF[vfi].nome)
+                  }
+                }
+              } else {
+                // Verificar campo falhas gravado no confronto_escopo
+                const cEscF = normalizarJson(exRecFalha.get('confronto_escopo'))
+                if (cEscF && Array.isArray(cEscF.falhas) && cEscF.falhas.length > 0) {
+                  for (let ffi = 0; ffi < cEscF.falhas.length; ffi++) {
+                    const fnome = cEscF.falhas[ffi].ativo_nome || cEscF.falhas[ffi].item_comprovante
+                    if (fnome && !vmsFalhasLista.includes(fnome)) {
+                      vmsFalhasLista.push(fnome)
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+
           return {
             cadastrada: true,
             ultima_comprovacao: melhorComprovacao ? melhorComprovacao.dataIso : null,
@@ -932,10 +993,10 @@ routerAdd(
             ultima_execucao_status: ultimaExecucaoCronologica.status,
             ultima_execucao_obs: ultimaExecucaoCronologica.observacao,
             job_nome: ultimaExecucaoCronologica.jobNome || candReferencia.rotina.getString('nome'),
+            vms_falhas: vmsFalhasLista.length > 0 ? vmsFalhasLista : [assetNome],
             ocorrencias_abertas: ocorrenciasAbertas.length,
           }
         }
-
         if (!melhorComprovacao) {
           return {
             cadastrada: true,
@@ -1218,6 +1279,7 @@ routerAdd(
         // Tentar calcular NOVO confronto a partir dos ativos exigidos e dos detalhes de VMs.
         const nomeJobReconciliado = extrairNomeJob(ex, rotina)
         const novoComprovado = []
+        const novasFalhas = []
         const novasPendencias = []
 
         for (let ai = 0; ai < assetsExigidos.length; ai++) {
@@ -1296,6 +1358,21 @@ routerAdd(
                 comprovado_em: extrairDataExecucao(ex) || now.toISOString(),
               })
             } else {
+              if (m === modalidadeExNorm && vmPresente && !vmComSucesso) {
+                novasFalhas.push({
+                  ativo_id: aId,
+                  ativo_nome: aNome,
+                  ativo_tipo: aTipo,
+                  modalidade: m,
+                  rotina: rotinaId || null,
+                  rotina_nome: rotina ? rotina.getString('nome') : null,
+                  job_nome: nomeJobReconciliado || (rotina ? rotina.getString('nome') : null),
+                  data_execucao: extrairDataExecucao(ex) || now.toISOString(),
+                  status: 'erro',
+                  motivo: vmMotivoErro || `Falha na execução da VM ${aNome}.`,
+                })
+              }
+
               const modLabel = m === 'local' ? 'Local' : m === 'nuvem' ? 'Nuvem' : 'Replicação'
               let motivoPend = `Atendível por outra rotina/job (requer processamento dos comprovantes de ${modLabel.toLowerCase()}).`
               if (m === modalidadeExNorm) {
@@ -1322,15 +1399,14 @@ routerAdd(
           }
         }
 
-        // REGRA DE OURO FIX 1: NUNCA inicializar novoComprovado como [] e persistir!
-        // Se novoComprovado for vazio, NÃO PERSISTIR NADA na execução nem na avaliação.
-        if (novoComprovado.length === 0) {
+        // REGRA DE OURO FIX 1: Não persistir escopo vazio se nem comprovado nem falhas foram encontrados.
+        // Se houver comprovações OU falhas registradas, persistir o escopo completo!
+        if (novoComprovado.length === 0 && novasFalhas.length === 0) {
           console.warn(
-            `[confronto:reconciliacao] Nenhum item comprovado foi calculado para a execução #${ex.id}. Sobrescrita destrutiva neutralizada: registro mantido intacto.`,
+            `[confronto:reconciliacao] Nenhum item comprovado nem falha foi calculado para a execução #${ex.id}. Sobrescrita destrutiva neutralizada: registro mantido intacto.`,
           )
           continue
         }
-
         // Resolução robusta de escopo
         let escIdReconciliado =
           confExistenteEx && confExistenteEx.escopo_id ? confExistenteEx.escopo_id : null
@@ -1414,15 +1490,16 @@ routerAdd(
           exigencias: exigenciasReconciliadas,
           comprovado: novoComprovado,
           pendencias: novasPendencias,
+          falhas: novasFalhas,
           total_ativos_escopo: assetsExigidos.length,
           total_exigencias_modalidade: exigenciasReconciliadas.reduce(
             (acc, cur) => acc + (cur.modalidades ? cur.modalidades.length : 3),
             0,
           ),
           total_comprovadas: novoComprovado.length,
+          total_falhas: novasFalhas.length,
           total_pendencias: novasPendencias.length,
         }
-
         // Persistir novo confronto válido na execução
         try {
           ex.set('confronto_escopo', JSON.parse(JSON.stringify(novoConfronto)))
