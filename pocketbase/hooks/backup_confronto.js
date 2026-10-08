@@ -82,78 +82,81 @@ routerAdd(
     }
 
     function inferirModalidadePorTexto(texto) {
-      const t = String(texto || '').toLowerCase()
+      const t = String(texto || '').trim()
+      if (!t) return null
+
+      // Avaliação: nuvem/replicação ANTES de local. Local somente se nenhum qualificador de nuvem/replicação.
+      // Replicacao: palavra inteira, excluindo "backup & replication"
+      const tSemSignature = t.replace(/backup\s*&\s*replication/gi, '')
       if (
-        t.indexOf('nuvem') !== -1 ||
-        t.indexOf('nuvens') !== -1 ||
-        t.indexOf('cloud') !== -1 ||
-        t.indexOf('backup_copy') !== -1 ||
-        t.indexOf('copy job') !== -1 ||
-        t.indexOf('copy') !== -1 ||
-        t.indexOf('acronis') !== -1
-      ) {
-        return 'nuvem'
-      }
-      if (
-        t.indexOf('replica') !== -1 ||
-        t.indexOf('replicas') !== -1 ||
-        t.indexOf('replication') !== -1 ||
-        t.indexOf('replicação') !== -1 ||
-        t.indexOf('replicações') !== -1
+        /\b(?:replicas?|replica[çc][aã]o|replica[çc][oõ]es|replication job)\b/i.test(tSemSignature)
       ) {
         return 'replicacao'
       }
-      if (
-        t.indexOf('local') !== -1 ||
-        t.indexOf('backup vms') !== -1 ||
-        t.indexOf('backup job') !== -1 ||
-        t.indexOf('backup') !== -1
-      ) {
+
+      // Nuvem: palavra inteira
+      if (/\b(?:nuvens?|cloud|backup_copy|copy job)\b/i.test(tSemSignature)) {
+        return 'nuvem'
+      }
+
+      // Local: palavra inteira
+      if (/\blocal\b/i.test(tSemSignature)) {
         return 'local'
       }
+
       return null
     }
 
     function inferirModalidadeExecucao(observacao, rotinaNome, destino) {
       const obs = String(observacao || '').toLowerCase()
-      const rot = String(rotinaNome || '').toLowerCase()
-      const dest = String(destino || '').toLowerCase()
+      const rot = String(rotinaNome || '').trim()
+      const dest = String(destino || '').trim()
 
-      // 1. Observação da execução (conteúdo/identidade do comprovante tem máxima prioridade)
-      if (obs.indexOf('veeam backup_copy') !== -1 || obs.indexOf('backup_copy') !== -1) {
-        return 'nuvem'
-      }
-      if (obs.indexOf('veeam replication') !== -1 || obs.indexOf('replication') !== -1) {
-        return 'replicacao'
-      }
-      if (obs.indexOf('veeam backup:') !== -1 || obs.indexOf('veeam backup ') !== -1) {
-        return 'local'
-      }
-
-      // 2. Nome da rotina vinculada à execução
-      const modRot = inferirModalidadePorTexto(rot)
-      if (modRot) return modRot
-
-      // 3. Destino caso seja específico (evitando destino genérico que contenha ambas as palavras)
+      // 1) Prefixo do tipo do job na observação (PRIORIDADE MÁXIMA, definitivo)
       if (
-        dest &&
-        dest.indexOf('local') !== -1 &&
-        dest.indexOf('nuvem') === -1 &&
-        dest.indexOf('cloud') === -1
-      ) {
-        return 'local'
-      }
-      if (
-        dest &&
-        (dest.indexOf('nuvem') !== -1 || dest.indexOf('cloud') !== -1) &&
-        dest.indexOf('local') === -1
+        obs.indexOf('veeam backup_copy:') !== -1 ||
+        obs.indexOf('backup copy job:') !== -1 ||
+        obs.indexOf('copy job:') !== -1
       ) {
         return 'nuvem'
       }
-      if (dest && (dest.indexOf('replica') !== -1 || dest.indexOf('replication') !== -1)) {
+      if (obs.indexOf('veeam replication:') !== -1 || obs.indexOf('replication job:') !== -1) {
         return 'replicacao'
       }
+      if (obs.indexOf('veeam backup:') !== -1 || obs.indexOf('backup job:') !== -1) {
+        return 'local'
+      }
 
+      // 2) ÚLTIMO recurso — sufixo ancorado no nome da rotina (regex com âncora de fim, não contenção)
+      if (rot) {
+        if (/-\s*replicas?$|\breplica[çc][aã]o$/i.test(rot)) {
+          return 'replicacao'
+        }
+        if (/to cloud/i.test(rot) || /-\s*nuvens?$/i.test(rot)) {
+          return 'nuvem'
+        }
+        if (/-\s*local$/i.test(rot)) {
+          return 'local'
+        }
+      }
+
+      // 3) Destino, somente se inequívoco
+      if (dest) {
+        const destLower = dest.toLowerCase()
+        const temLocal = /\blocal\b/i.test(destLower)
+        const temNuvem = /\b(?:nuvens?|cloud)\b/i.test(destLower)
+        const temReplica = /\b(?:replicas?|replica[çc][aã]o|replication)\b/i.test(destLower)
+
+        // Se tiver mais de um destino (ex.: "Local/Nuvem"), é ambíguo -> não inequívoco
+        const count = (temLocal ? 1 : 0) + (temNuvem ? 1 : 0) + (temReplica ? 1 : 0)
+        if (count === 1) {
+          if (temReplica) return 'replicacao'
+          if (temNuvem) return 'nuvem'
+          if (temLocal) return 'local'
+        }
+      }
+
+      // 4) null se nada — execução sem modalidade NUNCA comprova exigência nenhuma
       return null
     }
 
@@ -348,6 +351,8 @@ routerAdd(
       return e.forbiddenError('Acesso restrito à própria organização.')
     }
 
+    const isDebug = false
+
     // 1. Carregar ativos do inventário ativos da organização
     let allAssets = []
     try {
@@ -536,6 +541,16 @@ routerAdd(
         rotinaNome,
         exRec.getString('destino'),
       )
+      if (isDebug) {
+        console.log(
+          '[confronto:debug:exec]',
+          exId,
+          'mod:',
+          modInferidaExec,
+          'obs:',
+          exObs.slice(0, 50),
+        )
+      }
 
       const comprovados =
         confEscopoObj && Array.isArray(confEscopoObj.comprovado) ? confEscopoObj.comprovado : []
@@ -830,7 +845,23 @@ routerAdd(
       confronto: confrontoList,
       alerta_falha_recente: alertaFalhaGlobal,
     }
-
+    if (isDebug && confrontoList.length > 0) {
+      const primeiro = confrontoList[0]
+      console.log(
+        '[confronto:debug:resumo]',
+        primeiro.nome,
+        'local:',
+        primeiro.modalidades?.local?.status_modalidade,
+        'nuvem:',
+        primeiro.modalidades?.nuvem?.status_modalidade,
+        'replicacao:',
+        primeiro.modalidades?.replicacao?.status_modalidade,
+        'consolidado:',
+        primeiro.status_consolidado,
+        'totais:',
+        JSON.stringify(payload.totais),
+      )
+    }
     return e.json(200, payload)
   },
   $apis.requireAuth(),
@@ -908,78 +939,81 @@ routerAdd(
     }
 
     function inferirModalidadePorTexto(texto) {
-      const t = String(texto || '').toLowerCase()
+      const t = String(texto || '').trim()
+      if (!t) return null
+
+      // Avaliação: nuvem/replicação ANTES de local. Local somente se nenhum qualificador de nuvem/replicação.
+      // Replicacao: palavra inteira, excluindo "backup & replication"
+      const tSemSignature = t.replace(/backup\s*&\s*replication/gi, '')
       if (
-        t.indexOf('nuvem') !== -1 ||
-        t.indexOf('nuvens') !== -1 ||
-        t.indexOf('cloud') !== -1 ||
-        t.indexOf('backup_copy') !== -1 ||
-        t.indexOf('copy job') !== -1 ||
-        t.indexOf('copy') !== -1 ||
-        t.indexOf('acronis') !== -1
-      ) {
-        return 'nuvem'
-      }
-      if (
-        t.indexOf('replica') !== -1 ||
-        t.indexOf('replicas') !== -1 ||
-        t.indexOf('replication') !== -1 ||
-        t.indexOf('replicação') !== -1 ||
-        t.indexOf('replicações') !== -1
+        /\b(?:replicas?|replica[çc][aã]o|replica[çc][oõ]es|replication job)\b/i.test(tSemSignature)
       ) {
         return 'replicacao'
       }
-      if (
-        t.indexOf('local') !== -1 ||
-        t.indexOf('backup vms') !== -1 ||
-        t.indexOf('backup job') !== -1 ||
-        t.indexOf('backup') !== -1
-      ) {
+
+      // Nuvem: palavra inteira
+      if (/\b(?:nuvens?|cloud|backup_copy|copy job)\b/i.test(tSemSignature)) {
+        return 'nuvem'
+      }
+
+      // Local: palavra inteira
+      if (/\blocal\b/i.test(tSemSignature)) {
         return 'local'
       }
+
       return null
     }
 
     function inferirModalidadeExecucao(observacao, rotinaNome, destino) {
       const obs = String(observacao || '').toLowerCase()
-      const rot = String(rotinaNome || '').toLowerCase()
-      const dest = String(destino || '').toLowerCase()
+      const rot = String(rotinaNome || '').trim()
+      const dest = String(destino || '').trim()
 
-      // 1. Observação da execução (conteúdo/identidade do comprovante tem máxima prioridade)
-      if (obs.indexOf('veeam backup_copy') !== -1 || obs.indexOf('backup_copy') !== -1) {
-        return 'nuvem'
-      }
-      if (obs.indexOf('veeam replication') !== -1 || obs.indexOf('replication') !== -1) {
-        return 'replicacao'
-      }
-      if (obs.indexOf('veeam backup:') !== -1 || obs.indexOf('veeam backup ') !== -1) {
-        return 'local'
-      }
-
-      // 2. Nome da rotina vinculada à execução
-      const modRot = inferirModalidadePorTexto(rot)
-      if (modRot) return modRot
-
-      // 3. Destino caso seja específico (evitando destino genérico que contenha ambas as palavras)
+      // 1) Prefixo do tipo do job na observação (PRIORIDADE MÁXIMA, definitivo)
       if (
-        dest &&
-        dest.indexOf('local') !== -1 &&
-        dest.indexOf('nuvem') === -1 &&
-        dest.indexOf('cloud') === -1
-      ) {
-        return 'local'
-      }
-      if (
-        dest &&
-        (dest.indexOf('nuvem') !== -1 || dest.indexOf('cloud') !== -1) &&
-        dest.indexOf('local') === -1
+        obs.indexOf('veeam backup_copy:') !== -1 ||
+        obs.indexOf('backup copy job:') !== -1 ||
+        obs.indexOf('copy job:') !== -1
       ) {
         return 'nuvem'
       }
-      if (dest && (dest.indexOf('replica') !== -1 || dest.indexOf('replication') !== -1)) {
+      if (obs.indexOf('veeam replication:') !== -1 || obs.indexOf('replication job:') !== -1) {
         return 'replicacao'
       }
+      if (obs.indexOf('veeam backup:') !== -1 || obs.indexOf('backup job:') !== -1) {
+        return 'local'
+      }
 
+      // 2) ÚLTIMO recurso — sufixo ancorado no nome da rotina (regex com âncora de fim, não contenção)
+      if (rot) {
+        if (/-\s*replicas?$|\breplica[çc][aã]o$/i.test(rot)) {
+          return 'replicacao'
+        }
+        if (/to cloud/i.test(rot) || /-\s*nuvens?$/i.test(rot)) {
+          return 'nuvem'
+        }
+        if (/-\s*local$/i.test(rot)) {
+          return 'local'
+        }
+      }
+
+      // 3) Destino, somente se inequívoco
+      if (dest) {
+        const destLower = dest.toLowerCase()
+        const temLocal = /\blocal\b/i.test(destLower)
+        const temNuvem = /\b(?:nuvens?|cloud)\b/i.test(destLower)
+        const temReplica = /\b(?:replicas?|replica[çc][aã]o|replication)\b/i.test(destLower)
+
+        // Se tiver mais de um destino (ex.: "Local/Nuvem"), é ambíguo -> não inequívoco
+        const count = (temLocal ? 1 : 0) + (temNuvem ? 1 : 0) + (temReplica ? 1 : 0)
+        if (count === 1) {
+          if (temReplica) return 'replicacao'
+          if (temNuvem) return 'nuvem'
+          if (temLocal) return 'local'
+        }
+      }
+
+      // 4) null se nada — execução sem modalidade NUNCA comprova exigência nenhuma
       return null
     }
 
@@ -1174,6 +1208,8 @@ routerAdd(
       return e.forbiddenError('Acesso restrito à própria organização.')
     }
 
+    const isDebug = false
+
     let allAssets = []
     try {
       allAssets = $app.findRecordsByFilter(
@@ -1355,6 +1391,16 @@ routerAdd(
         rotinaNome,
         exRec.getString('destino'),
       )
+      if (isDebug) {
+        console.log(
+          '[confronto:debug:exec]',
+          exId,
+          'mod:',
+          modInferidaExec,
+          'obs:',
+          exObs.slice(0, 50),
+        )
+      }
 
       const comprovados =
         confEscopoObj && Array.isArray(confEscopoObj.comprovado) ? confEscopoObj.comprovado : []
@@ -1647,6 +1693,23 @@ routerAdd(
       },
       confronto: confrontoList,
       alerta_falha_recente: alertaFalhaGlobal,
+    }
+    if (isDebug && confrontoList.length > 0) {
+      const primeiro = confrontoList[0]
+      console.log(
+        '[confronto:debug:resumo]',
+        primeiro.nome,
+        'local:',
+        primeiro.modalidades?.local?.status_modalidade,
+        'nuvem:',
+        primeiro.modalidades?.nuvem?.status_modalidade,
+        'replicacao:',
+        primeiro.modalidades?.replicacao?.status_modalidade,
+        'consolidado:',
+        primeiro.status_consolidado,
+        'totais:',
+        JSON.stringify(payload.totais),
+      )
     }
 
     return e.json(200, payload)
