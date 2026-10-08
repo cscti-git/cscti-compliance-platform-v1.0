@@ -981,28 +981,6 @@ routerAdd(
           avisosParsing.push('Cabeçalho de job do Veeam extraído via fallback de assunto')
         }
         const lowerAss = assunto.toLowerCase()
-        if (
-          lowerAss.includes('[failed]') ||
-          lowerAss.includes('[error]') ||
-          lowerAss.includes('[falha]') ||
-          lowerConteudo.includes('>failed<') ||
-          lowerConteudo.includes('status: failed')
-        ) {
-          statusDetectado = 'erro'
-        } else if (
-          lowerAss.includes('[warning]') ||
-          lowerAss.includes('[alerta]') ||
-          lowerConteudo.includes('>warning<') ||
-          lowerConteudo.includes('status: warning')
-        ) {
-          statusDetectado = 'parcial'
-        } else if (
-          lowerAss.includes('[success]') ||
-          lowerConteudo.includes('>success<') ||
-          lowerConteudo.includes('status: success')
-        ) {
-          statusDetectado = 'sucesso'
-        }
 
         const procVmsRegex = /(\d+)\s+of\s+(\d+)\s+(?:VMs|objects?)\s+processed/i
         const procVmsMatch = rawConteudo.match(procVmsRegex) || plainText.match(procVmsRegex)
@@ -1024,10 +1002,38 @@ routerAdd(
         const eM = plainText.match(errCntRegex)
         if (eM) contadores.error = parseInt(eM[1], 10)
 
-        if (contadores.error > 0 && statusDetectado !== 'erro') {
+        // Detecção inicial de status
+        // Atenção: NÃO disparar 'parcial' só com '>warning<' no HTML bruto porque "<td>Warning 0</td>" contém '>warning<'.
+        // Avaliar com precisão via contadores ou regex de status real
+        const hasFailedStatus =
+          lowerAss.includes('[failed]') ||
+          lowerAss.includes('[error]') ||
+          lowerAss.includes('[falha]') ||
+          /(?:status:\s*failed|>failed<)/i.test(rawConteudo) ||
+          contadores.error > 0
+
+        const hasWarningStatus =
+          !hasFailedStatus &&
+          (lowerAss.includes('[warning]') ||
+            lowerAss.includes('[alerta]') ||
+            /(?:status:\s*warning)/i.test(rawConteudo) ||
+            contadores.warning > 0)
+
+        const hasSuccessStatus =
+          !hasFailedStatus &&
+          !hasWarningStatus &&
+          (lowerAss.includes('[success]') ||
+            /(?:status:\s*success|>success<)/i.test(rawConteudo) ||
+            (contadores.error === 0 && contadores.warning === 0 && contadores.success > 0))
+
+        if (hasFailedStatus) {
           statusDetectado = 'erro'
-        } else if (contadores.warning > 0 && statusDetectado === 'sucesso') {
+        } else if (hasWarningStatus) {
           statusDetectado = 'parcial'
+        } else if (hasSuccessStatus) {
+          statusDetectado = 'sucesso'
+        } else {
+          statusDetectado = 'sucesso'
         }
 
         const startTimeMatch = plainText.match(/Start\s*time\s*[:\s]*(\d{1,2}:\d{2}(?::\d{2})?)/i)
@@ -1076,13 +1082,13 @@ routerAdd(
             const n = String(nome).trim()
             if (n.length <= 3) return false
             if (
-              /^(backup job|backup copy job|replication job|job |created by|summary|total size|backup size|data read|transferred|duration|name|vm|vms|success|warning|error|failed)$/i.test(
+              /(?:backup\s+(?:copy\s+)?job|replication\s+job|job\b|created\s+by|summary|total\s+size|backup\s+size|data\s+read|transferred|duration|^name$|^vm$|^vms$|success|warning|error|failed)\b/i.test(
                 n,
               )
             ) {
               return false
             }
-            if (/^(?:success|warning|error|failed|created by)\b/i.test(n)) {
+            if (/processed/i.test(n) || /\d+\s+of\s+\d+\s+vms/i.test(n)) {
               return false
             }
             return true
@@ -1139,10 +1145,18 @@ routerAdd(
                   const transferred =
                     cellMatches.length >= 7 ? stripHtml(cellMatches[6]).trim() : ''
 
+                  // duracao nunca recebe texto com "processed" ou "Success"
+                  let duracaoLimpa = c1
+                  if (
+                    /(?:processed|success|warning|failed|error|\d+\s+of\s+\d+)/i.test(duracaoLimpa)
+                  ) {
+                    duracaoLimpa = ''
+                  }
+
                   detalhesVms.push({
                     nome: c0,
                     status: statusVm,
-                    duracao: c1,
+                    duracao: duracaoLimpa,
                     tamanho_total: totalSize,
                     dados_lidos: dataRead,
                     transferido: transferred,
@@ -1354,10 +1368,14 @@ routerAdd(
           contadores.total_vms = detalhesVms.length
           contadores.processadas = detalhesVms.length
 
+          // DEFEITO 2: status='sucesso' quando contadores error=0 e warning=0 e todas as VMs válidas success;
+          // 'parcial' só com warning real > 0; 'erro' só com error > 0
           if (cErr > 0) {
             statusDetectado = 'erro'
-          } else if (cWarn > 0 && statusDetectado === 'sucesso') {
+          } else if (cWarn > 0) {
             statusDetectado = 'parcial'
+          } else if (cSuc > 0 && cErr === 0 && cWarn === 0) {
+            statusDetectado = 'sucesso'
           }
         }
 
@@ -2215,14 +2233,21 @@ routerAdd(
           } else {
             const textoIdentidade = `${assunto} ${jobName} ${rotinaNomeReal}`.toLowerCase()
 
-            if (textoIdentidade.includes('backup copy job:')) {
+            if (
+              textoIdentidade.includes('backup copy job:') ||
+              textoIdentidade.includes('copy job:') ||
+              textoIdentidade.includes('to cloud')
+            ) {
               modalidadesComprovadasPorEsta.add('nuvem')
             } else if (textoIdentidade.includes('replication job:')) {
               modalidadesComprovadasPorEsta.add('replicacao')
             } else if (
-              textoIdentidade.includes('backup job:') &&
+              (textoIdentidade.includes('backup job:') ||
+                textoIdentidade.includes('backup vms') ||
+                (rotinaNomeReal && rotinaNomeReal.toLowerCase().startsWith('backup job:'))) &&
               !textoIdentidade.includes('copy') &&
-              !textoIdentidade.includes('replication')
+              !textoIdentidade.includes('replication') &&
+              !textoIdentidade.includes('cloud')
             ) {
               modalidadesComprovadasPorEsta.add('local')
             }
@@ -2612,17 +2637,56 @@ routerAdd(
       })
 
       // 9. RPO (Recovery Point Objective)
-      const rpoPass = statusDetectado === 'sucesso'
+      // DEFEITO 4: A checagem de RPO compara horário da última execução bem-sucedida da modalidade
+      // contra o RPO do plano (24h); execução recente bem-sucedida = CONFORME.
+      const isExecucaoRecenteSucesso = statusDetectado === 'sucesso'
+      let rpoPass = isExecucaoRecenteSucesso
+      let rpoDetalhes = ''
+
+      if (isExecucaoRecenteSucesso) {
+        rpoPass = true
+        rpoDetalhes = `Execução recente realizada com sucesso. Ponto de recuperação atualizado dentro da meta de RPO do plano (${planoRpoHoras}h). Objetivo atendido.`
+      } else {
+        // Verificar se houve execução anterior bem sucedida dentro da janela de RPO do plano
+        let ultimaComprovadaHoras = null
+        try {
+          if (rotinaFinalId) {
+            const execsAnteriores = $app.findRecordsByFilter(
+              'backup_execucoes',
+              `rotina = '${rotinaFinalId}' && status = 'sucesso'`,
+              '-data_inicio',
+              1,
+              0,
+            )
+            if (execsAnteriores.length > 0) {
+              const dtAnt =
+                execsAnteriores[0].getString('data_inicio') ||
+                execsAnteriores[0].getString('created')
+              if (dtAnt) {
+                const diffHoras =
+                  (new Date().getTime() - new Date(dtAnt).getTime()) / (1000 * 60 * 60)
+                ultimaComprovadaHoras = Math.round(diffHoras * 10) / 10
+              }
+            }
+          }
+        } catch (_) {}
+
+        if (ultimaComprovadaHoras !== null && ultimaComprovadaHoras <= planoRpoHoras) {
+          rpoPass = true
+          rpoDetalhes = `Execução atual com ${statusDetectado}, porém existe ponto de recuperação prévio bem-sucedido há ${ultimaComprovadaHoras}h, dentro do RPO de ${planoRpoHoras}h do plano.`
+        } else {
+          rpoPass = false
+          rpoDetalhes = `Falha na execução impede a atualização do ponto de recuperação. RPO do plano (${planoRpoHoras}h) em risco.`
+        }
+      }
+
       checklist.push({
         item: 'rpo',
         titulo: 'RPO (Recovery Point Objective)',
         status: rpoPass ? 'conforme' : 'nao_conforme',
         passou: rpoPass,
         rpo_esperado_horas: planoRpoHoras,
-        detalhes:
-          statusDetectado === 'sucesso'
-            ? `Ponto de recuperação gerado nesta execução (RPO esperado do plano: ≤ ${planoRpoHoras}h). Objetivo atendido.`
-            : `Falha na execução impede a atualização do ponto de recuperação. RPO do plano (${planoRpoHoras}h) em risco.`,
+        detalhes: rpoDetalhes,
       })
 
       // Regra de Negócio C: VEREDITO ÚNICO DO LAUDO
@@ -2672,7 +2736,9 @@ routerAdd(
       } else if (statusDetectado === 'parcial') {
         conformidadeDetalhe =
           adaptadorUsado === 'VEEAM_HTML'
-            ? `Atenção: Job Veeam "${jobName}" concluído com ${contadores.warning} alerta(s)/warning(s).`
+            ? contadores.warning > 0
+              ? `Atenção: Job Veeam "${jobName}" concluído com ${contadores.warning} alerta(s)/warning(s).`
+              : `Atenção: Job Veeam "${jobName}" concluído com avisos/pendências.`
             : 'Atenção: Trabalho concluído com avisos/pendências ou cópia parcial.'
       } else if (!regraCasada && !rotinaFinalId) {
         conformidadeDetalhe = `Não Conforme: Comprovante processado via ${adaptadorUsado}, mas nenhuma regra de identificação cadastrada correspondeu ao remetente/assunto e nenhuma rotina vinculada.`

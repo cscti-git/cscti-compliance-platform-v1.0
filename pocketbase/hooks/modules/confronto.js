@@ -373,8 +373,12 @@ routerAdd(
       const textoIdentidade = `${assuntoEvidencia} ${jobNameLaudo} ${rotinaNome}`.toLowerCase()
 
       // Ordem rigorosa:
-      // 1. "backup copy job:" -> 'nuvem'
-      if (textoIdentidade.includes('backup copy job:')) {
+      // 1. "backup copy job:" ou "copy job:" ou "to cloud" -> 'nuvem'
+      if (
+        textoIdentidade.includes('backup copy job:') ||
+        textoIdentidade.includes('copy job:') ||
+        textoIdentidade.includes('to cloud')
+      ) {
         return 'nuvem'
       }
 
@@ -383,11 +387,14 @@ routerAdd(
         return 'replicacao'
       }
 
-      // 3. "backup job:" -> 'local' (garantindo ausência de copy/replication)
+      // 3. "backup job:" ou "backup vms" -> 'local' (garantindo ausência de copy/replication/cloud)
       if (
-        textoIdentidade.includes('backup job:') &&
+        (textoIdentidade.includes('backup job:') ||
+          textoIdentidade.includes('backup vms') ||
+          (rotinaNome && rotinaNome.toLowerCase().startsWith('backup job:'))) &&
         !textoIdentidade.includes('copy') &&
-        !textoIdentidade.includes('replication')
+        !textoIdentidade.includes('replication') &&
+        !textoIdentidade.includes('cloud')
       ) {
         return 'local'
       }
@@ -426,16 +433,29 @@ routerAdd(
       // Fontes vinculadas diretamente ao ativo via ativo_inventario
       let fontesDoAtivo = fontesPorAtivo[assetId] || []
 
-      // Se não encontrou por ativo_inventario direto, tentar correspondência por caminho_identificacao com o nome do ativo
+      // Se não encontrou por ativo_inventario direto, tentar correspondência por caminho_identificacao ou nome
       if (fontesDoAtivo.length === 0) {
         const nomeNorm = normalizarString(assetNome)
         for (let fi = 0; fi < todasFontes.length; fi++) {
           const f = todasFontes[fi]
           const camNorm = normalizarString(f.getString('caminho_identificacao'))
-          if (camNorm && camNorm === nomeNorm) {
+          const fNomeNorm = normalizarString(f.getString('nome'))
+          if (
+            (camNorm &&
+              (camNorm === nomeNorm || camNorm.includes(nomeNorm) || nomeNorm.includes(camNorm))) ||
+            (fNomeNorm &&
+              (fNomeNorm === nomeNorm ||
+                fNomeNorm.includes(nomeNorm) ||
+                nomeNorm.includes(fNomeNorm)))
+          ) {
             fontesDoAtivo.push(f)
           }
         }
+      }
+
+      // Se ainda não encontrou e existem fontes genéricas/VMs cadastradas da organização, considerar as fontes ativas da rotina
+      if (fontesDoAtivo.length === 0 && todasFontes.length > 0) {
+        fontesDoAtivo = todasFontes
       }
 
       // Função de avaliação de uma modalidade exigida ('local', 'nuvem', 'replicacao')
