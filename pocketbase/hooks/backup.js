@@ -1055,10 +1055,6 @@ routerAdd(
         const transferredMatch = plainText.match(/Transferred\s*[:\s]*([\d.,]+\s*[TGMK]?B)/i)
         if (transferredMatch) {
           metricasVeeam.transferred = transferredMatch[1].trim()
-          if (!tamanhoBytes || tamanhoBytes === 0) {
-            tamanhoFormatado = metricasVeeam.transferred
-            tamanhoBytes = parseBrSizeToBytes(metricasVeeam.transferred)
-          }
         }
 
         const dedupeMatch = plainText.match(/Dedupe\s*[:\s]*([\d.,]+x?)/i)
@@ -1075,6 +1071,23 @@ routerAdd(
         }
 
         try {
+          const isLinhaVmValida = (nome) => {
+            if (!nome) return false
+            const n = String(nome).trim()
+            if (n.length <= 3) return false
+            if (
+              /^(backup job|backup copy job|replication job|job |created by|summary|total size|backup size|data read|transferred|duration|name|vm|vms|success|warning|error|failed)$/i.test(
+                n,
+              )
+            ) {
+              return false
+            }
+            if (/^(?:success|warning|error|failed|created by)\b/i.test(n)) {
+              return false
+            }
+            return true
+          }
+
           // 1. Tabela HTML de Details
           const tableDetailsMatch = rawConteudo.match(/<table[^>]*>([\s\S]*?)<\/table>/gi)
           if (tableDetailsMatch) {
@@ -1094,7 +1107,7 @@ routerAdd(
                 if (cellMatches.length >= 2) {
                   const c0 = stripHtml(cellMatches[0]).trim()
                   const c1 = stripHtml(cellMatches[1]).trim()
-                  if (!c0 || c0.toLowerCase() === 'name' || c0.toLowerCase() === 'vm') continue
+                  if (!c0 || !isLinhaVmValida(c0)) continue
 
                   // Ignora linha se o nome for igual ao jobName detectado ou cabeçalho de job
                   const c0Norm = c0
@@ -1183,6 +1196,7 @@ routerAdd(
               const rawName = m[1].trim()
               const lowerName = rawName.toLowerCase()
               if (cabecalhosIgnorar.includes(lowerName)) return null
+              if (!isLinhaVmValida(rawName)) return null
               if (lowerName.startsWith('job') || lowerName.startsWith('http')) return null
 
               const rawNorm = rawName
@@ -1248,6 +1262,7 @@ routerAdd(
 
               if (
                 !cabecalhosIgnorar.includes(lowerP0) &&
+                isLinhaVmValida(p0) &&
                 !(p0Norm && jnNormParts && p0Norm === jnNormParts) &&
                 /^(Success|Warning|Failed|Error)$/i.test(p1)
               ) {
@@ -1586,9 +1601,10 @@ routerAdd(
         }
       }
 
-      const casarItensComFontesInline = (itensComprovante, fontesCadastradas) => {
+      const casarItensComFontesInline = (itensComprovante, fontesCadastradas, ativosDoEscopo) => {
         const itens = Array.isArray(itensComprovante) ? itensComprovante : []
         const fontes = Array.isArray(fontesCadastradas) ? fontesCadastradas : []
+        const ativos = Array.isArray(ativosDoEscopo) ? ativosDoEscopo : []
         const fontesCobertas = []
         const fontesNaoCobertas = []
 
@@ -1601,7 +1617,9 @@ routerAdd(
           let achou = false
           let fonteMatchNome = ''
           let fonteMatchObj = null
+          let ativoMatchId = null
 
+          // 1. Casar contra fontes da rotina/organização (caminho_identificacao e aliases com contenção bidirecional)
           for (let fI = 0; fI < fontes.length; fI++) {
             const f = fontes[fI]
             if (!f) continue
@@ -1611,24 +1629,61 @@ routerAdd(
                 : f.caminho_identificacao || ''
             const fAliasesRaw =
               typeof f.getString === 'function' ? f.getString('aliases') : f.aliases || ''
+            const fAtivoInv =
+              typeof f.getString === 'function'
+                ? f.getString('ativo_inventario')
+                : f.ativo_inventario || null
             const fCaminhoNorm = normalizarTexto(fCaminho)
             const fAliases = extrairAliases(fAliasesRaw)
 
-            if (fCaminhoNorm && fCaminhoNorm === itemNorm) {
+            if (
+              fCaminhoNorm &&
+              (fCaminhoNorm === itemNorm ||
+                fCaminhoNorm.includes(itemNorm) ||
+                itemNorm.includes(fCaminhoNorm))
+            ) {
               achou = true
               fonteMatchNome = fCaminho
               fonteMatchObj = f
+              ativoMatchId = fAtivoInv
               break
             }
             for (let aI = 0; aI < fAliases.length; aI++) {
-              if (fAliases[aI] === itemNorm) {
+              const alNorm = normalizarTexto(fAliases[aI])
+              if (
+                alNorm &&
+                (alNorm === itemNorm || alNorm.includes(itemNorm) || itemNorm.includes(alNorm))
+              ) {
                 achou = true
                 fonteMatchNome = fCaminho || fAliases[aI]
                 fonteMatchObj = f
+                ativoMatchId = fAtivoInv
                 break
               }
             }
             if (achou) break
+          }
+
+          // 2. Se não casou por fonte, casar contra os nomes dos ativos do escopo (case-insensitive, trim, contenção bidirecional)
+          if (!achou && ativos.length > 0) {
+            for (let atI = 0; atI < ativos.length; atI++) {
+              const at = ativos[atI]
+              if (!at) continue
+              const atNome =
+                typeof at.getString === 'function' ? at.getString('name') : at.name || ''
+              const atNomeNorm = normalizarTexto(atNome)
+              if (
+                atNomeNorm &&
+                (atNomeNorm === itemNorm ||
+                  atNomeNorm.includes(itemNorm) ||
+                  itemNorm.includes(atNomeNorm))
+              ) {
+                achou = true
+                fonteMatchNome = atNome
+                ativoMatchId = typeof at.getString === 'function' ? at.id : at.id
+                break
+              }
+            }
           }
 
           if (achou) {
@@ -1636,6 +1691,7 @@ routerAdd(
               item: itemNome,
               fonte_cadastrada: fonteMatchNome,
               fonte_id: (fonteMatchObj && fonteMatchObj.id) || null,
+              ativo_id: ativoMatchId || null,
               fora_escopo: false,
             })
           } else {
@@ -1923,17 +1979,121 @@ routerAdd(
         }
       }
 
-      const matchResult = casarItensComFontesInline(itensComprovante, fontesCadastradas)
+      // -------------------------------------------------------------
+      // ITEM 2: RESOLUÇÃO DEFENSIVA DA CADEIA DE ESCOPO E CONFRONTO
+      // Cadeia defensiva: rotina → plano → escopo → lista de ativos vinculados ao escopo
+      // -------------------------------------------------------------
+      let escopoRec = null
+      if (escopoIdRef) {
+        try {
+          escopoRec = $app.findRecordById('backup_escopo', escopoIdRef)
+        } catch (_) {}
+      }
+
+      // Se a rotina tem plano e o plano tem escopo mas escopoIdRef não estava preenchido
+      if (!escopoRec && rotinaRecObj) {
+        try {
+          const pId = rotinaRecObj.getString('plano')
+          if (pId) {
+            const pRec = planoRecObj || $app.findRecordById('backup_planos', pId)
+            if (pRec) {
+              const escId = pRec.getString('escopo')
+              if (escId) {
+                escopoRec = $app.findRecordById('backup_escopo', escId)
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Fallback se ainda não achou escopo direto: tentar localizar escopo ativo da organização
+      if (!escopoRec) {
+        try {
+          const escoposOrg = $app.findRecordsByFilter(
+            'backup_escopo',
+            `organization = '${organizationId}' && status = 'ativo'`,
+            '+created',
+            1,
+            0,
+          )
+          if (escoposOrg.length > 0) {
+            escopoRec = escoposOrg[0]
+          }
+        } catch (_) {}
+      }
+
+      // Expandir ativos do escopo tratando array, string JSON e string simples
+      const ativosEscopo = []
+      if (escopoRec) {
+        let ativosIds = []
+        try {
+          const rawAtivos = escopoRec.get('ativos')
+          if (Array.isArray(rawAtivos)) {
+            ativosIds = rawAtivos
+          } else if (typeof rawAtivos === 'string') {
+            try {
+              const parsed = JSON.parse(rawAtivos)
+              if (Array.isArray(parsed)) {
+                ativosIds = parsed
+              } else if (parsed && typeof parsed === 'object') {
+                ativosIds = [parsed.id || String(parsed)]
+              } else if (parsed) {
+                ativosIds = [String(parsed)]
+              }
+            } catch (_) {
+              if (rawAtivos.trim()) {
+                ativosIds = rawAtivos
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              }
+            }
+          }
+        } catch (_) {}
+
+        if (ativosIds && ativosIds.length > 0) {
+          for (let aIdx = 0; aIdx < ativosIds.length; aIdx++) {
+            const itemAt = ativosIds[aIdx]
+            const aId =
+              typeof itemAt === 'string'
+                ? itemAt
+                : itemAt && itemAt.id
+                  ? String(itemAt.id)
+                  : String(itemAt || '')
+            if (!aId) continue
+            try {
+              const aRec = $app.findRecordById('inventory_assets', aId)
+              if (aRec) ativosEscopo.push(aRec)
+            } catch (_) {}
+          }
+        } else {
+          // Se o campo ativos estiver vazio no escopo, buscar ativos com exigência da org
+          try {
+            const assetsOrg = $app.findRecordsByFilter(
+              'inventory_assets',
+              `organization = '${organizationId}' && status = 'ativo' && (exige_backup_local = true || exige_backup_nuvem = true || exige_backup_replicacao = true)`,
+              '+name',
+              50,
+              0,
+            )
+            for (let i = 0; i < assetsOrg.length; i++) {
+              ativosEscopo.push(assetsOrg[i])
+            }
+          } catch (_) {}
+        }
+      }
+
+      const matchResult = casarItensComFontesInline(
+        itensComprovante,
+        fontesCadastradas,
+        ativosEscopo,
+      )
       const fontesCobertas = matchResult.fontesCobertas
       const fontesNaoCobertas = matchResult.fontesNaoCobertas
 
-      // -------------------------------------------------------------
-      // ITEM 2: CONFRONTO EVIDÊNCIA × EXIGÊNCIAS DO ESCOPO
-      // Cadeia: rotina → plano → escopo → lista de ativos vinculados ao escopo
-      // -------------------------------------------------------------
       const confrontoEscopo = {
-        escopo_id: escopoIdRef || null,
-        escopo_nome: null,
+        escopo_id: escopoRec ? escopoRec.id : escopoIdRef || null,
+        escopo_nome: escopoRec ? escopoRec.getString('nome') || 'Escopo Geral' : null,
         rotina_id: rotinaFinalId || null,
         rotina_nome: rotinaNomeReal || null,
         plano_id: planoRecObj ? planoRecObj.id : null,
@@ -1949,82 +2109,10 @@ routerAdd(
       }
 
       try {
-        let escopoRec = null
-        if (escopoIdRef) {
-          try {
-            escopoRec = $app.findRecordById('backup_escopo', escopoIdRef)
-          } catch (_) {}
-        }
-
-        // Se o plano não apontar escopo direto, tentar localizar escopo ativo da organização
-        if (!escopoRec) {
-          try {
-            const escoposOrg = $app.findRecordsByFilter(
-              'backup_escopo',
-              `organization = '${organizationId}' && status = 'ativo'`,
-              '+created',
-              1,
-              0,
-            )
-            if (escoposOrg.length > 0) {
-              escopoRec = escoposOrg[0]
-            }
-          } catch (_) {}
-        }
-
         if (escopoRec) {
           confrontoEscopo.escopo_id = escopoRec.id
           confrontoEscopo.escopo_nome = escopoRec.getString('nome') || 'Escopo Geral'
-
-          // Ler ativos vinculados ao escopo
-          let ativosIds = []
-          try {
-            const rawAtivos = escopoRec.get('ativos')
-            if (Array.isArray(rawAtivos)) {
-              ativosIds = rawAtivos
-            } else if (typeof rawAtivos === 'string') {
-              try {
-                const parsed = JSON.parse(rawAtivos)
-                if (Array.isArray(parsed)) ativosIds = parsed
-                else if (parsed) ativosIds = [parsed]
-              } catch (_) {
-                if (rawAtivos.trim()) ativosIds = [rawAtivos.trim()]
-              }
-            }
-          } catch (_) {}
-
-          // Buscar os registros completos dos ativos em inventory_assets
-          const ativosEscopo = []
-          if (ativosIds && ativosIds.length > 0) {
-            for (let aIdx = 0; aIdx < ativosIds.length; aIdx++) {
-              const aId =
-                typeof ativosIds[aIdx] === 'string'
-                  ? ativosIds[aIdx]
-                  : ativosIds[aIdx] && ativosIds[aIdx].id
-              if (!aId) continue
-              try {
-                const aRec = $app.findRecordById('inventory_assets', aId)
-                if (aRec) ativosEscopo.push(aRec)
-              } catch (_) {}
-            }
-          } else {
-            // Se o campo ativos estiver vazio no escopo, buscar todos os ativos com exigência da org
-            try {
-              const assetsOrg = $app.findRecordsByFilter(
-                'inventory_assets',
-                `organization = '${organizationId}' && status = 'ativo' && (exige_backup_local = true || exige_backup_nuvem = true || exige_backup_replicacao = true)`,
-                '+name',
-                50,
-                0,
-              )
-              for (let i = 0; i < assetsOrg.length; i++) {
-                ativosEscopo.push(assetsOrg[i])
-              }
-            } catch (_) {}
-          }
-
           confrontoEscopo.total_ativos_escopo = ativosEscopo.length
-
           // Regra de Ouro A & B: MODALIDADE PROVADA SAI DO COMPROVANTE, NUNCA DO PLANO.
           // Regra de Negócio A: Considerar SOMENTE a identidade do job da própria evidência
           // (assunto da evidência e/ou nome do job/rotina vinculada), NUNCA o corpo do texto
@@ -2266,8 +2354,19 @@ routerAdd(
       if (detalhesVms && detalhesVms.length > 0) {
         for (let dvI = 0; dvI < detalhesVms.length; dvI++) {
           const dvNome = detalhesVms[dvI].nome
-          const isNaoCoberto = fontesNaoCobertas.some((fnc) => fnc.item === dvNome)
-          if (isNaoCoberto) {
+          const cobMatch = fontesCobertas.find(
+            (fc) => normalizarTexto(fc.item) === normalizarTexto(dvNome),
+          )
+          const isNaoCoberto = fontesNaoCobertas.some(
+            (fnc) => normalizarTexto(fnc.item) === normalizarTexto(dvNome),
+          )
+          if (cobMatch) {
+            detalhesVms[dvI].fora_escopo = false
+            detalhesVms[dvI].status_escopo = 'coberto'
+            if (cobMatch.ativo_id) {
+              detalhesVms[dvI].ativo_id = cobMatch.ativo_id
+            }
+          } else if (isNaoCoberto) {
             detalhesVms[dvI].fora_escopo = true
             detalhesVms[dvI].status_escopo = 'fora_escopo'
             detalhesVms[dvI].motivo_escopo = 'Não cadastrado — fora do escopo ou alias pendente'
