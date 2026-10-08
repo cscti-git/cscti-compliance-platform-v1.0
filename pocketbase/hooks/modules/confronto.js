@@ -452,13 +452,13 @@ routerAdd(
       // CAMADA C: Marcador explícito no NOME DA ROTINA (- LOCAL, - NUVEM/- NUVENS, - REPLICA/- REPLICAS/- REPLICACAO)
       if (rotinaNome) {
         const rNome = rotinaNome.trim().toLowerCase()
-        if (/(?:^|\s|-)\s*(?:replicas?|replicacao|replica[çc][aã]o)\s*$/i.test(rNome)) {
+        if (/(?:^|\s|-)\s*(?:replicas?|replicacao|replica[çc][aã]o)(?:\s*|$)/i.test(rNome)) {
           return 'replicacao'
         }
-        if (/(?:^|\s|-)\s*nuvens?\s*$/i.test(rNome)) {
+        if (/(?:^|\s|-)\s*nuvens?(?:\s*|$)/i.test(rNome)) {
           return 'nuvem'
         }
-        if (/(?:^|\s|-)\s*local\s*$/i.test(rNome)) {
+        if (/(?:^|\s|-)\s*local(?:\s*|$)/i.test(rNome)) {
           return 'local'
         }
       }
@@ -610,52 +610,69 @@ routerAdd(
             const ex = execucoes[ei]
             if (ex.getString('rotina') !== rotinaId) continue
 
-            // REGRA FUNDAMENTAL: Se a execução já possui confronto_escopo.comprovado gravado,
-            // essa É a fonte única de verdade gravada pelo processamento!
+            // REGRA FUNDAMENTAL: A avaliação de proteção de cada ativo deve usar
+            // como FONTE PRIMÁRIA o campo confronto_escopo JÁ GRAVADO na execução
+            // (lido com normalizarJson(ex.get('confronto_escopo'))). Se comprovado (array)
+            // estiver não-vazio, use esses itens diretamente para marcar as modalidades
+            // como comprovadas por ativo (campo ativo_id, modalidade, comprovado_em, fonte_casada)
+            // — SEM executar o recálculo de inferência para essa execução.
             const confGravadoEx = normalizarJson(ex.get('confronto_escopo'))
-            let modalidadeProvadaPelaExecucao = null
             let itemGravadoComprovado = null
 
+            // Helper de correspondência de ativo em itens de confronto_escopo
+            const verificarMatchAtivo = (listaComprovados) => {
+              if (!Array.isArray(listaComprovados) || listaComprovados.length === 0) return null
+              const aNomeNorm = normalizarString(assetNome)
+              const aNomeComp = normalizarCompacto(assetNome)
+              const cNorm = caminhoNorm
+              const cComp = caminhoComp
+
+              for (let cidx = 0; cidx < listaComprovados.length; cidx++) {
+                const item = listaComprovados[cidx]
+                if (!item) continue
+                const itemNome = item.ativo_nome || item.item_comprovante || item.fonte_casada || ''
+                const itemNorm = normalizarString(itemNome)
+                const itemComp = normalizarCompacto(itemNome)
+
+                const bateu =
+                  item.ativo_id === assetId ||
+                  (itemNorm &&
+                    (itemNorm === aNomeNorm ||
+                      itemNorm === cNorm ||
+                      (aNomeNorm && itemNorm.includes(aNomeNorm)) ||
+                      (aNomeNorm && aNomeNorm.includes(itemNorm)) ||
+                      (cNorm && itemNorm.includes(cNorm)) ||
+                      (cNorm && cNorm.includes(itemNorm)))) ||
+                  (itemComp &&
+                    (itemComp === aNomeComp ||
+                      itemComp === cComp ||
+                      (aNomeComp && itemComp.includes(aNomeComp)) ||
+                      (aNomeComp && aNomeComp.includes(itemComp)) ||
+                      (cComp && itemComp.includes(cComp)) ||
+                      (cComp && cComp.includes(itemComp))))
+
+                if (bateu) {
+                  return item
+                }
+              }
+              return null
+            }
+
+            // 1. FONTE PRIMÁRIA: confronto_escopo gravado na execução
             if (
               confGravadoEx &&
               typeof confGravadoEx === 'object' &&
               Array.isArray(confGravadoEx.comprovado) &&
               confGravadoEx.comprovado.length > 0
             ) {
-              // Verificar se este ativo específico consta como comprovado no confronto gravado
-              const assetNomeNormTemp = normalizarString(assetNome)
-              const assetNomeCompTemp = normalizarCompacto(assetNome)
-              for (let cidx = 0; cidx < confGravadoEx.comprovado.length; cidx++) {
-                const compItem = confGravadoEx.comprovado[cidx]
-                const itemNome = compItem.ativo_nome || compItem.item_comprovante || ''
-                const itemNorm = normalizarString(itemNome)
-                const itemComp = normalizarCompacto(itemNome)
-                const bateuAtivo =
-                  compItem.ativo_id === assetId ||
-                  (itemNorm &&
-                    (itemNorm === assetNomeNormTemp ||
-                      itemNorm.includes(assetNomeNormTemp) ||
-                      assetNomeNormTemp.includes(itemNorm))) ||
-                  (itemComp &&
-                    (itemComp === assetNomeCompTemp ||
-                      itemComp.includes(assetNomeCompTemp) ||
-                      assetNomeCompTemp.includes(itemComp)))
-
-                if (bateuAtivo && compItem.modalidade) {
-                  modalidadeProvadaPelaExecucao = compItem.modalidade
-                  itemGravadoComprovado = compItem
-                  break
-                }
-              }
-
-              // Se o ativo não bateu diretamente mas a execução inteira comprova uma modalidade homogênea
-              if (!modalidadeProvadaPelaExecucao && confGravadoEx.comprovado[0]?.modalidade) {
-                modalidadeProvadaPelaExecucao = confGravadoEx.comprovado[0].modalidade
+              const matched = verificarMatchAtivo(confGravadoEx.comprovado)
+              if (matched && matched.modalidade === modalidadeNome) {
+                itemGravadoComprovado = matched
               }
             }
 
-            // Fallback: se não há confronto gravado na execução, consultar a avaliação vinculada
-            if (!modalidadeProvadaPelaExecucao) {
+            // 2. FONTE SECUNDÁRIA (Fallback se gravado na execução estiver vazio/ausente): backup_avaliacoes
+            if (!itemGravadoComprovado) {
               try {
                 const avalsEx = $app.findRecordsByFilter(
                   'backup_avaliacoes',
@@ -672,110 +689,80 @@ routerAdd(
                     Array.isArray(confAval.comprovado) &&
                     confAval.comprovado.length > 0
                   ) {
-                    const assetNomeNormTemp = normalizarString(assetNome)
-                    const assetNomeCompTemp = normalizarCompacto(assetNome)
-                    for (let cidx = 0; cidx < confAval.comprovado.length; cidx++) {
-                      const compItem = confAval.comprovado[cidx]
-                      const itemNome = compItem.ativo_nome || compItem.item_comprovante || ''
-                      const itemNorm = normalizarString(itemNome)
-                      const itemComp = normalizarCompacto(itemNome)
-                      const bateuAtivo =
-                        compItem.ativo_id === assetId ||
-                        (itemNorm &&
-                          (itemNorm === assetNomeNormTemp ||
-                            itemNorm.includes(assetNomeNormTemp) ||
-                            assetNomeNormTemp.includes(itemNorm))) ||
-                        (itemComp &&
-                          (itemComp === assetNomeCompTemp ||
-                            itemComp.includes(assetNomeCompTemp) ||
-                            assetNomeCompTemp.includes(itemComp)))
-
-                      if (bateuAtivo && compItem.modalidade) {
-                        modalidadeProvadaPelaExecucao = compItem.modalidade
-                        itemGravadoComprovado = compItem
-                        break
-                      }
-                    }
-                    if (!modalidadeProvadaPelaExecucao && confAval.comprovado[0]?.modalidade) {
-                      modalidadeProvadaPelaExecucao = confAval.comprovado[0].modalidade
+                    const matched = verificarMatchAtivo(confAval.comprovado)
+                    if (matched && matched.modalidade === modalidadeNome) {
+                      itemGravadoComprovado = matched
                     }
                   }
                 }
               } catch (_) {}
             }
 
-            // Fallback final: apenas se não houver confronto gravado nem na execução nem na avaliação
-            if (!modalidadeProvadaPelaExecucao) {
-              modalidadeProvadaPelaExecucao = inferirModalidadeComprovante(ex, cand.rotina)
-            }
-
-            if (modalidadeProvadaPelaExecucao !== modalidadeNome) {
-              continue
-            }
-
             let cobreAtivoNaExecucao = false
             let statusIndividualAtivo = null
             let motivoIndividualAtivo = ''
-            const dVms = obterDetalhesVmsExecucao(ex)
-            const assetNomeNorm = normalizarString(assetNome)
-            const assetNomeComp = normalizarCompacto(assetNome)
 
-            if (Array.isArray(dVms) && dVms.length > 0) {
-              for (let vi = 0; vi < dVms.length; vi++) {
-                const vm = dVms[vi]
-                const vmNomeNorm = normalizarString(vm.nome)
-                const vmNomeComp = normalizarCompacto(vm.nome)
-                if (!vmNomeNorm && !vmNomeComp) continue
-
-                // Match tolerante em qualquer direção (normalizado e compacto)
-                const bateu =
-                  vmNomeNorm === assetNomeNorm ||
-                  vmNomeNorm === caminhoNorm ||
-                  vmNomeComp === assetNomeComp ||
-                  vmNomeComp === caminhoComp ||
-                  (assetNomeNorm && vmNomeNorm.includes(assetNomeNorm)) ||
-                  (assetNomeNorm && assetNomeNorm.includes(vmNomeNorm)) ||
-                  (caminhoNorm && vmNomeNorm.includes(caminhoNorm)) ||
-                  (caminhoNorm && caminhoNorm.includes(vmNomeNorm)) ||
-                  (assetNomeComp && vmNomeComp.includes(assetNomeComp)) ||
-                  (assetNomeComp && assetNomeComp.includes(vmNomeComp))
-
-                if (bateu) {
-                  if (!vm.fora_escopo && vm.status_escopo !== 'fora_escopo') {
-                    cobreAtivoNaExecucao = true
-                    const st = String(vm.status || '').toLowerCase()
-                    if (st === 'success' || st === 'sucesso') {
-                      statusIndividualAtivo = 'sucesso'
-                    } else if (st === 'warning' || st === 'aviso') {
-                      statusIndividualAtivo = 'aviso'
-                    } else if (
-                      st === 'error' ||
-                      st === 'failed' ||
-                      st === 'erro' ||
-                      st === 'falha'
-                    ) {
-                      statusIndividualAtivo = 'erro'
-                      motivoIndividualAtivo = `VM ${vm.nome} constou com status "${vm.status}" na execução.`
-                    } else {
-                      statusIndividualAtivo = ex.getString('status') || 'erro'
-                    }
-                    break
-                  }
-                }
-              }
+            // Se o item JÁ ESTÁ COMPROVADO no campo gravado para esta modalidade,
+            // aceitamos DIRETO sem executar recálculo de inferência!
+            if (itemGravadoComprovado) {
+              cobreAtivoNaExecucao = true
+              const st = String(itemGravadoComprovado.status || '').toLowerCase()
+              statusIndividualAtivo = st === 'success' || st === 'sucesso' || !st ? 'sucesso' : st
             } else {
-              cobreAtivoNaExecucao = true
-              statusIndividualAtivo = ex.getString('status') || 'sucesso'
-            }
+              // Recálculo ao vivo (inferência de modalidade + casamento de fonte) só roda
+              // quando o campo gravado está vazio ou ausente para o ativo.
+              let modalidadeRecalculada = inferirModalidadeComprovante(ex, cand.rotina)
+              if (modalidadeRecalculada === modalidadeNome) {
+                const dVms = obterDetalhesVmsExecucao(ex)
+                const assetNomeNorm = normalizarString(assetNome)
+                const assetNomeComp = normalizarCompacto(assetNome)
 
-            // Se o item já estava comprovado no confronto_escopo gravado, garantir match direto!
-            if (itemGravadoComprovado && itemGravadoComprovado.modalidade === modalidadeNome) {
-              cobreAtivoNaExecucao = true
-              if (itemGravadoComprovado.status) {
-                const st = String(itemGravadoComprovado.status).toLowerCase()
-                statusIndividualAtivo = st === 'success' || st === 'sucesso' ? 'sucesso' : st
-              } else {
-                statusIndividualAtivo = 'sucesso'
+                if (Array.isArray(dVms) && dVms.length > 0) {
+                  for (let vi = 0; vi < dVms.length; vi++) {
+                    const vm = dVms[vi]
+                    const vmNomeNorm = normalizarString(vm.nome)
+                    const vmNomeComp = normalizarCompacto(vm.nome)
+                    if (!vmNomeNorm && !vmNomeComp) continue
+
+                    const bateu =
+                      vmNomeNorm === assetNomeNorm ||
+                      vmNomeNorm === caminhoNorm ||
+                      vmNomeComp === assetNomeComp ||
+                      vmNomeComp === caminhoComp ||
+                      (assetNomeNorm && vmNomeNorm.includes(assetNomeNorm)) ||
+                      (assetNomeNorm && assetNomeNorm.includes(vmNomeNorm)) ||
+                      (caminhoNorm && vmNomeNorm.includes(caminhoNorm)) ||
+                      (caminhoNorm && caminhoNorm.includes(vmNomeNorm)) ||
+                      (assetNomeComp && vmNomeComp.includes(assetNomeComp)) ||
+                      (assetNomeComp && assetNomeComp.includes(vmNomeComp))
+
+                    if (bateu) {
+                      if (!vm.fora_escopo && vm.status_escopo !== 'fora_escopo') {
+                        cobreAtivoNaExecucao = true
+                        const st = String(vm.status || '').toLowerCase()
+                        if (st === 'success' || st === 'sucesso') {
+                          statusIndividualAtivo = 'sucesso'
+                        } else if (st === 'warning' || st === 'aviso') {
+                          statusIndividualAtivo = 'aviso'
+                        } else if (
+                          st === 'error' ||
+                          st === 'failed' ||
+                          st === 'erro' ||
+                          st === 'falha'
+                        ) {
+                          statusIndividualAtivo = 'erro'
+                          motivoIndividualAtivo = `VM ${vm.nome} constou com status "${vm.status}" na execução.`
+                        } else {
+                          statusIndividualAtivo = ex.getString('status') || 'erro'
+                        }
+                        break
+                      }
+                    }
+                  }
+                } else {
+                  cobreAtivoNaExecucao = true
+                  statusIndividualAtivo = ex.getString('status') || 'sucesso'
+                }
               }
             }
 
@@ -786,7 +773,8 @@ routerAdd(
               if (dtIso) {
                 const dtTime = new Date(dtIso).getTime()
                 const nomeJobExec =
-                  (itemGravadoComprovado && itemGravadoComprovado.job_nome) ||
+                  (itemGravadoComprovado &&
+                    (itemGravadoComprovado.job_nome || itemGravadoComprovado.rotina_nome)) ||
                   extrairNomeJob(ex, cand.rotina)
 
                 if (dtTime > ultimaExecucaoCronologicaTime) {
@@ -992,12 +980,13 @@ routerAdd(
       totalExigidos > 0 ? Math.round((totalProtegidos / totalExigidos) * 100) : 0
 
     // -----------------------------------------------------------------
-    // FIX 1 & 2: RECONCILIAÇÃO SEGURA E NÃO-DESTRUTIVA DAS EXECUÇÕES
+    // RECONCILIAÇÃO SEGURA E NÃO-DESTRUTIVA DAS EXECUÇÕES
     // Regra inegociável: NUNCA sobrescrever comprovado com array vazio [].
     // Se a avaliação vinculada possui confronto_escopo.comprovado válido (não-vazio),
     // copia INTEGRALMENTE para a execução clonando com JSON.parse(JSON.stringify(...)).
-    // Se a avaliação não tiver itens válidos ou não for encontrada, o runtime
-    // NÃO TOCA no campo comprovado da execução — preserva o que já está gravado.
+    // Se a execução já possui confronto_escopo gravado com comprovado não-vazio,
+    // use-o como FONTE ÚNICA DE VERDADE e sincronize com a avaliação.
+    // NUNCA re-inferir ou recalcular se já existe campo gravado preenchido!
     // -----------------------------------------------------------------
     let totalExecucoesReconciliadas = 0
     try {
@@ -1006,8 +995,7 @@ routerAdd(
         const rotinaId = ex.getString('rotina')
         const rotina = rotinasMap[rotinaId]
 
-        // Se a execução já possui confronto_escopo gravado com comprovado não-vazio,
-        // use-o como FONTE ÚNICA DE VERDADE. NUNCA re-inferir ou recalcular se já existe!
+        // 1. Verificar FONTE PRIMÁRIA gravada na execução
         const confExistenteEx = normalizarJson(ex.get('confronto_escopo'))
         const temComprovadoValidoEx =
           confExistenteEx &&
@@ -1015,33 +1003,75 @@ routerAdd(
           Array.isArray(confExistenteEx.comprovado) &&
           confExistenteEx.comprovado.length > 0
 
+        // 2. Verificar se a avaliação possui confronto gravado
+        let avalRecEncontrada = null
+        let confrontoCopiadoDaAvaliacao = null
+        try {
+          const avalsExistentes = $app.findRecordsByFilter(
+            'backup_avaliacoes',
+            `execucao = '${ex.id}'`,
+            '-created',
+            1,
+            0,
+          )
+          if (avalsExistentes.length > 0) {
+            avalRecEncontrada = avalsExistentes[0]
+            const cAval = normalizarJson(avalRecEncontrada.get('confronto_escopo'))
+            if (
+              cAval &&
+              typeof cAval === 'object' &&
+              Array.isArray(cAval.comprovado) &&
+              cAval.comprovado.length > 0
+            ) {
+              confrontoCopiadoDaAvaliacao = JSON.parse(JSON.stringify(cAval))
+            }
+          }
+        } catch (errBuscaAval) {
+          console.error(
+            '[confronto:reconciliacao] Erro ao buscar avaliação para a execução #' + ex.id + ':',
+            errBuscaAval?.message || errBuscaAval,
+          )
+        }
+
+        // Se a execução já possui comprovado válido, ela é a FONTE PRIMÁRIA
         if (temComprovadoValidoEx) {
-          // Já está comprovado e consistente pela fonte de verdade do processamento.
-          // Sincronizar apenas com backup_avaliacoes caso ela não tenha o confronto.
-          try {
-            const avalsExistentes = $app.findRecordsByFilter(
-              'backup_avaliacoes',
-              `execucao = '${ex.id}'`,
-              '-created',
-              1,
-              0,
-            )
-            if (avalsExistentes.length > 0) {
-              const aRec = avalsExistentes[0]
-              const cAval = normalizarJson(aRec.get('confronto_escopo'))
+          if (avalRecEncontrada) {
+            try {
+              const cAval = normalizarJson(avalRecEncontrada.get('confronto_escopo'))
               if (
                 !cAval ||
                 !Array.isArray(cAval.comprovado) ||
                 cAval.comprovado.length !== confExistenteEx.comprovado.length
               ) {
-                aRec.set('confronto_escopo', JSON.parse(JSON.stringify(confExistenteEx)))
-                $app.save(aRec)
+                avalRecEncontrada.set(
+                  'confronto_escopo',
+                  JSON.parse(JSON.stringify(confExistenteEx)),
+                )
+                $app.save(avalRecEncontrada)
               }
+            } catch (errSyncAval) {
+              console.error(
+                `[confronto:reconciliacao] Falha ao sincronizar avaliação a partir da execução #${ex.id}:`,
+                errSyncAval?.message || errSyncAval,
+              )
             }
-          } catch (errSyncAval) {
+          }
+          continue
+        }
+
+        // Se a execução não possui comprovado válido mas a avaliação possui, copiar da avaliação
+        if (confrontoCopiadoDaAvaliacao) {
+          try {
+            ex.set('confronto_escopo', JSON.parse(JSON.stringify(confrontoCopiadoDaAvaliacao)))
+            $app.save(ex)
+            totalExecucoesReconciliadas++
+            console.log(
+              `[confronto:reconciliacao] Confronto copiado com sucesso da avaliação para a execução #${ex.id}. Comprovados: ${confrontoCopiadoDaAvaliacao.comprovado.length}.`,
+            )
+          } catch (errSaveCopia) {
             console.error(
-              `[confronto:reconciliacao] Falha ao sincronizar avaliação a partir da execução #${ex.id}:`,
-              errSyncAval?.message || errSyncAval,
+              `[confronto:reconciliacao] FALHA LOUD ao salvar confronto copiado na execução #${ex.id}:`,
+              errSaveCopia?.message || errSaveCopia,
             )
           }
           continue
@@ -1064,96 +1094,6 @@ routerAdd(
               errSaveDv?.message || errSaveDv,
             )
           }
-        }
-
-        // 2. Buscar avaliação vinculada para sincronização (Fonte Única de Verdade)
-        let avalRecEncontrada = null
-        let confrontoCopiadoDaAvaliacao = null
-        try {
-          const avalsExistentes = $app.findRecordsByFilter(
-            'backup_avaliacoes',
-            `execucao = '${ex.id}'`,
-            '-created',
-            1,
-            0,
-          )
-          if (avalsExistentes.length > 0) {
-            avalRecEncontrada = avalsExistentes[0]
-            const cAval = normalizarJson(avalRecEncontrada.get('confronto_escopo'))
-            if (
-              cAval &&
-              typeof cAval === 'object' &&
-              Array.isArray(cAval.comprovado) &&
-              cAval.comprovado.length > 0
-            ) {
-              // CLONE DEFENSIVO para evitar o erro "Can't set property on Go slice"
-              confrontoCopiadoDaAvaliacao = JSON.parse(JSON.stringify(cAval))
-            }
-          }
-        } catch (errBuscaAval) {
-          console.error(
-            '[confronto:reconciliacao] Erro ao buscar avaliação para a execução #' + ex.id + ':',
-            errBuscaAval?.message || errBuscaAval,
-          )
-        }
-
-        // CENÁRIO A: Avaliação possui confronto_escopo com comprovado válido (não-vazio).
-        // Copiar INTEGRALMENTE para a execução, mantendo fonte única de verdade.
-        if (confrontoCopiadoDaAvaliacao) {
-          // Só persistir se a execução ainda não tiver os mesmos itens comprovados
-          const precisaCopiar =
-            !temComprovadoValidoEx ||
-            confExistenteEx.comprovado.length !== confrontoCopiadoDaAvaliacao.comprovado.length ||
-            confExistenteEx.comprovado[0]?.modalidade !== modalidadeEx
-
-          if (precisaCopiar) {
-            try {
-              ex.set('confronto_escopo', JSON.parse(JSON.stringify(confrontoCopiadoDaAvaliacao)))
-              $app.save(ex)
-              totalExecucoesReconciliadas++
-              console.log(
-                `[confronto:reconciliacao] Confronto copiado com sucesso da avaliação para a execução #${ex.id}. Comprovados: ${confrontoCopiadoDaAvaliacao.comprovado.length}.`,
-              )
-            } catch (errSaveCopia) {
-              console.error(
-                `[confronto:reconciliacao] FALHA LOUD ao salvar confronto copiado na execução #${ex.id}:`,
-                errSaveCopia?.message || errSaveCopia,
-              )
-              try {
-                const auditCol = $app.findCollectionByNameOrId('audit_log')
-                const auditRec = new Record(auditCol)
-                auditRec.set('organization', targetOrgId)
-                auditRec.set('action', 'BACKUP_EXECUCAO_UPDATE_ERROR')
-                auditRec.set('entity', 'Backup e Continuidade')
-                auditRec.set(
-                  'detail',
-                  `FALHA ao sincronizar confronto da avaliação para a execução #${ex.id}: ${errSaveCopia?.message || String(errSaveCopia)}`,
-                )
-                auditRec.set('metadata', { execucao_id: ex.id, error: String(errSaveCopia) })
-                $app.save(auditRec)
-              } catch (_) {}
-            }
-          }
-          continue
-        }
-
-        // CENÁRIO B: Avaliação NÃO possui comprovado válido, mas a EXECUÇÃO JÁ POSSUI.
-        // PRESERVAR O QUE JÁ ESTÁ GRAVADO NA EXECUÇÃO. Se a avaliação existir, copia da execução para a avaliação.
-        if (temComprovadoValidoEx) {
-          if (avalRecEncontrada) {
-            try {
-              const cClone = JSON.parse(JSON.stringify(confExistenteEx))
-              avalRecEncontrada.set('confronto_escopo', cClone)
-              $app.save(avalRecEncontrada)
-            } catch (errSyncAval) {
-              console.error(
-                `[confronto:reconciliacao] Falha ao sincronizar avaliação a partir da execução #${ex.id}:`,
-                errSyncAval?.message || errSyncAval,
-              )
-            }
-          }
-          // Execução já protegida e com dados válidos: não recalcular nem sobrescrever!
-          continue
         }
 
         // CENÁRIO C: Nem a avaliação nem a execução têm comprovado preenchido.
