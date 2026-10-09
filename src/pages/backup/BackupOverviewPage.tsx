@@ -26,6 +26,7 @@ import {
   Sliders,
   Sparkles,
   Server,
+  UserCheck,
 } from 'lucide-react'
 import {
   listBackupEscopos,
@@ -37,9 +38,11 @@ import {
   listBackupExecucoes,
   listBackupOcorrencias,
   listBackupTestes,
+  listBackupMonitoramentos,
   getBackupConfronto,
 } from '@/services/backupService'
 import { BackupConfrontoTable } from '@/components/backup/BackupConfrontoTable'
+import { BackupNocValidacaoCard } from '@/components/backup/BackupNocValidacaoCard'
 import type { BackupConfrontoResponse } from '@/types/cscti'
 import { listInventoryAssets } from '@/services/csctiService'
 import type {
@@ -53,8 +56,8 @@ import type {
   BackupOcorrenciaItem,
   BackupTesteRecuperacaoItem,
   InventoryAssetItem,
+  BackupMonitoramentoExternoItem,
 } from '@/types/cscti'
-
 // Sub-abas
 import { BackupCicloStepper } from '@/components/backup/BackupCicloStepper'
 import { BackupEscopoTab } from './BackupEscopoTab'
@@ -85,9 +88,9 @@ export const BackupOverviewPage: React.FC = () => {
   const [ocorrencias, setOcorrencias] = useState<BackupOcorrenciaItem[]>([])
   const [testes, setTestes] = useState<BackupTesteRecuperacaoItem[]>([])
   const [assets, setAssets] = useState<InventoryAssetItem[]>([])
+  const [monitoramentos, setMonitoramentos] = useState<BackupMonitoramentoExternoItem[]>([])
   const [confrontoData, setConfrontoData] = useState<BackupConfrontoResponse | null>(null)
   const [loadingConfronto, setLoadingConfronto] = useState<boolean>(false)
-
   const loadConfronto = async () => {
     if (!orgId) return
     setLoadingConfronto(true)
@@ -116,6 +119,7 @@ export const BackupOverviewPage: React.FC = () => {
         ocoData,
         tesData,
         assData,
+        nocData,
       ] = await Promise.all([
         listBackupEscopos(orgId),
         listBackupPlanos(orgId),
@@ -127,6 +131,7 @@ export const BackupOverviewPage: React.FC = () => {
         listBackupOcorrencias(orgId),
         listBackupTestes(orgId),
         listInventoryAssets(orgId),
+        listBackupMonitoramentos(orgId),
       ])
       setEscopos(escData)
       setPlanos(plaData)
@@ -138,6 +143,7 @@ export const BackupOverviewPage: React.FC = () => {
       setOcorrencias(ocoData)
       setTestes(tesData)
       setAssets(assData)
+      setMonitoramentos(nocData)
       // Carregar confronto em conjunto
       loadConfronto()
     } catch (err) {
@@ -379,7 +385,17 @@ export const BackupOverviewPage: React.FC = () => {
                 {evidenciasPendentes}
               </span>
             )}
+            {monitoramentos.length > 0 && (
+              <span
+                className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 text-[10px] font-bold"
+                title="Atestados humanos do NOC registrados (Monitoramento Externo)"
+              >
+                <UserCheck className="w-2.5 h-2.5 mr-0.5" />
+                {monitoramentos.length}
+              </span>
+            )}
           </TabsTrigger>
+
           <TabsTrigger
             value="execucoes"
             className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
@@ -825,8 +841,15 @@ export const BackupOverviewPage: React.FC = () => {
             }}
           />
 
+          {/* DUPLA CAMADA DE CONFORMIDADE: atestado humano diário do NOC (2ª camada) */}
+          <BackupNocValidacaoCard
+            monitoramentos={monitoramentos}
+            loading={loading}
+            onOpenNoc={() => setSearchParams({ tab: 'evidencias', sub: 'monitoramento_externo' })}
+          />
           {/* Banner de Status do Último Teste de Recuperação */}
           <div className="p-4 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-850 to-[#0B2545] text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+            {' '}
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-lg bg-white/10 text-emerald-400">
                 <CheckCircle2 className="w-6 h-6" />
@@ -853,7 +876,6 @@ export const BackupOverviewPage: React.FC = () => {
                 )}
               </div>
             </div>
-
             <Button
               onClick={() => setSearchParams({ tab: 'testes' })}
               variant="secondary"
@@ -1198,6 +1220,12 @@ export const BackupOverviewPage: React.FC = () => {
             canOperate={canOperate}
             orgId={orgId}
             onReload={loadAllData}
+            subAbaInicial={
+              searchParams.get('sub') === 'monitoramento_externo'
+                ? 'monitoramento_externo'
+                : undefined
+            }
+            onConsumirSubAbaInicial={() => setSearchParams({ tab: 'evidencias' })}
           />
         </TabsContent>
 

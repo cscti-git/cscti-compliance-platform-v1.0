@@ -91,17 +91,21 @@ interface BackupEvidenciasTabProps {
   canOperate: boolean
   orgId: string
   onReload: () => void
+  /** Sub-aba solicitada de fora (ex.: deep-link do card "Validação Humana (NOC)" da Visão Geral). */
+  subAbaInicial?: 'evidencias' | 'monitoramento_externo'
+  /** Consome o deep-link (limpa o parâmetro de URL) após a primeira renderização. */
+  onConsumirSubAbaInicial?: () => void
 }
-
 export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
   evidencias,
   rotinas,
   canOperate,
   orgId,
   onReload,
+  subAbaInicial,
+  onConsumirSubAbaInicial,
 }) => {
   const { toast } = useToast()
-
   // Modal Registrar Evidência (Upload/Colar HTML ou texto)
   const [modalOpen, setModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -181,8 +185,19 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
 
   // Sub-abas dentro de Evidências: "evidencias" | "monitoramento_externo"
   const [activeSubTab, setActiveSubTab] = useState<'evidencias' | 'monitoramento_externo'>(
-    'evidencias',
+    // Deep-link do card "Validação Humana (NOC)" da Visão Geral (?tab=evidencias&sub=monitoramento_externo)
+    subAbaInicial === 'monitoramento_externo' ? 'monitoramento_externo' : 'evidencias',
   )
+
+  // Consome o parâmetro de deep-link após a montagem, para que voltar à aba
+  // pelo seletor interno não reforce a sub-aba em cliques seguintes.
+  useEffect(() => {
+    if (subAbaInicial === 'monitoramento_externo' && onConsumirSubAbaInicial) {
+      onConsumirSubAbaInicial()
+    }
+    // Executa apenas na montagem (quando o deep-link chega via URL)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Monitoramentos Externos do NOC (Atestado Humano Diário)
   const [monitoramentos, setMonitoramentos] = useState<BackupMonitoramentoExternoItem[]>([])
