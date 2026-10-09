@@ -12,7 +12,6 @@ import {
   ShieldAlert,
   Loader2,
   UserCheck,
-  History,
   ClipboardList,
   Server,
   Cloud,
@@ -640,53 +639,6 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                       </div>
                     ))}
                   </div>
-                )}
-              </section>
-
-              {/* ===== SEÇÃO 6 — TRILHA DE AUDITORIA ===== */}
-              <section className="space-y-2.5">
-                <h2 className="text-sm font-bold text-[#0B2545] uppercase tracking-wide border-b border-slate-200 pb-1">
-                  6. Trilha de Auditoria do Período
-                </h2>
-                {data.audit.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">
-                    Nenhum evento de auditoria no período.
-                  </p>
-                ) : (
-                  <table className="w-full text-[11px] border border-slate-200">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-700">
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
-                          Data/Hora
-                        </th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
-                          Ação
-                        </th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
-                          Recurso
-                        </th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
-                          Usuário
-                        </th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
-                          Resumo
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.audit.map((a) => (
-                        <tr key={a.id} className="border-b border-slate-100">
-                          <td className="px-2 py-1.5 text-slate-600">
-                            {formatSpDateTime(a.created)}
-                          </td>
-                          <td className="px-2 py-1.5 text-slate-700 font-medium">{a.acao}</td>
-                          <td className="px-2 py-1.5 text-slate-600">{a.recurso}</td>
-                          <td className="px-2 py-1.5 text-slate-600">{a.usuario || '—'}</td>
-                          <td className="px-2 py-1.5 text-slate-600">{a.resumo}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 )}
               </section>
 

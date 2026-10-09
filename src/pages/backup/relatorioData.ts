@@ -152,17 +152,74 @@ export function mapExecucao(e: BackupExecucaoItem | Record<string, any>): Execuc
     fonte = String(rec.fonte)
   }
 
-  // Modalidade (local/nuvem/replicacao)
-  let modalidade = String(rec.modalidade || '').toLowerCase()
-  if (!modalidade && rec.confronto_escopo?.modalidade) {
-    modalidade = String(rec.confronto_escopo.modalidade).toLowerCase()
-  } else if (!modalidade && rec.destino) {
-    const dest = String(rec.destino).toLowerCase()
-    if (dest.includes('nuvem') || dest.includes('cloud')) modalidade = 'nuvem'
-    else if (dest.includes('repl')) modalidade = 'replicacao'
-    else modalidade = 'local'
+  // Modalidade (local/nuvem/replicacao) — espelha estritamente o motor backend (backup_confronto.js: inferirModalidadeExecucao)
+  const obs = String(rec.observacao || '').toLowerCase()
+  const rotNome = String(rotina || '').trim()
+  const dest = String(rec.destino || '').trim()
+
+  let modalidade = ''
+
+  // a) Prefixo do job em rec.observacao (case-insensitive, prioridade máxima)
+  if (
+    obs.includes('veeam backup_copy:') ||
+    obs.includes('backup copy job:') ||
+    obs.includes('copy job:')
+  ) {
+    modalidade = 'nuvem'
+  } else if (obs.includes('veeam replication:') || obs.includes('replication job:')) {
+    modalidade = 'replicacao'
+  } else if (obs.includes('veeam backup:') || obs.includes('backup job:')) {
+    modalidade = 'local'
   }
-  if (!modalidade) modalidade = 'local'
+
+  // b) Padrão do nome da rotina (rotina_nome, regex case-insensitive)
+  if (!modalidade && rotNome) {
+    if (/-\s*replicas?$|\breplica[çc][aã]o$/i.test(rotNome)) {
+      modalidade = 'replicacao'
+    } else if (/to cloud/i.test(rotNome) || /-\s*nuvens?$/i.test(rotNome)) {
+      modalidade = 'nuvem'
+    } else if (/-\s*local$/i.test(rotNome)) {
+      modalidade = 'local'
+    }
+  }
+
+  // c) Destino só conta se for INEQUÍVOCO (se contiver mais de 1 modalidade mencionada, ignora)
+  if (!modalidade && dest) {
+    const destLower = dest.toLowerCase()
+    const temLocal = /\blocal\b/i.test(destLower)
+    const temNuvem = /\b(?:nuvens?|cloud)\b/i.test(destLower)
+    const temReplica = /\b(?:replicas?|replica[çc][aã]o|replication)\b/i.test(destLower)
+    const count = (temLocal ? 1 : 0) + (temNuvem ? 1 : 0) + (temReplica ? 1 : 0)
+    if (count === 1) {
+      if (temReplica) modalidade = 'replicacao'
+      else if (temNuvem) modalidade = 'nuvem'
+      else if (temLocal) modalidade = 'local'
+    }
+  }
+
+  // d) Ler confronto_escopo.comprovado[].modalidade como fonte confirmatória
+  if (!modalidade) {
+    const comprovados = Array.isArray(rec.confronto_escopo?.comprovado)
+      ? rec.confronto_escopo.comprovado
+      : []
+    for (const comp of comprovados) {
+      const m = String(comp?.modalidade || '').toLowerCase()
+      if (m === 'local' || m === 'nuvem' || m === 'replicacao') {
+        modalidade = m
+        break
+      }
+    }
+  }
+
+  // Fallback caso ainda não tenha modalidade
+  if (!modalidade) {
+    const rawMod = String(rec.modalidade || '').toLowerCase()
+    if (rawMod === 'local' || rawMod === 'nuvem' || rawMod === 'replicacao') {
+      modalidade = rawMod
+    } else {
+      modalidade = 'local'
+    }
+  }
 
   const data_email = rec.data_email || rec.data_inicio || rec.created || null
 
@@ -388,28 +445,6 @@ export function mapNoc(r: Record<string, any>): NocRow {
   }
 }
 
-// ---------- Trilha de auditoria ----------
-
-export interface AuditRow {
-  id: string
-  created: string
-  acao: string
-  recurso: string
-  resumo: string
-  usuario: string
-}
-
-export function mapAudit(r: Record<string, any>): AuditRow {
-  return {
-    id: r.id,
-    created: r.created,
-    acao: r.action || r.acao || '',
-    recurso: r.entity || r.recurso || r.collection || '',
-    resumo: r.detail || r.resumo || r.detalhes || r.description || '',
-    usuario: r.user_name || r.usuario || '',
-  }
-}
-
 // ---------- Carga principal ----------
 
 export interface RelatorioBundle {
@@ -423,7 +458,6 @@ export interface RelatorioBundle {
   modalidades_status: ModalidadeComprovacao[]
   ocorrencias: OcorrenciaRow[]
   noc: NocRow[]
-  audit: AuditRow[]
 }
 
 export async function loadRelatorioData(
@@ -433,8 +467,8 @@ export async function loadRelatorioData(
   const startIso = new Date(`${period.start}T00:00:00Z`).toISOString()
   const endIso = endOfDaySpIso(period.end)
 
-  // Consultas paralelas tolerantes a coleções com ou sem dados
-  const [serventia, execucoes, ocorrencias, nocs, audits] = await Promise.all([
+  // Consultas paralelas tolerantes a coleções com ou sem dados (somente comprovação de backup)
+  const [serventia, execucoes, ocorrencias, nocs] = await Promise.all([
     loadServentia(orgId).catch(() => null),
     pb
       .collection('backup_execucoes')
@@ -458,16 +492,9 @@ export async function loadRelatorioData(
         sort: '-created',
       })
       .catch((): Record<string, any>[] => []),
-    pb
-      .collection('audit_log')
-      .getFullList<Record<string, any>>({
-        filter: `organization = "${orgId}" && created >= "${startIso}" && created <= "${endIso}"`,
-        sort: '-created',
-      })
-      .catch((): Record<string, any>[] => []),
   ])
 
-  // Filtragem de execuções no período por data_email (ou data_inicio / created como fallback)
+  // Filtragem de execuções no período por data_email (verdade operacional, ou fallback)
   const rows = execucoes
     .map((e) => mapExecucao(e))
     .filter((r) => {
@@ -528,6 +555,5 @@ export async function loadRelatorioData(
     modalidades_status,
     ocorrencias: ocorrencias.map(mapOcorrencia),
     noc: nocs.map(mapNoc),
-    audit: audits.map(mapAudit),
   }
 }
