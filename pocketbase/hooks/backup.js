@@ -58,13 +58,20 @@ routerAdd(
       const bodyDataEmail = body.data_email ? String(body.data_email).trim() : ''
 
       // -------------------------------------------------------------
-      // EXTRAÇÃO DEFENSIVA DE DATA DO E-MAIL (COMPROVANTE FACTUAL)
-      // Ordem estrita de fallbacks:
-      // (1) Header Date: RFC 2822 no bloco de cabeçalhos EML (antes da 1ª linha em branco)
-      // (2) body.data_email vindo do agente local / integração
-      // (3) Carimbo no conteúdo ("Created ... at", "Gerado em", dd/mm/aaaa hh:mm, extenso PT-BR)
-      // (4) Data no assunto
-      // Se não determinável: null (NUNCA inventar data)
+      // EXTRAÇÃO DEFENSIVA DE DATA DO COMPROVANTE (COMPROVANTE FACTUAL)
+      // HIERARQUIA ESTRITA DE EXTRAÇÃO:
+      // (1) Data por extenso em português no corpo (ex: "sexta-feira, 9 de outubro de 2026 08:35:08")
+      //     - Fonte de MAIOR prioridade factual dentro do corpo.
+      // (2) Header Date: RFC 2822 no bloco de cabeçalhos EML (apenas quando entrada é EML com header)
+      // (3) Campo estruturado body.data_email vindo do agente local / formulário
+      // (4) Campo "Gerado em" / "Generated at" / "Report generated" no corpo
+      //     - MAS NUNCA a linha "Created by ... at ..." que pertence à criação do job no Veeam.
+      // (5) Start time / End time da tabela Details (dd/mm/aaaa hh:mm ou dd/mm/aaaa com horário)
+      // (6) Assunto (último recurso)
+      //
+      // REGRA CRÍTICA: a linha "Created by <usuário> at <data>" (criação do job no Veeam)
+      // deve ser EXCLUÍDA explicitamente de qualquer extração — nunca é a data da execução.
+      // Se nada determinável de forma factual: null (NUNCA inventar data).
       // -------------------------------------------------------------
       const parseDateToIsoDefensiva = (str) => {
         if (!str) return null
@@ -77,49 +84,108 @@ routerAdd(
         return null
       }
 
-      const parseExtensoPtBrParaIso = (texto) => {
-        if (!texto) return null
-        const meses = {
-          janeiro: 0,
-          fevereiro: 1,
-          marco: 2,
-          março: 2,
-          abril: 3,
-          maio: 4,
-          junho: 5,
-          julho: 6,
-          agosto: 7,
-          setembro: 8,
-          outubro: 9,
-          novembro: 10,
-          dezembro: 11,
-        }
-        const regexExtenso =
-          /\b(\d{1,2})\s+de\s+([A-Za-zçÇ]+)\s+de\s+(\d{4})(?:[,\s]+(?:às|as)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?/i
-        const m = String(texto).match(regexExtenso)
-        if (m) {
-          const dia = parseInt(m[1], 10)
-          const mesNome = m[2].toLowerCase()
-          const ano = parseInt(m[3], 10)
-          const mes = meses[mesNome]
-          if (mes !== undefined && dia >= 1 && dia <= 31 && ano >= 2000 && ano <= 2100) {
-            const hora = m[4] ? parseInt(m[4], 10) : 12
-            const min = m[5] ? parseInt(m[5], 10) : 0
-            const sec = m[6] ? parseInt(m[6], 10) : 0
-            // Tratar horário local brasileiro como UTC-3 (+3h para UTC)
-            const utcDate = new Date(Date.UTC(ano, mes, dia, hora + 3, min, sec))
-            if (!isNaN(utcDate.getTime())) {
-              return utcDate.toISOString()
-            }
+      // Converte data e hora em horário local brasileiro (UTC-3) para ISO string (UTC)
+      const buildUtcDateFromPtBr = (dia, mes0, ano, hora, min, sec) => {
+        if (
+          dia >= 1 &&
+          dia <= 31 &&
+          mes0 >= 0 &&
+          mes0 <= 11 &&
+          ano >= 2000 &&
+          ano <= 2100 &&
+          hora >= 0 &&
+          hora <= 23 &&
+          min >= 0 &&
+          min <= 59 &&
+          sec >= 0 &&
+          sec <= 59
+        ) {
+          const utcDate = new Date(Date.UTC(ano, mes0, dia, hora + 3, min, sec))
+          if (!isNaN(utcDate.getTime())) {
+            return utcDate.toISOString()
           }
         }
         return null
       }
 
+      const parseExtensoPtBrParaIso = (texto) => {
+        if (!texto) return null
+        const meses = {
+          janeiro: 0,
+          jan: 0,
+          fevereiro: 1,
+          fev: 1,
+          marco: 2,
+          março: 2,
+          mar: 2,
+          abril: 3,
+          abr: 3,
+          maio: 4,
+          mai: 4,
+          junho: 5,
+          jun: 5,
+          julho: 6,
+          jul: 6,
+          agosto: 7,
+          ago: 7,
+          setembro: 8,
+          set: 8,
+          outubro: 9,
+          out: 9,
+          novembro: 10,
+          nov: 10,
+          dezembro: 11,
+          dez: 11,
+        }
+
+        // Padrão 1: Com dia da semana opcional por extenso no corpo:
+        // ex: "sexta-feira, 9 de outubro de 2026 08:35:08" ou "terça-feira, 6 de out de 2026 às 05:02"
+        const regexComSemana =
+          /(?:(?:segunda|terça|terca|quarta|quinta|sexta)(?:-feira)?|sábado|sabado|domingo)?(?:[,\s]+)?(\d{1,2})\s+de\s+([A-Za-zçÇ]+)\s+de\s+(\d{4})(?:[,\s]+(?:às|as)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?/i
+        const m = String(texto).match(regexComSemana)
+        if (m) {
+          const dia = parseInt(m[1], 10)
+          const mesNome = m[2].toLowerCase()
+          const ano = parseInt(m[3], 10)
+          const mes0 = meses[mesNome]
+          if (mes0 !== undefined) {
+            const hora = m[4] ? parseInt(m[4], 10) : 12
+            const min = m[5] ? parseInt(m[5], 10) : 0
+            const sec = m[6] ? parseInt(m[6], 10) : 0
+            const iso = buildUtcDateFromPtBr(dia, mes0, ano, hora, min, sec)
+            if (iso) return iso
+          }
+        }
+        return null
+      }
+
+      // Remove / limpa explicitamente trechos como "Created by ... at <data>" para evitar falso match
+      const sanitizarConteudoIgnorandoJobCreation = (conteudo) => {
+        if (!conteudo) return ''
+        return String(conteudo)
+          .replace(/Created\s+by\s+[^\r\n<>]+?\s+at\s+[\d\/\-\.\s\:\,]+/gi, ' ')
+          .replace(/Created\s+by[^\r\n<>]+/gi, ' ')
+      }
+
       const extrairDataEmailDefensiva = (conteudoTexto, paramDataEmail, assuntoTexto) => {
-        // Fallback 1: Header Date: do bloco de cabeçalhos EML (antes da primeira linha em branco)
-        if (conteudoTexto) {
-          const splitHeaders = String(conteudoTexto).split(/\r?\n\r?\n/)
+        const conteudoBruto = String(conteudoTexto || '')
+        // Conteúdo sanitizado sem as linhas de criação de job ("Created by ... at ...")
+        const conteudoSanitizado = sanitizarConteudoIgnorandoJobCreation(conteudoBruto)
+
+        // -------------------------------------------------------------
+        // (1) DATA POR EXTENSO EM PORTUGUÊS NO CORPO (MAIOR PRIORIDADE)
+        // ex: "sexta-feira, 9 de outubro de 2026 08:35:08"
+        // -------------------------------------------------------------
+        if (conteudoSanitizado) {
+          const extensoCorpoIso = parseExtensoPtBrParaIso(conteudoSanitizado)
+          if (extensoCorpoIso) return extensoCorpoIso
+        }
+
+        // -------------------------------------------------------------
+        // (2) HEADER Date: DO EML COMPLETO (bloco de cabeçalhos antes da linha em branco)
+        // -------------------------------------------------------------
+        if (conteudoBruto) {
+          const splitHeaders = conteudoBruto.split(/\r?\n\r?\n/)
           const headerBlock = splitHeaders[0] || ''
           const headerMatch = headerBlock.match(
             /(?:^|[\r\n])Date\s*:\s*([A-Za-z]{3},\s*\d{1,2}\s+[A-Za-z]{3}\s+\d{4}\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s+[+-]\d{4}|\s+[A-Z]{1,4})?)/i,
@@ -129,7 +195,6 @@ routerAdd(
             if (iso) return iso
           }
 
-          // Header Date com formato ISO ou simplificado no bloco de cabeçalhos
           const headerIsoMatch = headerBlock.match(
             /(?:^|[\r\n])Date\s*:\s*(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)/i,
           )
@@ -139,72 +204,110 @@ routerAdd(
           }
         }
 
-        // Fallback 2: body.data_email se enviado estruturado (pelo agente local ou formulário)
+        // -------------------------------------------------------------
+        // (3) CAMPO ESTRUTURADO body.data_email DO AGENTE LOCAL / FORMULÁRIO
+        // -------------------------------------------------------------
         if (paramDataEmail) {
           const isoBody = parseDateToIsoDefensiva(paramDataEmail)
           if (isoBody) return isoBody
         }
 
-        // Fallback 3: Carimbo no conteúdo
-        if (conteudoTexto) {
-          const s = String(conteudoTexto)
-
-          // 3a) "Created ... at ..." ou "Gerado em ..." com ISO/RFC
-          const createdIsoMatch = s.match(
-            /(?:created|gerado\s+em|data(?:\s+de\s+criação|\s+de\s+execução)?)\s*[:=\s]+["']?(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)/i,
+        // -------------------------------------------------------------
+        // (4) CAMPO "Gerado em" / "Generated at" / "Report generated"
+        // (NUNCA "Created by ... at ...")
+        // -------------------------------------------------------------
+        if (conteudoSanitizado) {
+          // 4a) Gerado em / Generated at seguido de data ISO
+          const geradoIsoMatch = conteudoSanitizado.match(
+            /(?:gerado\s+em|generated\s+at|report\s+generated(?:\s+at|\s+on)?|data(?:\s+de\s+execução|\s+do\s+relatório)?)\s*[:=\s]+["']?(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)/i,
           )
-          if (createdIsoMatch && createdIsoMatch[1]) {
-            const iso = parseDateToIsoDefensiva(createdIsoMatch[1].trim())
+          if (geradoIsoMatch && geradoIsoMatch[1]) {
+            const iso = parseDateToIsoDefensiva(geradoIsoMatch[1].trim())
             if (iso) return iso
           }
 
-          // 3b) Data no padrão brasileiro dd/mm/aaaa hh:mm(:ss) presente no conteúdo
-          const brMatch = s.match(
+          // 4b) Gerado em / Generated at seguido de dd/mm/aaaa hh:mm(:ss)
+          const geradoBrMatch = conteudoSanitizado.match(
+            /(?:gerado\s+em|generated\s+at|report\s+generated(?:\s+at|\s+on)?|data(?:\s+de\s+execução|\s+do\s+relatório)?)\s*[:=\s]+["']?(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})\s*(?:às|as)?\s*(\d{2}):(\d{2})(?::(\d{2}))?/i,
+          )
+          if (geradoBrMatch) {
+            const dia = parseInt(geradoBrMatch[1], 10)
+            const mes0 = parseInt(geradoBrMatch[2], 10) - 1
+            const ano = parseInt(geradoBrMatch[3], 10)
+            const hora = parseInt(geradoBrMatch[4], 10)
+            const min = parseInt(geradoBrMatch[5], 10)
+            const sec = geradoBrMatch[6] ? parseInt(geradoBrMatch[6], 10) : 0
+            const iso = buildUtcDateFromPtBr(dia, mes0, ano, hora, min, sec)
+            if (iso) return iso
+          }
+
+          // 4c) Gerado em / Generated at seguido de data por extenso
+          const geradoExtensoMatch = conteudoSanitizado.match(
+            /(?:gerado\s+em|generated\s+at|report\s+generated(?:\s+at|\s+on)?)\s*[:=\s]+([^\r\n<]{6,60})/i,
+          )
+          if (geradoExtensoMatch && geradoExtensoMatch[1]) {
+            const iso = parseExtensoPtBrParaIso(geradoExtensoMatch[1])
+            if (iso) return iso
+          }
+        }
+
+        // -------------------------------------------------------------
+        // (5) START TIME / END TIME DA TABELA DETAILS (dd/mm/aaaa hh:mm)
+        // OU formato padrão dd/mm/aaaa hh:mm(:ss) no corpo (exceto Created by)
+        // -------------------------------------------------------------
+        if (conteudoSanitizado) {
+          // 5a) Linha com Start Time / End Time acompanhada de data dd/mm/aaaa hh:mm
+          const startDateTimeMatch = conteudoSanitizado.match(
+            /(?:start\s*time|início|inicio)\s*[:=\s]+["']?(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})\s*(?:às|as)?\s*(\d{2}):(\d{2})(?::(\d{2}))?/i,
+          )
+          if (startDateTimeMatch) {
+            const dia = parseInt(startDateTimeMatch[1], 10)
+            const mes0 = parseInt(startDateTimeMatch[2], 10) - 1
+            const ano = parseInt(startDateTimeMatch[3], 10)
+            const hora = parseInt(startDateTimeMatch[4], 10)
+            const min = parseInt(startDateTimeMatch[5], 10)
+            const sec = startDateTimeMatch[6] ? parseInt(startDateTimeMatch[6], 10) : 0
+            const iso = buildUtcDateFromPtBr(dia, mes0, ano, hora, min, sec)
+            if (iso) return iso
+          }
+
+          // 5b) Data brasileira dd/mm/aaaa hh:mm(:ss) no corpo sanitizado
+          const brMatch = conteudoSanitizado.match(
             /\b(\d{2})\/(\d{2})\/(\d{4})\s+(?:às\s+|as\s+)?(\d{2}):(\d{2})(?::(\d{2}))?\b/,
           )
           if (brMatch) {
-            const d = parseInt(brMatch[1], 10)
-            const m = parseInt(brMatch[2], 10) - 1
-            const y = parseInt(brMatch[3], 10)
-            const h = parseInt(brMatch[4], 10)
+            const dia = parseInt(brMatch[1], 10)
+            const mes0 = parseInt(brMatch[2], 10) - 1
+            const ano = parseInt(brMatch[3], 10)
+            const hora = parseInt(brMatch[4], 10)
             const min = parseInt(brMatch[5], 10)
             const sec = brMatch[6] ? parseInt(brMatch[6], 10) : 0
-            if (d >= 1 && d <= 31 && m >= 0 && m <= 11 && y >= 2000 && y <= 2100) {
-              // Fuso de São Paulo / Brasília (UTC-3) -> +3 horas para UTC
-              const utcDate = new Date(Date.UTC(y, m, d, h + 3, min, sec))
-              if (!isNaN(utcDate.getTime())) {
-                return utcDate.toISOString()
-              }
-            }
+            const iso = buildUtcDateFromPtBr(dia, mes0, ano, hora, min, sec)
+            if (iso) return iso
           }
-
-          // 3c) Data por extenso em Português no conteúdo (ex: 12 de outubro de 2026 às 17:45)
-          const extensoIso = parseExtensoPtBrParaIso(s)
-          if (extensoIso) return extensoIso
         }
 
-        // Fallback 4: Data no assunto (ex.: "ANALISE PREVENTIVA DIARIA DE BACKUP 05/10/2026")
+        // -------------------------------------------------------------
+        // (6) ASSUNTO (ÚLTIMO RECURSO)
+        // ex: "ANALISE PREVENTIVA DIARIA DE BACKUP 05/10/2026"
+        // -------------------------------------------------------------
         if (assuntoTexto) {
           const sAssunto = String(assuntoTexto)
+          const extensoAssunto = parseExtensoPtBrParaIso(sAssunto)
+          if (extensoAssunto) return extensoAssunto
+
           const dataAssuntoBr = sAssunto.match(
             /\b(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})(?:\s+(?:às\s+|as\s+)?(\d{2}):(\d{2}))?\b/,
           )
           if (dataAssuntoBr) {
-            const d = parseInt(dataAssuntoBr[1], 10)
-            const m = parseInt(dataAssuntoBr[2], 10) - 1
-            const y = parseInt(dataAssuntoBr[3], 10)
-            const h = dataAssuntoBr[4] ? parseInt(dataAssuntoBr[4], 10) : 12
+            const dia = parseInt(dataAssuntoBr[1], 10)
+            const mes0 = parseInt(dataAssuntoBr[2], 10) - 1
+            const ano = parseInt(dataAssuntoBr[3], 10)
+            const hora = dataAssuntoBr[4] ? parseInt(dataAssuntoBr[4], 10) : 12
             const min = dataAssuntoBr[5] ? parseInt(dataAssuntoBr[5], 10) : 0
-            if (d >= 1 && d <= 31 && m >= 0 && m <= 11 && y >= 2000 && y <= 2100) {
-              const utcDate = new Date(Date.UTC(y, m, d, h + 3, min, 0))
-              if (!isNaN(utcDate.getTime())) {
-                return utcDate.toISOString()
-              }
-            }
+            const iso = buildUtcDateFromPtBr(dia, mes0, ano, hora, min, 0)
+            if (iso) return iso
           }
-
-          const extensoAssunto = parseExtensoPtBrParaIso(sAssunto)
-          if (extensoAssunto) return extensoAssunto
         }
 
         // Se nada determinável de forma factual: null (NUNCA inventar data)
