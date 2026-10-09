@@ -18,7 +18,7 @@ export const SvgDonutChart: React.FC<SvgDonutChartProps> = ({
   data,
   totalLabel,
   subLabel = 'Ativos',
-  size = 130,
+  size = 136,
   strokeWidth = 22,
 }) => {
   const total = data.reduce((acc, cur) => acc + cur.value, 0)
@@ -44,6 +44,7 @@ export const SvgDonutChart: React.FC<SvgDonutChartProps> = ({
         />
         {total > 0 &&
           data.map((seg, i) => {
+            if (seg.value <= 0) return null
             const segPercent = seg.value / total
             const strokeDasharray = `${segPercent * circumference} ${circumference}`
             const strokeDashoffset = -accumulatedPercent * circumference
@@ -65,13 +66,13 @@ export const SvgDonutChart: React.FC<SvgDonutChartProps> = ({
             )
           })}
       </svg>
-      {/* Central Text */}
+      {/* Texto Central */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="text-xl font-extrabold text-slate-900 leading-none tracking-tight">
           {totalLabel}
         </span>
         {subLabel && (
-          <span className="text-[11px] font-medium text-slate-500 mt-0.5 leading-none">
+          <span className="text-[11px] font-medium text-slate-500 mt-1 leading-none">
             {subLabel}
           </span>
         )}

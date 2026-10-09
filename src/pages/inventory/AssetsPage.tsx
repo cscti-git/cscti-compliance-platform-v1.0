@@ -58,32 +58,21 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Filter,
   SlidersHorizontal,
   Bell,
   MoreVertical,
   MoreHorizontal,
   FileText,
+  Printer,
   Edit2,
   Trash2,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
   AlertTriangle,
-  XCircle,
-  HelpCircle,
   Boxes,
-  Database,
-  Layers,
-  ArrowUp,
   Server,
   CheckCircle2,
   Clock,
-  Monitor,
-  Shield,
-  LayoutGrid,
-  FileText as FileTextIcon,
-  HardDrive,
 } from 'lucide-react'
 
 // Categorias padronizadas da visualização
@@ -278,7 +267,7 @@ export const AssetsPage: React.FC = () => {
   const pendingPercent =
     totalAssetsCount > 0 ? ((pendingAssetsCount / totalAssetsCount) * 100).toFixed(1) : '0'
 
-  // DADOS DO GRÁFICO 1: ATIVOS POR CATEGORIA
+  // DADOS DO GRÁFICO 1: ATIVOS POR CATEGORIA (Ordenado por quantidade decrescente conforme solicitação)
   const categoryStats = useMemo(() => {
     const estacoes = displayAssets.filter((a) => a.tipo === 'estacao').length
     const servidores = displayAssets.filter(
@@ -294,38 +283,41 @@ export const AssetsPage: React.FC = () => {
 
     const total = totalAssetsCount || 1
 
-    return [
+    const list = [
       {
         label: 'Estações de trabalho',
         value: estacoes,
-        percent: Math.round((estacoes / total) * 100),
-        color: '#2563EB', // blue-600
+        percent: totalAssetsCount > 0 ? Math.round((estacoes / total) * 100) : 0,
+        color: '#2563EB', // azul royal como no esboço
       },
       {
         label: 'Servidores',
         value: servidores,
-        percent: Math.round((servidores / total) * 100),
-        color: '#38BDF8', // sky-400
+        percent: totalAssetsCount > 0 ? Math.round((servidores / total) * 100) : 0,
+        color: '#38BDF8', // sky-400 / ciano claro
       },
       {
         label: 'Rede e segurança',
         value: rede,
-        percent: Math.round((rede / total) * 100),
+        percent: totalAssetsCount > 0 ? Math.round((rede / total) * 100) : 0,
         color: '#10B981', // emerald-500
       },
       {
         label: 'Sistemas e aplicações',
         value: sistemas,
-        percent: Math.round((sistemas / total) * 100),
-        color: '#FB923C', // orange-400
+        percent: totalAssetsCount > 0 ? Math.round((sistemas / total) * 100) : 0,
+        color: '#FB923C', // laranja
       },
       {
         label: 'Dados e outros',
         value: dados,
-        percent: Math.round((dados / total) * 100),
-        color: '#F59E0B', // amber-500
+        percent: totalAssetsCount > 0 ? Math.round((dados / total) * 100) : 0,
+        color: '#C084FC', // roxo/lilás como no topo do donut do esboço
       },
     ]
+
+    // Ordenar por quantidade real decrescente
+    return list.sort((a, b) => b.value - a.value)
   }, [displayAssets, totalAssetsCount])
 
   // DADOS DO GRÁFICO 2: CLASSIFICAÇÃO DE CRITICIDADE (Barras)
@@ -346,7 +338,7 @@ export const AssetsPage: React.FC = () => {
     ]
   }, [displayAssets])
 
-  // DADOS DO GRÁFICO 3: SITUAÇÃO DE CONFORMIDADE
+  // DADOS DO GRÁFICO 3: SITUAÇÃO DE CONFORMIDADE (Conforme esboço: Conforme, Pendente, Não conforme, Não avaliado)
   const conformidadeStats = useMemo(() => {
     const conforme = displayAssets.filter((a) => a.conformidadeStatus === 'conforme').length
     const pendente = displayAssets.filter((a) => a.conformidadeStatus === 'pendente').length
@@ -355,32 +347,34 @@ export const AssetsPage: React.FC = () => {
 
     const total = totalAssetsCount || 1
 
-    return [
+    const list = [
       {
         label: 'Conforme',
         value: conforme,
-        percent: Math.round((conforme / total) * 100),
-        color: '#10B981', // emerald-500
+        percent: totalAssetsCount > 0 ? Math.round((conforme / total) * 100) : 0,
+        color: '#10B981', // emerald-500 verde
       },
       {
         label: 'Pendente',
         value: pendente,
-        percent: Math.round((pendente / total) * 100),
-        color: '#F59E0B', // amber-500
+        percent: totalAssetsCount > 0 ? Math.round((pendente / total) * 100) : 0,
+        color: '#FBBF24', // âmbar/amarelo
       },
       {
         label: 'Não conforme',
         value: naoConforme,
-        percent: Math.round((naoConforme / total) * 100),
-        color: '#EF4444', // red-500
+        percent: totalAssetsCount > 0 ? Math.round((naoConforme / total) * 100) : 0,
+        color: '#EF4444', // vermelho
       },
       {
         label: 'Não avaliado',
         value: naoAvaliado,
-        percent: Math.round((naoAvaliado / total) * 100),
-        color: '#94A3B8', // slate-400
+        percent: totalAssetsCount > 0 ? Math.round((naoAvaliado / total) * 100) : 0,
+        color: '#94A3B8', // cinza
       },
     ]
+
+    return list
   }, [displayAssets, totalAssetsCount])
 
   // FILTRAGEM EM TEMPO REAL DA TABELA
@@ -651,7 +645,6 @@ export const AssetsPage: React.FC = () => {
             Gestão, classificação e conformidade dos ativos da organização
           </p>
         </div>
-
         {/* Indicador de Atualização + Botões de Ação */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Indicador de Última Atualização */}
@@ -673,6 +666,18 @@ export const AssetsPage: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Botão Imprimir Relatório */}
+          <Link to="/relatorios/inventario">
+            <Button
+              variant="outline"
+              className="border-slate-200/90 hover:bg-slate-50 text-slate-700 text-xs font-semibold h-9 px-3 gap-1.5 shadow-2xs"
+              title="Abrir relatório de inventário para impressão e PDF"
+            >
+              <Printer className="w-4 h-4 text-slate-600" />
+              <span>Imprimir Relatório</span>
+            </Button>
+          </Link>
 
           {/* Botão Primário Azul + Novo Ativo */}
           {canOperate && (
@@ -700,8 +705,8 @@ export const AssetsPage: React.FC = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 text-xs">
               <DropdownMenuItem asChild>
-                <Link to="/relatorios/inventario" target="_blank" className="cursor-pointer gap-2">
-                  <FileText className="w-4 h-4 text-slate-500" /> Exportar Relatório
+                <Link to="/relatorios/inventario" className="cursor-pointer gap-2">
+                  <Printer className="w-4 h-4 text-slate-500" /> Imprimir Relatório
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -718,7 +723,7 @@ export const AssetsPage: React.FC = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        </div>{' '}
       </div>
 
       {/* CONTEÚDO CONDICIONAL: GLPI TAB OU VISÃO GERAL COMPLETA */}
@@ -833,100 +838,110 @@ export const AssetsPage: React.FC = () => {
           </div>
 
           {/* 4. LINHA ANALÍTICA (3 painéis fixos em grid de 3 colunas, NUNCA sofrem reflow) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Gráfico 1: Ativos por Categoria */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Gráfico 1: Ativos por Categoria — Donut à esquerda + Legenda descritiva ao lado como na referência */}
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4.5 flex flex-col justify-between">
               <div>
-                <h3 className="text-xs font-bold text-slate-900 mb-2.5">Ativos por Categoria</h3>
-                <div className="flex justify-center my-1.5">
-                  <SvgDonutChart
-                    data={categoryStats.map((c) => ({
-                      label: c.label,
-                      value: c.value,
-                      color: c.color,
-                    }))}
-                    totalLabel={String(totalAssetsCount)}
-                    subLabel="Ativos"
-                    size={124}
-                    strokeWidth={20}
-                  />
-                </div>
-              </div>
-
-              {/* Legenda com contagem e % */}
-              <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px]">
-                {categoryStats.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-slate-600">
-                    <div className="flex items-center gap-2 truncate pr-1">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </div>
-                    <span className="font-semibold text-slate-800 whitespace-nowrap">
-                      {item.value}{' '}
-                      <span className="font-normal text-slate-400">({item.percent}%)</span>
-                    </span>
+                <h3 className="text-sm font-bold text-slate-900 mb-3">Ativos por Categoria</h3>
+                <div className="flex flex-col sm:flex-row items-center sm:items-center justify-between gap-4 py-1">
+                  {/* Donut com total no centro */}
+                  <div className="shrink-0 flex items-center justify-center">
+                    <SvgDonutChart
+                      data={categoryStats.map((c) => ({
+                        label: c.label,
+                        value: c.value,
+                        color: c.color,
+                      }))}
+                      totalLabel={String(totalAssetsCount)}
+                      subLabel="Ativos"
+                      size={132}
+                      strokeWidth={20}
+                    />
                   </div>
-                ))}
+
+                  {/* Legenda ao lado com NOME, QUANTIDADE REAL e PERCENTUAL: Estações de trabalho 120 (48%) */}
+                  <div className="flex-1 w-full space-y-2 text-xs">
+                    {categoryStats.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-2 text-slate-700"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="text-xs text-slate-600 truncate">{item.label}</span>
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1">
+                          {item.value}{' '}
+                          <span className="font-normal text-slate-500">({item.percent}%)</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </Card>
 
-            {/* Gráfico 2: Classificação de Criticidade (Barras) */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
+            {/* Gráfico 2: Classificação de Criticidade (Barras com escala dinâmica honesta) */}
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4.5 flex flex-col justify-between">
               <div>
-                <h3 className="text-xs font-bold text-slate-900 mb-2.5">
+                <h3 className="text-sm font-bold text-slate-900 mb-3">
                   Classificação de Criticidade
                 </h3>
                 <div className="my-1">
                   <SvgBarChart data={criticalityStats} />
                 </div>
               </div>
-              <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                <span>Total crítico:</span>
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Total crítico / alta:</span>
                 <strong className="text-red-600 font-bold">{criticalAssetsCount} ativos</strong>
               </div>
             </Card>
 
-            {/* Gráfico 3: Situação de Conformidade */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
+            {/* Gráfico 3: Situação de Conformidade — Donut à esquerda + Legenda descritiva ao lado como na referência */}
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4.5 flex flex-col justify-between">
               <div>
-                <h3 className="text-xs font-bold text-slate-900 mb-2.5">
-                  Situação de Conformidade
-                </h3>
-                <div className="flex justify-center my-1.5">
-                  <SvgDonutChart
-                    data={conformidadeStats.map((c) => ({
-                      label: c.label,
-                      value: c.value,
-                      color: c.color,
-                    }))}
-                    totalLabel={String(totalAssetsCount)}
-                    subLabel="Ativos"
-                    size={124}
-                    strokeWidth={20}
-                  />
-                </div>
-              </div>
-
-              {/* Legenda com contagem e % */}
-              <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px]">
-                {conformidadeStats.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-slate-600">
-                    <div className="flex items-center gap-2 truncate pr-1">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </div>
-                    <span className="font-semibold text-slate-800 whitespace-nowrap">
-                      {item.value}{' '}
-                      <span className="font-normal text-slate-400">({item.percent}%)</span>
-                    </span>
+                <h3 className="text-sm font-bold text-slate-900 mb-3">Situação de Conformidade</h3>
+                <div className="flex flex-col sm:flex-row items-center sm:items-center justify-between gap-4 py-1">
+                  {/* Donut com total no centro */}
+                  <div className="shrink-0 flex items-center justify-center">
+                    <SvgDonutChart
+                      data={conformidadeStats.map((c) => ({
+                        label: c.label,
+                        value: c.value,
+                        color: c.color,
+                      }))}
+                      totalLabel={String(totalAssetsCount)}
+                      subLabel="Ativos"
+                      size={132}
+                      strokeWidth={20}
+                    />
                   </div>
-                ))}
+
+                  {/* Legenda ao lado com NOME, QUANTIDADE REAL e PERCENTUAL: Conforme 186 (75%) */}
+                  <div className="flex-1 w-full space-y-2 text-xs">
+                    {conformidadeStats.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-2 text-slate-700"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="text-xs text-slate-600 truncate">{item.label}</span>
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1">
+                          {item.value}{' '}
+                          <span className="font-normal text-slate-500">({item.percent}%)</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </Card>
           </div>
