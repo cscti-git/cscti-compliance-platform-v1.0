@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { formatDateTime } from '@/lib/dateTime'
+import { formatDateTime, formatRelativeTimeSp } from '@/lib/dateTime'
 import type {
   BackupConfrontoResponse,
   ConfrontoAtivoItem,
@@ -34,23 +34,7 @@ export interface BackupConfrontoTableProps {
 }
 
 function formatRelativeTime(isoString: string | null): string {
-  if (!isoString) return 'nunca'
-  try {
-    const diffMs = Date.now() - new Date(isoString).getTime()
-    if (diffMs < 0) return 'agora'
-    const diffSec = Math.floor(diffMs / 1000)
-    const diffMin = Math.floor(diffSec / 60)
-    const diffHour = Math.floor(diffMin / 60)
-    const diffDay = Math.floor(diffHour / 24)
-
-    if (diffSec < 60) return `há ${diffSec}s`
-    if (diffMin < 60) return `há ${diffMin} min`
-    if (diffHour < 24) return `há ${diffHour}h`
-    if (diffDay === 1) return 'ontem'
-    return `há ${diffDay} dias`
-  } catch (_) {
-    return 'data inválida'
-  }
+  return formatRelativeTimeSp(isoString, 'nunca')
 }
 
 /** Formata data e hora no fuso America/Sao_Paulo com fallback */
@@ -320,6 +304,57 @@ export const BackupConfrontoTable: React.FC<BackupConfrontoTableProps> = ({
   const totalProtegidos = totais?.total_protegidos ?? 0
   const percentual = totais?.percentual_protegido ?? 0
 
+  // Diagnóstico de comprovações fora do RPO para exibição clara da última comprovação
+  const foraRpoBannerInfo = React.useMemo(() => {
+    if (!ativos || ativos.length === 0) return null
+
+    const modalidadesOrdem: Array<{ key: 'local' | 'nuvem' | 'replicacao'; label: string }> = [
+      { key: 'local', label: 'Local' },
+      { key: 'nuvem', label: 'Nuvem' },
+      { key: 'replicacao', label: 'Replicação' },
+    ]
+
+    const ultimasPorMod: Record<string, { data: string; rpoHoras: number }> = {}
+    let temForaRpo = false
+
+    ativos.forEach((item) => {
+      modalidadesOrdem.forEach(({ key }) => {
+        const mod = item.modalidades?.[key]
+        if (mod && mod.ultima_comprovacao) {
+          const dataIso = mod.ultima_comprovacao
+          const current = ultimasPorMod[key]
+          if (!current || new Date(dataIso).getTime() > new Date(current.data).getTime()) {
+            ultimasPorMod[key] = {
+              data: dataIso,
+              rpoHoras: mod.rpo_horas_configurado || 24,
+            }
+          }
+        }
+        if (mod && mod.status_modalidade === 'FORA_RPO') {
+          temForaRpo = true
+        }
+      })
+    })
+
+    if (!temForaRpo) return null
+
+    const partes: string[] = []
+    let rpoHorasPadrao = 24
+
+    modalidadesOrdem.forEach(({ key, label }) => {
+      const info = ultimasPorMod[key]
+      if (info) {
+        rpoHorasPadrao = info.rpoHoras || rpoHorasPadrao
+        const rel = formatRelativeTime(info.data)
+        partes.push(`${label} ${rel}`)
+      }
+    })
+
+    if (partes.length === 0) return null
+
+    return `Última comprovação: ${partes.join(', ')} — fora da janela de RPO de ${rpoHorasPadrao}h`
+  }, [ativos])
+
   return (
     <Card className="border-slate-200 shadow-2xs overflow-hidden">
       <CardHeader className="p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
@@ -411,9 +446,13 @@ export const BackupConfrontoTable: React.FC<BackupConfrontoTableProps> = ({
                   ? `${totais?.total_parcialmente_protegidos ?? totalProtegidos + (totais?.total_parcial ?? 0)} de ${totalExigidos} ativos parcialmente protegidos · ${totais?.total_protegidos_completo ?? totalProtegidos} com proteção completa`
                   : 'Nenhum ativo exigido'}
               </p>
-              <p className="text-[10px] text-slate-400">
-                Rotina perante as exigências: Local ✓ e Nuvem ✓ comprovadas, falta a replicação
-              </p>
+              {foraRpoBannerInfo ? (
+                <p className="text-[11px] text-amber-300 font-medium mt-0.5">{foraRpoBannerInfo}</p>
+              ) : (
+                <p className="text-[10px] text-slate-400">
+                  Rotina perante as exigências: Local ✓ e Nuvem ✓ comprovadas, falta a replicação
+                </p>
+              )}
             </div>
           </div>
 

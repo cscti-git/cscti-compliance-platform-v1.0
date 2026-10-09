@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatDateTime } from '@/lib/dateTime'
+import { formatDateTime, formatRelativeTimeSp } from '@/lib/dateTime'
 import {
   HardDriveDownload,
   ShieldCheck,
@@ -206,6 +206,63 @@ export const BackupOverviewPage: React.FC = () => {
     }
     return confrontoTotais?.percentual_protegido ?? 0
   }, [confrontoTotais, confrontoData])
+
+  // Diagnóstico de comprovações fora da janela de RPO para exibição clara ao usuário
+  const foraRpoInfo = useMemo(() => {
+    if (!confrontoData?.confronto || confrontoData.confronto.length === 0) return null
+
+    // Encontrar modalidades com última comprovação real
+    const modalidadesOrdem: Array<{ key: 'local' | 'nuvem' | 'replicacao'; label: string }> = [
+      { key: 'local', label: 'Local' },
+      { key: 'nuvem', label: 'Nuvem' },
+      { key: 'replicacao', label: 'Replicação' },
+    ]
+
+    const ultimasPorMod: Record<string, { data: string; rpoHoras: number; status: string }> = {}
+    let temForaRpo = false
+
+    confrontoData.confronto.forEach((item) => {
+      modalidadesOrdem.forEach(({ key }) => {
+        const mod = item.modalidades?.[key]
+        if (mod && mod.ultima_comprovacao) {
+          const dataIso = mod.ultima_comprovacao
+          const current = ultimasPorMod[key]
+          if (!current || new Date(dataIso).getTime() > new Date(current.data).getTime()) {
+            ultimasPorMod[key] = {
+              data: dataIso,
+              rpoHoras: mod.rpo_horas_configurado || 24,
+              status: mod.status_modalidade,
+            }
+          }
+        }
+        if (mod && mod.status_modalidade === 'FORA_RPO') {
+          temForaRpo = true
+        }
+      })
+    })
+
+    if (!temForaRpo) return null
+
+    // Montar os trechos por modalidade ordenada
+    const partes: string[] = []
+    let rpoHorasPadrao = 24
+
+    modalidadesOrdem.forEach(({ key, label }) => {
+      const info = ultimasPorMod[key]
+      if (info) {
+        rpoHorasPadrao = info.rpoHoras || rpoHorasPadrao
+        const rel = formatRelativeTimeSp(info.data)
+        partes.push(`${label} ${rel}`)
+      }
+    })
+
+    if (partes.length === 0) return null
+
+    return {
+      texto: `Última comprovação: ${partes.join(', ')} — fora da janela de RPO de ${rpoHorasPadrao}h`,
+      rpoHoras: rpoHorasPadrao,
+    }
+  }, [confrontoData])
 
   return (
     <div className="space-y-6">
@@ -563,15 +620,29 @@ export const BackupOverviewPage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {/* Card Proteção Efetiva / Ativos Protegidos */}
             <Card className="border-slate-200 shadow-2xs bg-gradient-to-br from-white to-blue-50/40">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
+              <CardContent className="p-4 flex flex-col justify-between h-full">
+                <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    Proteção Efetiva
+                    <span>Proteção Efetiva</span>
                     <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1 py-0.2 rounded">
                       RPO
                     </span>
                   </p>
-                  <p className="text-2xl font-bold mt-0.5 text-slate-900">
+                  <div
+                    className={`p-2 rounded-lg shrink-0 ${
+                      percentualProtegidoConfronto === 100
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : percentualProtegidoConfronto > 0
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-red-50 text-red-700'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                </div>
+
+                <div className="mt-1">
+                  <p className="text-2xl font-bold text-slate-900 leading-none">
                     <span
                       className={
                         percentualProtegidoConfronto === 100
@@ -585,7 +656,8 @@ export const BackupOverviewPage: React.FC = () => {
                     </span>
                     <span className="text-xs font-semibold text-slate-600 ml-1.5">protegido</span>
                   </p>
-                  <p className="text-[11px] text-slate-700 font-medium mt-0.5">
+
+                  <p className="text-[11px] text-slate-700 font-medium mt-1.5 leading-snug">
                     {totalExigidosConfronto > 0 ? (
                       totalProtegidosCompleto === totalExigidosConfronto ? (
                         <span>
@@ -602,55 +674,69 @@ export const BackupOverviewPage: React.FC = () => {
                       'Sem exigências marcadas'
                     )}
                   </p>
-                  {totalExigidosConfronto > 0 &&
+
+                  {foraRpoInfo ? (
+                    <p className="text-[10px] text-amber-700 font-medium mt-1 leading-snug">
+                      {foraRpoInfo.texto}
+                    </p>
+                  ) : (
+                    totalExigidosConfronto > 0 &&
                     totalProtegidosCompleto < totalExigidosConfronto && (
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-[10px] text-slate-500 mt-1 leading-snug">
                         Rotina perante as exigências: Local ✓ e Nuvem ✓ comprovadas, falta a
                         replicação
                       </p>
-                    )}
-                </div>
-                <div
-                  className={`p-2.5 rounded-lg ${
-                    percentualProtegidoConfronto === 100
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : percentualProtegidoConfronto > 0
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-red-50 text-red-700'
-                  }`}
-                >
-                  <ShieldCheck className="w-5 h-5" />
+                    )
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-slate-200 shadow-2xs">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
+              <CardContent className="p-4 flex flex-col justify-between h-full">
+                <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Planos / Rotinas
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 mt-0.5">
+                  <div className="p-2 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-1">
+                  <p className="text-2xl font-bold text-slate-900 leading-none">
                     {totalPlanosAtivos}{' '}
                     <span className="text-sm font-normal text-slate-500">
                       / {totalRotinasAtivas} ativas
                     </span>
                   </p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-blue-50 text-blue-700">
-                  <Sliders className="w-5 h-5" />
+                  <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                    Planos vinculados a rotinas ativas
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-slate-200 shadow-2xs">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
+              <CardContent className="p-4 flex flex-col justify-between h-full">
+                <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Execuções com Sucesso
                   </p>
+                  <div
+                    className={`p-2 rounded-lg shrink-0 ${
+                      taxaSucesso !== null && taxaSucesso >= 90
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : taxaSucesso !== null
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-1">
                   <p
-                    className={`text-2xl font-bold mt-0.5 ${
+                    className={`text-2xl font-bold leading-none ${
                       taxaSucesso === null
                         ? 'text-slate-400'
                         : taxaSucesso >= 90
@@ -672,56 +758,57 @@ export const BackupOverviewPage: React.FC = () => {
                       '—'
                     )}
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
                     {execucoes.length > 0
                       ? 'Refere-se a execuções de job — não mede a proteção dos ativos'
                       : 'Nenhuma execução registrada'}
                   </p>
                 </div>
-                <div
-                  className={`p-2.5 rounded-lg ${
-                    taxaSucesso !== null && taxaSucesso >= 90
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : taxaSucesso !== null
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-slate-100 text-slate-400'
-                  }`}
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
               </CardContent>
             </Card>
 
             <Card className="border-slate-200 shadow-2xs">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
+              <CardContent className="p-4 flex flex-col justify-between h-full">
+                <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Evidências Processadas
                   </p>
-                  <p className="text-2xl font-bold text-[#0B2545] mt-0.5">{evidencias.length}</p>
+                  <div className="p-2 rounded-lg bg-indigo-50 text-indigo-700 shrink-0">
+                    <FileCheck2 className="w-4 h-4" />
+                  </div>
                 </div>
-                <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-700">
-                  <FileCheck2 className="w-5 h-5" />
+                <div className="mt-1">
+                  <p className="text-2xl font-bold text-[#0B2545] leading-none">
+                    {evidencias.length}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Comprovantes validados e arquivados
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-slate-200 shadow-2xs">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
+              <CardContent className="p-4 flex flex-col justify-between h-full">
+                <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Ocorrências Abertas
                   </p>
+                  <div
+                    className={`p-2 rounded-lg shrink-0 ${ocorrenciasAbertas > 0 ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-1">
                   <p
-                    className={`text-2xl font-bold mt-0.5 ${ocorrenciasAbertas > 0 ? 'text-red-700' : 'text-slate-900'}`}
+                    className={`text-2xl font-bold leading-none ${ocorrenciasAbertas > 0 ? 'text-red-700' : 'text-slate-900'}`}
                   >
                     {ocorrenciasAbertas}
                   </p>
-                </div>
-                <div
-                  className={`p-2.5 rounded-lg ${ocorrenciasAbertas > 0 ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}
-                >
-                  <AlertTriangle className="w-5 h-5" />
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Pendências ativas que demandam ação
+                  </p>
                 </div>
               </CardContent>
             </Card>
