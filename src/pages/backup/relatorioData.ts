@@ -2,7 +2,12 @@
 // Regras espelham o motor: RPO e "execução mais recente" usam data_email (data do comprovante, fuso SP);
 // cada execução comprova somente a modalidade que o job demonstra (veredito único = pior verificação).
 import pb from '../../lib/pocketbase/client'
-import type { BackupExecucaoItem, BackupOcorrenciaItem } from '../../types/cscti'
+import { getBackupConfronto } from '../../services/backupService'
+import type {
+  BackupConfrontoResponse,
+  BackupExecucaoItem,
+  BackupOcorrenciaItem,
+} from '../../types/cscti'
 
 // ---------- Datas (fuso de São Paulo) ----------
 
@@ -259,6 +264,9 @@ export interface AtivoProtecao {
   parcial: boolean
   completa: boolean
   ultimaExecucao: string | null
+  tipo?: string
+  criticidade?: string
+  status_consolidado?: string
 }
 
 export interface ProtectionAggregate {
@@ -274,7 +282,7 @@ export const MODALIDADES = ['local', 'nuvem', 'replicacao']
 export const RPO_MS: Record<string, number> = {
   local: 24 * 3600_000,
   nuvem: 24 * 3600_000,
-  replicacao: 24 * 30_000, // 30 min — rotinas de 30 min (memória do projeto)
+  replicacao: 24 * 3600_000, // 24h conforme plano da serventia (RPO padrão de 24h)
 }
 
 export function mapAtivo(
@@ -501,6 +509,7 @@ export interface RelatorioBundle {
   modalidades_status: ModalidadeComprovacao[]
   ocorrencias: OcorrenciaRow[]
   noc: NocRow[]
+  confrontoRaw?: BackupConfrontoResponse | null
 }
 
 export async function loadRelatorioData(
@@ -510,9 +519,18 @@ export async function loadRelatorioData(
   const startIso = new Date(`${period.start}T00:00:00Z`).toISOString()
   const endIso = endOfDaySpIso(period.end)
 
-  // Consultas paralelas tolerantes a coleções com ou sem dados (somente comprovação de backup)
-  const [serventia, execucoes, ocorrencias, nocs] = await Promise.all([
+  // Consultas paralelas:
+  // 1. Dados estruturais da serventia
+  // 2. Confronto centrado no ativo (motor backend) — estado atual de conformidade / Visão Geral
+  // 3. Execuções completas (todas da organização, para mapear estado atual e Seção 3 do período)
+  // 4. Ocorrências dentro do período selecionado (Seção 4)
+  // 5. Monitoramentos externos NOC
+  const [serventia, confrontoRes, execucoes, ocorrencias, nocs] = await Promise.all([
     loadServentia(orgId).catch(() => null),
+    getBackupConfronto(orgId).catch((err) => {
+      console.warn('[relatorioData] Motor de confronto inacessível:', err)
+      return null as BackupConfrontoResponse | null
+    }),
     pb
       .collection('backup_execucoes')
       .getFullList<Record<string, any>>({
@@ -537,59 +555,199 @@ export async function loadRelatorioData(
       .catch((): Record<string, any>[] => []),
   ])
 
-  // Filtragem de execuções no período por data_email (verdade operacional, ou fallback)
-  const rows = execucoes
-    .map((e) => mapExecucao(e))
-    .filter((r) => {
-      const dataIso = r.data_email || r.created
-      if (!dataIso) return true
-      return dataIso >= startIso && dataIso <= endIso
-    })
+  // Todas as execuções mapeadas (sem filtro de período), usadas para derivar o estado atual
+  const allRows = execucoes.map((e) => mapExecucao(e))
 
-  // Agrupar por fonte (ativo) preservando ordem de primeira aparição
-  const byFonte = new Map<string, ExecucaoRow[]>()
-  for (const r of rows) {
-    const key = r.fonte || '(sem fonte)'
-    if (!byFonte.has(key)) byFonte.set(key, [])
-    byFonte.get(key)!.push(r)
-  }
+  // SEÇÃO 3: Filtragem de execuções no período por data_email (verdade operacional, ou fallback)
+  const execucoesDoPeriodo = allRows.filter((r) => {
+    const dataIso = r.data_email || r.created
+    if (!dataIso) return true
+    return dataIso >= startIso && dataIso <= endIso
+  })
+
+  // SEÇÃO 1 e SEÇÃO 2: Estado atual da proteção (independente do período de referência das Seções 3 e 4)
+  // Alinhado 100% com o motor de confronto da Visão Geral
+  let ativos: AtivoProtecao[] = []
+  let total_ativos = 0
+  let total_parciais = 0
+  let total_completos = 0
+  let pct_protegido = 0
+  let modalidades_status: ModalidadeComprovacao[] = []
 
   const now = new Date()
-  const ativos: AtivoProtecao[] = []
-  for (const [fonte, erows] of byFonte) {
-    const rotina = erows[0]?.rotina_nome || '—'
-    ativos.push(mapAtivo(fonte, rotina, erows, now))
-  }
 
-  const total_ativos = ativos.length
-  const total_parciais = ativos.filter((a) => a.parcial).length
-  const total_completos = ativos.filter((a) => a.completa).length
-  const pct_protegido = total_ativos
-    ? Math.round((ativos.reduce((s, a) => s + a.comprovadas / 3, 0) / total_ativos) * 100)
-    : 0
+  if (
+    confrontoRes &&
+    confrontoRes.ok &&
+    Array.isArray(confrontoRes.confronto) &&
+    confrontoRes.confronto.length > 0
+  ) {
+    // Alinhamento direto com o motor de confronto
+    const confList = confrontoRes.confronto
+    total_ativos = confrontoRes.totais?.total_ativos_exigidos ?? confList.length
+    total_completos =
+      confrontoRes.totais?.total_protegidos_completo ??
+      confList.filter((a) => a.status_consolidado === 'PROTEGIDO').length
+    total_parciais =
+      confrontoRes.totais?.total_parcial ??
+      confList.filter((a) => a.status_consolidado === 'PARCIAL').length
+    pct_protegido =
+      typeof confrontoRes.totais?.percentual_protegido_efetivo === 'number'
+        ? confrontoRes.totais.percentual_protegido_efetivo
+        : (confrontoRes.totais?.percentual_protegido ?? 0)
 
-  const modalidades_status = Object.keys(MODALIDADE_LABELS).map((key) => {
-    const all = rows.filter((r) => r.modalidade === key)
-    const last = all.reduce<ExecucaoRow | null>((acc, r) => {
-      if (!acc) return r
-      return (parseSpDate(r.data_email)?.getTime() ?? 0) >
-        (parseSpDate(acc.data_email)?.getTime() ?? 0)
-        ? r
-        : acc
-    }, null)
-    const d = parseSpDate(last?.data_email || null)
-    return {
-      key,
-      label: MODALIDADE_LABELS[key],
-      ultima: last?.data_email || null,
-      ultima_exec_id: last?.id || null,
-      dentro_rpo: !!d && d.getTime() >= now.getTime() - RPO_MS[key],
+    ativos = confList.map((item) => {
+      const modalList: ModalidadeComprovacao[] = Object.keys(MODALIDADE_LABELS).map((key) => {
+        const modInfo = (item.modalidades as any)?.[key]
+        const ultima = modInfo?.ultima_comprovacao || null
+        const dentro_rpo = modInfo ? Boolean(modInfo.dentro_do_rpo) : false
+        return {
+          key,
+          label: MODALIDADE_LABELS[key],
+          ultima,
+          ultima_exec_id: modInfo?.execucao_id || null,
+          dentro_rpo,
+        }
+      })
+
+      // Determinar rotina representativa
+      const rotinaNome =
+        item.modalidades?.local?.rotina_nome ||
+        item.modalidades?.nuvem?.rotina_nome ||
+        item.modalidades?.replicacao?.rotina_nome ||
+        'Rotina de Backup'
+
+      // Última execução geral comprovada deste ativo
+      let ultimaGeral: string | null = null
+      for (const m of modalList) {
+        if (m.ultima) {
+          if (!ultimaGeral || new Date(m.ultima).getTime() > new Date(ultimaGeral).getTime()) {
+            ultimaGeral = m.ultima
+          }
+        }
+      }
+
+      const comprovadasCount = item.total_atendidas ?? modalList.filter((m) => m.dentro_rpo).length
+      const exigidasCount = item.exigencias?.total_exigidas || 3
+      const isCompleta = item.status_consolidado === 'PROTEGIDO'
+      const isParcial = item.status_consolidado === 'PARCIAL'
+
+      return {
+        fonte: item.nome,
+        rotina_nome: rotinaNome,
+        modalidades: modalList,
+        comprovadas: comprovadasCount,
+        exigidas: exigidasCount,
+        parcial: isParcial,
+        completa: isCompleta,
+        ultimaExecucao: ultimaGeral,
+        tipo: item.tipo,
+        criticidade: item.criticidade,
+        status_consolidado: item.status_consolidado,
+      }
+    })
+
+    // Status geral por modalidade (agrega a última comprovação e se está dentro do RPO)
+    modalidades_status = Object.keys(MODALIDADE_LABELS).map((key) => {
+      let ultimaData: string | null = null
+      let ultimaExecId: string | null = null
+      let algumForaRpo = false
+      let temAoMenosUma = false
+
+      for (const item of confList) {
+        const mod = (item.modalidades as any)?.[key]
+        if (mod && mod.ultima_comprovacao) {
+          temAoMenosUma = true
+          if (
+            !ultimaData ||
+            new Date(mod.ultima_comprovacao).getTime() > new Date(ultimaData).getTime()
+          ) {
+            ultimaData = mod.ultima_comprovacao
+            ultimaExecId = mod.execucao_id || null
+          }
+          if (mod.status_modalidade === 'FORA_RPO') {
+            algumForaRpo = true
+          }
+        }
+      }
+
+      // Se nenhum ativo tem o mod comprovado no confronto, busca em allRows
+      if (!ultimaData) {
+        const allModRows = allRows.filter((r) => r.modalidade === key && r.status === 'sucesso')
+        const last = allModRows.reduce<ExecucaoRow | null>((acc, r) => {
+          if (!acc) return r
+          return (parseSpDate(r.data_email)?.getTime() ?? 0) >
+            (parseSpDate(acc.data_email)?.getTime() ?? 0)
+            ? r
+            : acc
+        }, null)
+        if (last) {
+          ultimaData = last.data_email
+          ultimaExecId = last.id
+        }
+      }
+
+      const d = parseSpDate(ultimaData)
+      // Dentro do RPO: segue a avaliação do confronto (se tem comprovação e nenhum ativo está FORA_RPO)
+      // ou fallback por RPO_MS
+      const rpoMs = RPO_MS[key] || 24 * 3600_000
+      const dentro_rpo = temAoMenosUma
+        ? !algumForaRpo
+        : Boolean(d && d.getTime() >= now.getTime() - rpoMs)
+
+      return {
+        key,
+        label: MODALIDADE_LABELS[key],
+        ultima: ultimaData,
+        ultima_exec_id: ultimaExecId,
+        dentro_rpo,
+      }
+    })
+  } else {
+    // Fallback: caso o motor de confronto backend falhe, usar allRows (execuções mais recentes sem filtro de período)
+    const byFonte = new Map<string, ExecucaoRow[]>()
+    for (const r of allRows) {
+      const key = r.fonte || '(sem fonte)'
+      if (!byFonte.has(key)) byFonte.set(key, [])
+      byFonte.get(key)!.push(r)
     }
-  })
+
+    for (const [fonte, erows] of byFonte) {
+      const rotina = erows[0]?.rotina_nome || '—'
+      ativos.push(mapAtivo(fonte, rotina, erows, now))
+    }
+
+    total_ativos = ativos.length
+    total_parciais = ativos.filter((a) => a.parcial).length
+    total_completos = ativos.filter((a) => a.completa).length
+    pct_protegido = total_ativos
+      ? Math.round((ativos.reduce((s, a) => s + a.comprovadas / 3, 0) / total_ativos) * 100)
+      : 0
+
+    modalidades_status = Object.keys(MODALIDADE_LABELS).map((key) => {
+      const all = allRows.filter((r) => r.modalidade === key)
+      const last = all.reduce<ExecucaoRow | null>((acc, r) => {
+        if (!acc) return r
+        return (parseSpDate(r.data_email)?.getTime() ?? 0) >
+          (parseSpDate(acc.data_email)?.getTime() ?? 0)
+          ? r
+          : acc
+      }, null)
+      const d = parseSpDate(last?.data_email || null)
+      const rpoMs = RPO_MS[key] || 24 * 3600_000
+      return {
+        key,
+        label: MODALIDADE_LABELS[key],
+        ultima: last?.data_email || null,
+        ultima_exec_id: last?.id || null,
+        dentro_rpo: !!d && d.getTime() >= now.getTime() - rpoMs,
+      }
+    })
+  }
 
   return {
     serventia,
-    execucoes: rows,
+    execucoes: execucoesDoPeriodo,
     ativos,
     total_ativos,
     total_parciais,
@@ -598,5 +756,6 @@ export async function loadRelatorioData(
     modalidades_status,
     ocorrencias: ocorrencias.map(mapOcorrencia),
     noc: nocs.map(mapNoc),
+    confrontoRaw: confrontoRes,
   }
 }

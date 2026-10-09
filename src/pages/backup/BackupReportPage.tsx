@@ -330,6 +330,11 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                   (prova = comprovante com data operacional <em>data_email</em>) divididas pelas 3
                   modalidades possíveis (Local, Nuvem, Replicação).
                 </p>
+                <p className="text-[10px] text-slate-500 italic bg-slate-50 border border-slate-200/80 rounded px-2.5 py-1">
+                  Nota metodológica: Status reflete a comprovação mais recente por modalidade (data
+                  do comprovante, fuso de São Paulo), independentemente do período de referência das
+                  Seções 3 e 4.
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="border border-slate-200 rounded-lg p-3 flex flex-col justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
