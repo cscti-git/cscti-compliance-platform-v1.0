@@ -1880,7 +1880,7 @@ routerAdd(
       // -------------------------------------------------------------
       const normalizarTexto = (str) => {
         if (str === null || str === undefined) return ''
-        return String(str).trim().toLowerCase().replace(/\s+/g, ' ')
+        return String(str).trim().toLowerCase().replace(/\\/g, '/').replace(/\s+/g, ' ')
       }
 
       const extrairAliases = (campoAliases) => {
@@ -2673,8 +2673,33 @@ routerAdd(
               }
             }
 
+            // d) Detecção de 'backup_copy', 'copy job' e 'to cloud' no assunto / nome do job / observação
+            // (mesma precedência de backup_confronto.js: excluindo assinatura "[Veeam Backup & Replication ...]")
+            if (!modInferida) {
+              const textoAnalise = [assunto || '', jobName || '', obsExecucao || '']
+                .join(' ')
+                .replace(/backup\s*&\s*replication/gi, '')
+                .toLowerCase()
+
+              if (
+                /\b(?:backup_copy|copy job)\b/i.test(textoAnalise) ||
+                textoAnalise.includes('to cloud')
+              ) {
+                modInferida = 'nuvem'
+              }
+            }
+
             if (modInferida) {
               modalidadesComprovadasPorEsta.add(modInferida)
+              if (modInferida === 'nuvem' && adaptadorUsado === 'VEEAM_HTML') {
+                const obsAtual = execRec.getString('observacao') || obsExecucao || ''
+                if (!obsAtual.startsWith('Veeam backup_copy:')) {
+                  const novaObs = obsAtual.startsWith('Veeam ')
+                    ? obsAtual.replace(/^Veeam [^:]+:/, 'Veeam backup_copy:')
+                    : `Veeam backup_copy: ${obsAtual}`
+                  execRec.set('observacao', novaObs)
+                }
+              }
             }
           }
 
