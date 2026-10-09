@@ -55,6 +55,161 @@ routerAdd(
       const fonteId = body.fonteId || ''
       const tipoEvidencia = body.tipo || 'upload_manual' // 'upload_manual' | 'e_mail'
       let nomeArquivoAnexo = String(body.nome_arquivo || '').trim()
+      const bodyDataEmail = body.data_email ? String(body.data_email).trim() : ''
+
+      // -------------------------------------------------------------
+      // EXTRAÇÃO DEFENSIVA DE DATA DO E-MAIL (COMPROVANTE FACTUAL)
+      // Ordem estrita de fallbacks:
+      // (1) Header Date: RFC 2822 no bloco de cabeçalhos EML (antes da 1ª linha em branco)
+      // (2) body.data_email vindo do agente local / integração
+      // (3) Carimbo no conteúdo ("Created ... at", "Gerado em", dd/mm/aaaa hh:mm, extenso PT-BR)
+      // (4) Data no assunto
+      // Se não determinável: null (NUNCA inventar data)
+      // -------------------------------------------------------------
+      const parseDateToIsoDefensiva = (str) => {
+        if (!str) return null
+        try {
+          const d = new Date(str)
+          if (!isNaN(d.getTime())) {
+            return d.toISOString()
+          }
+        } catch (_) {}
+        return null
+      }
+
+      const parseExtensoPtBrParaIso = (texto) => {
+        if (!texto) return null
+        const meses = {
+          janeiro: 0,
+          fevereiro: 1,
+          marco: 2,
+          março: 2,
+          abril: 3,
+          maio: 4,
+          junho: 5,
+          julho: 6,
+          agosto: 7,
+          setembro: 8,
+          outubro: 9,
+          novembro: 10,
+          dezembro: 11,
+        }
+        const regexExtenso =
+          /\b(\d{1,2})\s+de\s+([A-Za-zçÇ]+)\s+de\s+(\d{4})(?:[,\s]+(?:às|as)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?/i
+        const m = String(texto).match(regexExtenso)
+        if (m) {
+          const dia = parseInt(m[1], 10)
+          const mesNome = m[2].toLowerCase()
+          const ano = parseInt(m[3], 10)
+          const mes = meses[mesNome]
+          if (mes !== undefined && dia >= 1 && dia <= 31 && ano >= 2000 && ano <= 2100) {
+            const hora = m[4] ? parseInt(m[4], 10) : 12
+            const min = m[5] ? parseInt(m[5], 10) : 0
+            const sec = m[6] ? parseInt(m[6], 10) : 0
+            // Tratar horário local brasileiro como UTC-3 (+3h para UTC)
+            const utcDate = new Date(Date.UTC(ano, mes, dia, hora + 3, min, sec))
+            if (!isNaN(utcDate.getTime())) {
+              return utcDate.toISOString()
+            }
+          }
+        }
+        return null
+      }
+
+      const extrairDataEmailDefensiva = (conteudoTexto, paramDataEmail, assuntoTexto) => {
+        // Fallback 1: Header Date: do bloco de cabeçalhos EML (antes da primeira linha em branco)
+        if (conteudoTexto) {
+          const splitHeaders = String(conteudoTexto).split(/\r?\n\r?\n/)
+          const headerBlock = splitHeaders[0] || ''
+          const headerMatch = headerBlock.match(
+            /(?:^|[\r\n])Date\s*:\s*([A-Za-z]{3},\s*\d{1,2}\s+[A-Za-z]{3}\s+\d{4}\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s+[+-]\d{4}|\s+[A-Z]{1,4})?)/i,
+          )
+          if (headerMatch && headerMatch[1]) {
+            const iso = parseDateToIsoDefensiva(headerMatch[1].trim())
+            if (iso) return iso
+          }
+
+          // Header Date com formato ISO ou simplificado no bloco de cabeçalhos
+          const headerIsoMatch = headerBlock.match(
+            /(?:^|[\r\n])Date\s*:\s*(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)/i,
+          )
+          if (headerIsoMatch && headerIsoMatch[1]) {
+            const iso = parseDateToIsoDefensiva(headerIsoMatch[1].trim())
+            if (iso) return iso
+          }
+        }
+
+        // Fallback 2: body.data_email se enviado estruturado (pelo agente local ou formulário)
+        if (paramDataEmail) {
+          const isoBody = parseDateToIsoDefensiva(paramDataEmail)
+          if (isoBody) return isoBody
+        }
+
+        // Fallback 3: Carimbo no conteúdo
+        if (conteudoTexto) {
+          const s = String(conteudoTexto)
+
+          // 3a) "Created ... at ..." ou "Gerado em ..." com ISO/RFC
+          const createdIsoMatch = s.match(
+            /(?:created|gerado\s+em|data(?:\s+de\s+criação|\s+de\s+execução)?)\s*[:=\s]+["']?(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)/i,
+          )
+          if (createdIsoMatch && createdIsoMatch[1]) {
+            const iso = parseDateToIsoDefensiva(createdIsoMatch[1].trim())
+            if (iso) return iso
+          }
+
+          // 3b) Data no padrão brasileiro dd/mm/aaaa hh:mm(:ss) presente no conteúdo
+          const brMatch = s.match(
+            /\b(\d{2})\/(\d{2})\/(\d{4})\s+(?:às\s+|as\s+)?(\d{2}):(\d{2})(?::(\d{2}))?\b/,
+          )
+          if (brMatch) {
+            const d = parseInt(brMatch[1], 10)
+            const m = parseInt(brMatch[2], 10) - 1
+            const y = parseInt(brMatch[3], 10)
+            const h = parseInt(brMatch[4], 10)
+            const min = parseInt(brMatch[5], 10)
+            const sec = brMatch[6] ? parseInt(brMatch[6], 10) : 0
+            if (d >= 1 && d <= 31 && m >= 0 && m <= 11 && y >= 2000 && y <= 2100) {
+              // Fuso de São Paulo / Brasília (UTC-3) -> +3 horas para UTC
+              const utcDate = new Date(Date.UTC(y, m, d, h + 3, min, sec))
+              if (!isNaN(utcDate.getTime())) {
+                return utcDate.toISOString()
+              }
+            }
+          }
+
+          // 3c) Data por extenso em Português no conteúdo (ex: 12 de outubro de 2026 às 17:45)
+          const extensoIso = parseExtensoPtBrParaIso(s)
+          if (extensoIso) return extensoIso
+        }
+
+        // Fallback 4: Data no assunto (ex.: "ANALISE PREVENTIVA DIARIA DE BACKUP 05/10/2026")
+        if (assuntoTexto) {
+          const sAssunto = String(assuntoTexto)
+          const dataAssuntoBr = sAssunto.match(
+            /\b(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})(?:\s+(?:às\s+|as\s+)?(\d{2}):(\d{2}))?\b/,
+          )
+          if (dataAssuntoBr) {
+            const d = parseInt(dataAssuntoBr[1], 10)
+            const m = parseInt(dataAssuntoBr[2], 10) - 1
+            const y = parseInt(dataAssuntoBr[3], 10)
+            const h = dataAssuntoBr[4] ? parseInt(dataAssuntoBr[4], 10) : 12
+            const min = dataAssuntoBr[5] ? parseInt(dataAssuntoBr[5], 10) : 0
+            if (d >= 1 && d <= 31 && m >= 0 && m <= 11 && y >= 2000 && y <= 2100) {
+              const utcDate = new Date(Date.UTC(y, m, d, h + 3, min, 0))
+              if (!isNaN(utcDate.getTime())) {
+                return utcDate.toISOString()
+              }
+            }
+          }
+
+          const extensoAssunto = parseExtensoPtBrParaIso(sAssunto)
+          if (extensoAssunto) return extensoAssunto
+        }
+
+        // Se nada determinável de forma factual: null (NUNCA inventar data)
+        return null
+      }
 
       // -------------------------------------------------------------
       // DETECÇÃO DEFENSIVA DE CONTEÚDO BASE64 NO BACKEND
@@ -315,6 +470,9 @@ routerAdd(
       const evidenciasCol = $app.findCollectionByNameOrId('backup_evidencias')
       const nowIso = new Date().toISOString()
 
+      // Extração factual da data do e-mail com fallbacks estritos
+      const dataEmailCalculada = extrairDataEmailDefensiva(rawConteudo, bodyDataEmail, assunto)
+
       if (!evidenciaRec) {
         isNovaEvidencia = true
         evidenciaRec = new Record(evidenciasCol)
@@ -327,7 +485,13 @@ routerAdd(
         evidenciaRec.set('data_recebida', nowIso)
         evidenciaRec.set('hash_conteudo', hashConteudo)
         evidenciaRec.set('conteudo', rawConteudo)
+        if (dataEmailCalculada) {
+          evidenciaRec.set('data_email', dataEmailCalculada)
+        }
         evidenciaRec.set('status_processamento', 'pendente')
+        $app.save(evidenciaRec)
+      } else if (!evidenciaRec.getString('data_email') && dataEmailCalculada) {
+        evidenciaRec.set('data_email', dataEmailCalculada)
         $app.save(evidenciaRec)
       }
 
@@ -1835,6 +1999,12 @@ routerAdd(
       execRec.set('tamanho_bytes', tamanhoBytes)
       execRec.set('tamanho_formatado', tamanhoFormatado)
       execRec.set('destino', destinoDetectado)
+
+      // Propagar data_email factual para a execução vinculada (prioridade absoluta para RPO e ordenação)
+      const dataEmailParaExec = dataEmailCalculada || evidenciaRec.getString('data_email') || null
+      if (dataEmailParaExec) {
+        execRec.set('data_email', dataEmailParaExec)
+      }
 
       let obsExecucao = ''
       if (adaptadorUsado === 'ACRONIS_PDF') {
