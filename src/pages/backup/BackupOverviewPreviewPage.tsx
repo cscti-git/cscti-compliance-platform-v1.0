@@ -926,224 +926,231 @@ export const BackupOverviewPreviewPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. LINHA DE 4 KPIS (Cards brancos com círculo de ícone colorido à esquerda) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Total de Ativos Protegidos (Database verde) */}
-        <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-              <Database className="w-6 h-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs font-semibold text-slate-500 block">
-                Total de Ativos Protegidos
-              </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
-                  {totalAtivosProtegidos}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-                de {totalAtivosInventariados} ativos inventariados
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* KPI 2: Execuções Realizadas (Check verde) */}
-        <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-6 h-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs font-semibold text-slate-500 block">
-                Execuções Realizadas
-              </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
-                  {totalExecucoes}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-                registradas no histórico
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* KPI 3: Execuções com Alertas (Alerta âmbar) */}
-        <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs font-semibold text-slate-500 block">
-                Execuções com Alertas
-              </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
-                  {execucoesComAlertas}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-                {pctAlertas}% do total
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* KPI 4: Execuções com Falha (X vermelho) */}
-        <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-              <XCircle className="w-6 h-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs font-semibold text-slate-500 block">
-                Execuções com Falha
-              </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
-                  {execucoesComFalha}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-                {pctFalhas}% do total
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 3. LINHA DE 3 PAINÉIS ANALÍTICOS (Linguagem idêntica aos gráficos homologados do Inventário) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Painel A: Status das Execuções (Donut) */}
-        <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-5 sm:p-6 flex flex-col justify-between min-h-[250px]">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 mb-4">Status das Execuções</h3>
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 py-0.5">
-              <div className="shrink-0 flex items-center justify-center">
-                <SvgDonutChart
-                  data={statusExecucoesData.map((s) => ({
-                    label: s.label,
-                    value: s.value,
-                    color: s.color,
-                  }))}
-                  totalLabel={String(totalExecucoes)}
-                  subLabel="Execuções"
-                  size={120}
-                  strokeWidth={18}
-                />
-              </div>
-
-              {/* Legenda com contagem e percentual real */}
-              <div className="flex-1 w-full space-y-2.5 text-xs">
-                {statusExecucoesData.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between gap-3 text-slate-700 hover:text-slate-900 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 pr-1">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-xs text-slate-600 truncate" title={item.label}>
-                        {item.label}
-                      </span>
-                    </div>
-                    <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1 text-right">
-                      {item.value}{' '}
-                      <span className="font-normal text-slate-500">({item.percent}%)</span>
+      {/* ESTRUTURA PRINCIPAL (ALINHADA COM O ESBOÇO ORIGINAL DO USUÁRIO):
+          - Coluna esquerda (largura flexível): 4 KPIs no topo, depois 3 painéis analíticos, depois filtros e tabela de execuções
+          - Coluna direita (~280-320px): Sidebar contínua alinhada no topo com os 4 KPIs (Próximas Execuções, Últimas Ocorrências, Ações Rápidas)
+      */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+        {/* COLUNA ESQUERDA: KPIs + Gráficos Analíticos + Filtros + Tabela */}
+        <div className="xl:col-span-9 space-y-5 min-w-0">
+          {/* 2. LINHA DE 4 KPIS (Cards brancos com círculo de ícone colorido à esquerda, compactos para caber em 4 colunas) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* KPI 1: Total de Ativos Protegidos (Database verde) */}
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
+              <CardContent className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                  <Database className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                    Total de Ativos Protegidos
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
+                      {totalAtivosProtegidos}
                     </span>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
+                    de {totalAtivosInventariados} ativos inventariados
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Painel B: Cobertura de Proteção por Tipo de Ativo (Barras horizontais reais) */}
-        <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-5 sm:p-6 flex flex-col justify-between min-h-[250px]">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 mb-3">
-              Cobertura de Proteção por Tipo de Ativo
-            </h3>
-            <div className="my-1">
-              <HorizontalStackedBar categories={coberturaPorTipoAtivo} />
-            </div>
-          </div>
-          {/* Legenda inferior */}
-          <div className="pt-3 mt-2 border-t border-slate-100 flex items-center justify-center gap-4 text-[11px] text-slate-600 flex-wrap">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" /> Protegidos
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400" /> Parciais
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-500" /> Sem proteção
-            </span>
-          </div>
-        </Card>
-
-        {/* Painel C: Conformidade das Rotinas (Donut real) */}
-        <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-5 sm:p-6 flex flex-col justify-between min-h-[250px]">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 mb-4">Conformidade das Rotinas</h3>
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 py-0.5">
-              <div className="shrink-0 flex items-center justify-center">
-                <SvgDonutChart
-                  data={conformidadeRotinas.segments.map((s) => ({
-                    label: s.label,
-                    value: s.value,
-                    color: s.color,
-                  }))}
-                  totalLabel={`${conformidadeRotinas.pctConforme}%`}
-                  subLabel="Conforme"
-                  size={120}
-                  strokeWidth={18}
-                />
-              </div>
-
-              {/* Legenda com NOME, QUANTIDADE REAL e PERCENTUAL */}
-              <div className="flex-1 w-full space-y-2.5 text-xs">
-                {conformidadeRotinas.segments.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between gap-3 text-slate-700 hover:text-slate-900 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 pr-1">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-xs text-slate-600 truncate" title={item.label}>
-                        {item.label}
-                      </span>
-                    </div>
-                    <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1 text-right">
-                      {item.percent}%{' '}
-                      <span className="font-normal text-slate-500">({item.value})</span>
+            {/* KPI 2: Execuções Realizadas (Check verde) */}
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
+              <CardContent className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                    Execuções Realizadas
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
+                      {totalExecucoes}
                     </span>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="pt-3 mt-2 border-t border-slate-100 text-center text-xs text-slate-500 font-medium">
-            Total de rotinas:{' '}
-            <strong className="text-slate-800">{conformidadeRotinas.total}</strong>
-          </div>
-        </Card>
-      </div>
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
+                    registradas no histórico
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
-      {/* 4 & 5 & 6. ESTRUTURA PRINCIPAL: COLUNA ESQUERDA (Filtros + Tabela) + COLUNA DIREITA (Próximas Execuções, Ocorrências, Ações) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* COLUNA ESQUERDA (8 ou 9 colunas) */}
-        <div className="lg:col-span-8 xl:col-span-9 space-y-4">
+            {/* KPI 3: Execuções com Alertas (Alerta âmbar) */}
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
+              <CardContent className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                    Execuções com Alertas
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
+                      {execucoesComAlertas}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
+                    {pctAlertas}% do total
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* KPI 4: Execuções com Falha (X vermelho) */}
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
+              <CardContent className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <XCircle className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                    Execuções com Falha
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
+                      {execucoesComFalha}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
+                    {pctFalhas}% do total
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 3. LINHA DE 3 PAINÉIS ANALÍTICOS (Linguagem idêntica aos gráficos homologados do Inventário) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Painel A: Status das Execuções (Donut) */}
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-4 sm:p-5 flex flex-col justify-between min-h-[250px]">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 mb-3 sm:mb-4">
+                  Status das Execuções
+                </h3>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 py-0.5">
+                  <div className="shrink-0 flex items-center justify-center">
+                    <SvgDonutChart
+                      data={statusExecucoesData.map((s) => ({
+                        label: s.label,
+                        value: s.value,
+                        color: s.color,
+                      }))}
+                      totalLabel={String(totalExecucoes)}
+                      subLabel="Execuções"
+                      size={110}
+                      strokeWidth={16}
+                    />
+                  </div>
+
+                  {/* Legenda com contagem e percentual real */}
+                  <div className="flex-1 w-full space-y-2 text-xs">
+                    {statusExecucoesData.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-2 text-slate-700 hover:text-slate-900 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 pr-1">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="text-xs text-slate-600 truncate" title={item.label}>
+                            {item.label}
+                          </span>
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1 text-right">
+                          {item.value}{' '}
+                          <span className="font-normal text-slate-500">({item.percent}%)</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Painel B: Cobertura de Proteção por Tipo de Ativo (Barras horizontais reais) */}
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-4 sm:p-5 flex flex-col justify-between min-h-[250px]">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 mb-3">
+                  Cobertura de Proteção por Tipo de Ativo
+                </h3>
+                <div className="my-1">
+                  <HorizontalStackedBar categories={coberturaPorTipoAtivo} />
+                </div>
+              </div>
+              {/* Legenda inferior */}
+              <div className="pt-3 mt-2 border-t border-slate-100 flex items-center justify-center gap-3 text-[11px] text-slate-600 flex-wrap">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Protegidos
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Parciais
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Sem proteção
+                </span>
+              </div>
+            </Card>
+
+            {/* Painel C: Conformidade das Rotinas (Donut real) */}
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-4 sm:p-5 flex flex-col justify-between min-h-[250px]">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 mb-3 sm:mb-4">
+                  Conformidade das Rotinas
+                </h3>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 py-0.5">
+                  <div className="shrink-0 flex items-center justify-center">
+                    <SvgDonutChart
+                      data={conformidadeRotinas.segments.map((s) => ({
+                        label: s.label,
+                        value: s.value,
+                        color: s.color,
+                      }))}
+                      totalLabel={`${conformidadeRotinas.pctConforme}%`}
+                      subLabel="Conforme"
+                      size={110}
+                      strokeWidth={16}
+                    />
+                  </div>
+
+                  {/* Legenda com NOME, QUANTIDADE REAL e PERCENTUAL */}
+                  <div className="flex-1 w-full space-y-2 text-xs">
+                    {conformidadeRotinas.segments.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-2 text-slate-700 hover:text-slate-900 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 pr-1">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="text-xs text-slate-600 truncate" title={item.label}>
+                            {item.label}
+                          </span>
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1 text-right">
+                          {item.percent}%{' '}
+                          <span className="font-normal text-slate-500">({item.value})</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="pt-3 mt-2 border-t border-slate-100 text-center text-xs text-slate-500 font-medium">
+                Total de rotinas:{' '}
+                <strong className="text-slate-800">{conformidadeRotinas.total}</strong>
+              </div>
+            </Card>
+          </div>
+
           {/* BARRA DE FILTROS */}
           <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3">
             <div className="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between">
@@ -1501,8 +1508,8 @@ export const BackupOverviewPreviewPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* COLUNA LATERAL DIREITA: sticky ~280-300px */}
-        <div className="lg:col-span-4 xl:col-span-3 space-y-4 lg:sticky lg:top-4">
+        {/* COLUNA LATERAL DIREITA: sidebar contínua (~280-320px) alinhada no topo com os KPIs */}
+        <div className="xl:col-span-3 space-y-4">
           {/* Card 1: Próximas Execuções */}
           <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden">
             <div className="p-3.5 border-b border-slate-100 flex items-center justify-between">
