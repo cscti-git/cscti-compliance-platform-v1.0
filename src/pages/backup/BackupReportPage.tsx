@@ -71,15 +71,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 function statusIcon(status: string) {
   const s = (status || '').toLowerCase()
-  if (s === 'sucesso' || s === 'conforme' || s === 'ok') return <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-  if (s === 'falha' || s === 'nao_conforme' || s === 'erro') return <XCircle className="w-4 h-4 text-red-600" />
-  if (s === 'alerta' || s === 'atencao' || s === 'parcial') return <AlertTriangle className="w-4 h-4 text-amber-600" />
+  if (s === 'sucesso' || s === 'conforme' || s === 'ok')
+    return <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+  if (s === 'falha' || s === 'nao_conforme' || s === 'erro')
+    return <XCircle className="w-4 h-4 text-red-600" />
+  if (s === 'alerta' || s === 'atencao' || s === 'parcial')
+    return <AlertTriangle className="w-4 h-4 text-amber-600" />
   return <AlertCircle className="w-4 h-4 text-slate-400" />
 }
 
 export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgIdProp }) => {
-  const { currentOrganization } = useAuth()
-  const orgId = orgIdProp || currentOrganization?.id || ''
+  const { organization } = useAuth()
+  const orgId = orgIdProp || organization?.id || ''
   const [period, setPeriod] = useState<ReportPeriod>(() => buildDefaultPeriod())
   const [data, setData] = useState<RelatorioBundle | null>(null)
   const [loading, setLoading] = useState(false)
@@ -136,7 +139,8 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
   }, [data, pageSize])
 
   const periodoTexto = useMemo(
-    () => `${formatSpDateOnly(`${period.start}T12:00:00Z`)} a ${formatSpDateOnly(`${period.end}T12:00:00Z`)}`,
+    () =>
+      `${formatSpDateOnly(`${period.start}T12:00:00Z`)} a ${formatSpDateOnly(`${period.end}T12:00:00Z`)}`,
     [period],
   )
 
@@ -158,7 +162,7 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
             </Button>
           </Link>
         </div>
-    </div>
+      </div>
     )
   }
 
@@ -169,12 +173,18 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
         <div className="max-w-[880px] mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Link to="/backup">
-              <Button variant="ghost" size="sm" className="text-xs gap-1 text-slate-600 hover:text-slate-900">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs gap-1 text-slate-600 hover:text-slate-900"
+              >
                 <ArrowLeft className="w-3.5 h-3.5" /> Módulo Backup
               </Button>
             </Link>
             <span className="text-slate-300">|</span>
-            <span className="text-xs font-semibold text-slate-600">Relatório Comprobatório de Backup</span>
+            <span className="text-xs font-semibold text-slate-600">
+              Relatório Comprobatório de Backup
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
@@ -207,8 +217,18 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                 className="h-8 w-[135px] text-xs"
               />
             </div>
-            <Button variant="outline" size="sm" className="text-xs gap-1" onClick={load} disabled={loading}>
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1"
+              onClick={load}
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
               Atualizar
             </Button>
             <Button
@@ -225,7 +245,10 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
 
       {/* Folha A4 */}
       <div className="max-w-[880px] mx-auto px-4 py-6 print:p-0 print:max-w-none">
-        <div id="relatorio-a4" className="bg-white shadow-sm print:shadow-none border border-slate-200 print:border-0 print:w-full px-8 py-6 print:px-0 print:py-0">
+        <div
+          id="relatorio-a4"
+          className="bg-white shadow-sm print:shadow-none border border-slate-200 print:border-0 print:w-full px-8 py-6 print:px-0 print:py-0"
+        >
           {loading && !data && (
             <div className="space-y-3 p-6">
               <Skeleton className="h-8 w-2/3" />
@@ -274,7 +297,8 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                     {periodoTexto}
                   </p>
                   <p>
-                    <span className="font-semibold text-slate-800">Data de emissão:</span> {emissorTexto}
+                    <span className="font-semibold text-slate-800">Data de emissão:</span>{' '}
+                    {emissorTexto}
                   </p>
                 </div>
               </header>
@@ -294,7 +318,9 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                       Proteção efetiva
                     </span>
-                    <span className="text-2xl font-extrabold text-[#0B2545]">{data.pct_protegido}%</span>
+                    <span className="text-2xl font-extrabold text-[#0B2545]">
+                      {data.pct_protegido}%
+                    </span>
                     <span className="text-[10px] text-slate-500">protegido perante a rotina</span>
                   </div>
                   <div className="border border-slate-200 rounded-lg p-3">
@@ -314,7 +340,10 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                       {data.modalidades_status.map((m) => {
                         const Icon = MODALIDADES.find((x) => x.key === m.key)?.icon || Server
                         return (
-                          <div key={m.key} className="flex items-center justify-between gap-2 text-[11px]">
+                          <div
+                            key={m.key}
+                            className="flex items-center justify-between gap-2 text-[11px]"
+                          >
                             <span className="flex items-center gap-1 text-slate-700 font-medium">
                               <Icon className="w-3.5 h-3.5 text-slate-500" /> {m.label}
                             </span>
@@ -347,17 +376,26 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                   <table className="w-full text-[11px] border border-slate-200">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700">
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Ativo (Fonte)</th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Rotina</th>
+                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          Ativo (Fonte)
+                        </th>
+                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          Rotina
+                        </th>
                         {MODALIDADES.map((m) => (
-                          <th key={m.key} className="text-center px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          <th
+                            key={m.key}
+                            className="text-center px-2 py-1.5 border-b border-slate-200 font-semibold"
+                          >
                             {m.label}
                           </th>
                         ))}
                         <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
                           Últ. execução comprovada
                         </th>
-                        <th className="text-center px-2 py-1.5 border-b border-slate-200 font-semibold">Status</th>
+                        <th className="text-center px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          Status
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -374,7 +412,9 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                               )}
                             </td>
                           ))}
-                          <td className="px-2 py-1.5 text-slate-600">{formatSpDateTime(a.ultimaExecucao)}</td>
+                          <td className="px-2 py-1.5 text-slate-600">
+                            {formatSpDateTime(a.ultimaExecucao)}
+                          </td>
                           <td className="px-2 py-1.5 text-center">
                             {a.completa ? (
                               <span className="text-emerald-700 font-semibold">Completa</span>
@@ -397,12 +437,14 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                   3. Execuções do Período
                 </h2>
                 <p className="text-[11px] text-slate-600">
-                  Lista cronológica (mais recente primeiro) das execuções comprovadas pelo comprovante
-                  (data operacional <em>data_email</em>, fuso de São Paulo). Execuções excluídas com
-                  justificativa aparecem marcadas.
+                  Lista cronológica (mais recente primeiro) das execuções comprovadas pelo
+                  comprovante (data operacional <em>data_email</em>, fuso de São Paulo). Execuções
+                  excluídas com justificativa aparecem marcadas.
                 </p>
                 {data.execucoes.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">Nenhuma execução registrada no período.</p>
+                  <p className="text-xs text-slate-500 italic">
+                    Nenhuma execução registrada no período.
+                  </p>
                 ) : (
                   <>
                     <table className="w-full text-[11px] border border-slate-200">
@@ -411,11 +453,21 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                           <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
                             Data do comprovante
                           </th>
-                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Rotina</th>
-                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Fonte</th>
-                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Modalidade</th>
-                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Status</th>
-                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Evidência</th>
+                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                            Rotina
+                          </th>
+                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                            Fonte
+                          </th>
+                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                            Modalidade
+                          </th>
+                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                            Status
+                          </th>
+                          <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                            Evidência
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -424,7 +476,9 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                             key={e.id}
                             className={`border-b border-slate-100 ${e.justificativa_exclusao ? 'bg-red-50/50 line-through opacity-70' : ''}`}
                           >
-                            <td className="px-2 py-1.5 text-slate-700">{formatSpDateTime(e.data_email)}</td>
+                            <td className="px-2 py-1.5 text-slate-700">
+                              {formatSpDateTime(e.data_email)}
+                            </td>
                             <td className="px-2 py-1.5 text-slate-700">{e.rotina_nome || '—'}</td>
                             <td className="px-2 py-1.5 text-slate-600">{e.fonte || '—'}</td>
                             <td className="px-2 py-1.5 text-slate-600">
@@ -452,7 +506,13 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                           Página {page + 1} de {totalPages} · {data.execucoes.length} execuções
                         </span>
                         <div className="flex gap-1.5">
-                          <Button variant="outline" size="sm" className="text-xs" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            disabled={page === 0}
+                            onClick={() => setPage((p) => Math.max(0, p - 1))}
+                          >
                             Anterior
                           </Button>
                           <Button
@@ -477,11 +537,16 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                   4. Ocorrências do Período
                 </h2>
                 {data.ocorrencias.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">Nenhuma ocorrência registrada no período.</p>
+                  <p className="text-xs text-slate-500 italic">
+                    Nenhuma ocorrência registrada no período.
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     {data.ocorrencias.map((o) => (
-                      <div key={o.id} className="border border-slate-200 rounded-lg p-2.5 space-y-1">
+                      <div
+                        key={o.id}
+                        className="border border-slate-200 rounded-lg p-2.5 space-y-1"
+                      >
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-800">
                             {o.status === 'resolvida' ? (
@@ -492,7 +557,9 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                             {OCORRENCIA_STATUS_LABELS[o.status] || o.status} · {o.origem_label}
                             {o.fonte ? ` · ${o.fonte}` : ''}
                           </span>
-                          <span className="text-[10px] text-slate-500">{formatSpDateTime(o.created)}</span>
+                          <span className="text-[10px] text-slate-500">
+                            {formatSpDateTime(o.created)}
+                          </span>
                         </div>
                         <p className="text-[11px] text-slate-700">
                           <span className="font-semibold">Fato real:</span> {o.fato_real}
@@ -500,7 +567,7 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                         <p className="text-[11px] text-slate-600">
                           <span className="font-semibold">Parecer:</span> {o.parecer}
                         </p>
-                      </th>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -518,7 +585,10 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                 ) : (
                   <div className="space-y-2">
                     {data.noc.map((n) => (
-                      <div key={n.id} className="border border-slate-200 rounded-lg p-2.5 space-y-1.5">
+                      <div
+                        key={n.id}
+                        className="border border-slate-200 rounded-lg p-2.5 space-y-1.5"
+                      >
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1.5">
                             <UserCheck className="w-3.5 h-3.5 text-purple-700" />
@@ -527,24 +597,33 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                           </span>
                           {n.convergencia === 'convergente' ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
-                              <ShieldCheck className="w-3 h-3" /> NOC concorda com a análise do sistema
+                              <ShieldCheck className="w-3 h-3" /> NOC concorda com a análise do
+                              sistema
                             </span>
                           ) : n.convergencia === 'divergente' ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
-                              <ShieldAlert className="w-3 h-3" /> Divergência detectada (registrada; veredito do
-                              sistema prevalece)
+                              <ShieldAlert className="w-3 h-3" /> Divergência detectada (registrada;
+                              veredito do sistema prevalece)
                             </span>
                           ) : (
-                            <span className="text-[10px] text-slate-400">Convergência não avaliada</span>
+                            <span className="text-[10px] text-slate-400">
+                              Convergência não avaliada
+                            </span>
                           )}
                         </div>
                         {n.vms.length > 0 && (
                           <table className="w-full text-[10px] border border-slate-100">
                             <thead>
                               <tr className="bg-slate-50 text-slate-600">
-                                <th className="text-left px-2 py-1 border-b border-slate-100">VM</th>
-                                <th className="text-left px-2 py-1 border-b border-slate-100">Status NOC</th>
-                                <th className="text-left px-2 py-1 border-b border-slate-100">Ações do técnico</th>
+                                <th className="text-left px-2 py-1 border-b border-slate-100">
+                                  VM
+                                </th>
+                                <th className="text-left px-2 py-1 border-b border-slate-100">
+                                  Status NOC
+                                </th>
+                                <th className="text-left px-2 py-1 border-b border-slate-100">
+                                  Ações do técnico
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -570,22 +649,36 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                   6. Trilha de Auditoria do Período
                 </h2>
                 {data.audit.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">Nenhum evento de auditoria no período.</p>
+                  <p className="text-xs text-slate-500 italic">
+                    Nenhum evento de auditoria no período.
+                  </p>
                 ) : (
                   <table className="w-full text-[11px] border border-slate-200">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700">
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Data/Hora</th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Ação</th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Recurso</th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Usuário</th>
-                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">Resumo</th>
+                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          Data/Hora
+                        </th>
+                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          Ação
+                        </th>
+                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          Recurso
+                        </th>
+                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          Usuário
+                        </th>
+                        <th className="text-left px-2 py-1.5 border-b border-slate-200 font-semibold">
+                          Resumo
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.audit.map((a) => (
                         <tr key={a.id} className="border-b border-slate-100">
-                          <td className="px-2 py-1.5 text-slate-600">{formatSpDateTime(a.created)}</td>
+                          <td className="px-2 py-1.5 text-slate-600">
+                            {formatSpDateTime(a.created)}
+                          </td>
                           <td className="px-2 py-1.5 text-slate-700 font-medium">{a.acao}</td>
                           <td className="px-2 py-1.5 text-slate-600">{a.recurso}</td>
                           <td className="px-2 py-1.5 text-slate-600">{a.usuario || '—'}</td>
@@ -602,8 +695,8 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                 <div className="space-y-0.5">
                   <p className="font-semibold text-slate-700">{CSCTI_BRAND.name}</p>
                   <p>
-                    Documento espelha o estado dos registros à data de emissão ({emissorTexto}) — não
-                    substitui os comprovantes originais arquivados.
+                    Documento espelha o estado dos registros à data de emissão ({emissorTexto}) —
+                    não substitui os comprovantes originais arquivados.
                   </p>
                 </div>
                 <span className="print:hidden">

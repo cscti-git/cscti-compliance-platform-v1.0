@@ -1664,7 +1664,9 @@ export const BackupGuiaPage: React.FC = () => {
                 <strong>X de Y ativos parcialmente protegidos · Z com proteção completa</strong>
                 &quot; distingue os ativos que possuem comprovação recente em ao menos uma
                 modalidade (X) daqueles que cumpriram todas as exigências configuradas (Z). A
-                validação é rigorosa com o relógio: ela considera a <strong>janela de RPO</strong>{' '}
+                validação é rigorosa com o relógio: ela considera a <strong>
+                  janela de RPO
+                </strong>{' '}
                 de cada modalidade e plano cadastrado.
               </p>
             </div>
@@ -2013,7 +2015,7 @@ export const BackupGuiaPage: React.FC = () => {
               variant="outline"
               className="text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-100 gap-1.5"
             >
-              Visualizar Relatório Comprobatório <ExternalLink className="w-3.5 h-3.5" />
+              Emitir Relatório A4 <ExternalLink className="w-3.5 h-3.5" />
             </Button>
           </Link>
         </div>

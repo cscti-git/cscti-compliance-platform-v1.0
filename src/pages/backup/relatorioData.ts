@@ -1,7 +1,7 @@
 // src/pages/backup/relatorioData.ts — Agregação de dados para o Relatório Comprobatório de Backup (A4)
 // Regras espelham o motor: RPO e "execução mais recente" usam data_email (data do comprovante, fuso SP);
 // cada execução comprova somente a modalidade que o job demonstra (veredito único = pior verificação).
-import { pb } from '../../lib/pocketbase/client'
+import pb from '../../lib/pocketbase/client'
 import type { BackupExecucaoItem, BackupOcorrenciaItem } from '../../types/cscti'
 
 // ---------- Datas (fuso de São Paulo) ----------
@@ -59,7 +59,7 @@ export function buildDefaultPeriod(): ReportPeriod {
   return { start: fmt(start), end: fmt(end) }
 }
 
-// Fim do dia (inclusive) no fuso SP, convertido para UTC ISO — resolve o "fim do dia" sem ambiguidade.
+// Fim do dia (inclusive) no fuso SP, convertido para UTC ISO
 export function endOfDaySpIso(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   const utcAsSp = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999))
@@ -81,7 +81,13 @@ export interface ServentiaData {
 
 export async function loadServentia(orgId: string): Promise<ServentiaData | null> {
   if (!orgId) return null
-  const rec = await pb.collection('organization').getOne<Record<string, any>>(orgId)
+  const rec = await pb
+    .collection('organizations')
+    .getOne<Record<string, any>>(orgId)
+    .catch(async () => {
+      // fallback caso a collection seja nomeada no singular
+      return pb.collection('organization').getOne<Record<string, any>>(orgId)
+    })
   return {
     id: rec.id,
     nome: String(rec.nome || rec.name || ''),
@@ -119,35 +125,61 @@ export const MODALIDADE_LABELS: Record<string, string> = {
 export const STATUS_LABELS: Record<string, string> = {
   sucesso: 'Sucesso',
   falha: 'Falha',
+  erro: 'Falha',
   alerta: 'Alerta',
   pendente: 'Pendente',
+  parcial: 'Parcial',
 }
 
-export function mapExecucao(
-  e: BackupExecucaoItem,
-  i: number,
-  arr: BackupExecucaoItem[],
-): ExecucaoRow {
-  const fonte = e.fonte || ''
-  const rotina = e.rotina_nome || ''
-  const next = arr[i + 1]
-  const nextRotina = next ? next.rotina_nome || '' : ''
-  const nextFonte = next ? next.fonte || '' : ''
-  const rotinaTerminou = next ? rotina !== nextRotina : true
-  const fonteTerminou = next ? fonte !== nextFonte : true
+export function mapExecucao(e: BackupExecucaoItem | Record<string, any>): ExecucaoRow {
+  const rec = e as Record<string, any>
+  const expand = rec.expand || {}
+  const rotina = expand.rotina?.nome || rec.rotina_nome || rec.rotina || ''
+
+  // Extrai detalhes de VMs ou confronto
+  let fonte = ''
+  if (Array.isArray(rec.detalhes_vms) && rec.detalhes_vms.length > 0) {
+    fonte = rec.detalhes_vms
+      .map((v: any) => v.vm || v.nome || '')
+      .filter(Boolean)
+      .join(', ')
+  } else if (rec.confronto_escopo?.ativos && Array.isArray(rec.confronto_escopo.ativos)) {
+    fonte = rec.confronto_escopo.ativos
+      .map((a: any) => a.nome || a.ativo || '')
+      .filter(Boolean)
+      .join(', ')
+  } else if (rec.fonte) {
+    fonte = String(rec.fonte)
+  }
+
+  // Modalidade (local/nuvem/replicacao)
+  let modalidade = String(rec.modalidade || '').toLowerCase()
+  if (!modalidade && rec.confronto_escopo?.modalidade) {
+    modalidade = String(rec.confronto_escopo.modalidade).toLowerCase()
+  } else if (!modalidade && rec.destino) {
+    const dest = String(rec.destino).toLowerCase()
+    if (dest.includes('nuvem') || dest.includes('cloud')) modalidade = 'nuvem'
+    else if (dest.includes('repl')) modalidade = 'replicacao'
+    else modalidade = 'local'
+  }
+  if (!modalidade) modalidade = 'local'
+
+  const data_email = rec.data_email || rec.data_inicio || rec.created || null
 
   return {
-    id: e.id,
-    rotina_nome: rotina,
-    fonte,
-    modalidade: e.modalidade || '',
-    modalidade_label: MODALIDADE_LABELS[e.modalidade] || '—',
-    status: e.status,
-    status_label: STATUS_LABELS[e.status] || e.status,
-    data_email: e.data_email || null,
-    created: e.created,
-    evidencia_id: e.evidencia || '',
-    justificativa_exclusao: e.justificativa_exclusao || '',
+    id: rec.id,
+    rotina_nome: rotina || '—',
+    fonte: fonte || '—',
+    modalidade,
+    modalidade_label: MODALIDADE_LABELS[modalidade] || modalidade || '—',
+    status: rec.status || 'sucesso',
+    status_label: STATUS_LABELS[rec.status] || rec.status || 'Sucesso',
+    data_email,
+    created: rec.created || '',
+    evidencia_id: rec.evidencia || '',
+    justificativa_exclusao: rec.observacao?.includes('EXCLUÍDA')
+      ? rec.observacao
+      : rec.justificativa_exclusao || '',
   }
 }
 
@@ -252,21 +284,51 @@ export const OCORRENCIA_ORIGEM_LABELS: Record<string, string> = {
 
 export const OCORRENCIA_STATUS_LABELS: Record<string, string> = {
   aberta: 'Aberta',
+  em_analise: 'Em análise',
   resolvida: 'Resolvida',
   dispensada: 'Dispensada',
 }
 
-export function mapOcorrencia(o: BackupOcorrenciaItem): OcorrenciaRow {
+export function mapOcorrencia(o: BackupOcorrenciaItem | Record<string, any>): OcorrenciaRow {
+  const rec = o as Record<string, any>
+  let fatoRealTexto = ''
+  let origemDetectada = 'motor'
+  let fonte = ''
+
+  if (typeof rec.fato_real === 'string') {
+    fatoRealTexto = rec.fato_real
+  } else if (rec.fato_real && typeof rec.fato_real === 'object') {
+    const fr = rec.fato_real
+    if (fr.origem === 'noc') origemDetectada = 'noc'
+    if (fr.rotina_nome) fatoRealTexto += `Rotina: ${fr.rotina_nome}. `
+    if (fr.modalidade) fatoRealTexto += `Modalidade: ${fr.modalidade}. `
+    if (Array.isArray(fr.vms_falhas) && fr.vms_falhas.length > 0) {
+      fonte = fr.vms_falhas
+        .map((v: any) => (typeof v === 'string' ? v : v.cliente || v.vm || ''))
+        .filter(Boolean)
+        .join(', ')
+      fatoRealTexto += `VMs com falha: ${fonte}. `
+    }
+    if (fr.erro_detalhe) fatoRealTexto += fr.erro_detalhe
+  }
+
+  if (!fatoRealTexto) {
+    fatoRealTexto = rec.descricao || rec.titulo || 'Ocorrência registrada'
+  }
+
   return {
-    id: o.id,
-    origem: o.origem || 'motor',
-    origem_label: OCORRENCIA_ORIGEM_LABELS[o.origem] || 'Motor (automática)',
-    status: o.status,
-    status_label: OCORRENCIA_STATUS_LABELS[o.status] || o.status,
-    fato_real: o.fato_real || '—',
-    parecer: o.parecer || '—',
-    created: o.created,
-    fonte: o.fonte || '',
+    id: rec.id,
+    origem: rec.origem || origemDetectada,
+    origem_label: OCORRENCIA_ORIGEM_LABELS[rec.origem || origemDetectada] || 'Motor (automática)',
+    status: rec.status,
+    status_label: OCORRENCIA_STATUS_LABELS[rec.status] || rec.status,
+    fato_real: fatoRealTexto,
+    parecer:
+      rec.resolucao ||
+      rec.parecer ||
+      (rec.status === 'resolvida' ? 'Resolvida conforme comprovação' : 'Aguardando validação'),
+    created: rec.created || '',
+    fonte: fonte || rec.fonte || '',
   }
 }
 
@@ -283,7 +345,21 @@ export interface NocRow {
 
 export function mapNoc(r: Record<string, any>): NocRow {
   let vms: { vm: string; status: string; acoes: string }[] = []
-  if (r.vms) {
+  if (r.clientes_status) {
+    try {
+      const parsed =
+        typeof r.clientes_status === 'string' ? JSON.parse(r.clientes_status) : r.clientes_status
+      if (Array.isArray(parsed)) {
+        vms = parsed.map((v: any) => ({
+          vm: String(v.cliente || v.vm || v.nome || ''),
+          status: String(v.status || ''),
+          acoes: String(v.acoes || ''),
+        }))
+      }
+    } catch {
+      /* campo livre */
+    }
+  } else if (r.vms) {
     try {
       const parsed = typeof r.vms === 'string' ? JSON.parse(r.vms) : r.vms
       if (Array.isArray(parsed)) {
@@ -297,12 +373,17 @@ export function mapNoc(r: Record<string, any>): NocRow {
       /* campo livre */
     }
   }
+
+  const temDivergencia = Array.isArray(r.divergencias) && r.divergencias.length > 0
+  const convergenciaCalculada =
+    r.convergencia || r.status_convergencia || (temDivergencia ? 'divergente' : 'convergente')
+
   return {
     id: r.id,
-    data_email: r.data_email || r.created,
+    data_email: r.data_monitoramento || r.data_email || r.created,
     created: r.created,
-    origem: r.origem || 'email',
-    convergencia: r.convergencia || r.status_convergencia || '',
+    origem: r.origem_tipo || r.origem || 'email',
+    convergencia: convergenciaCalculada,
     vms,
   }
 }
@@ -322,10 +403,10 @@ export function mapAudit(r: Record<string, any>): AuditRow {
   return {
     id: r.id,
     created: r.created,
-    acao: r.acao || r.action || '',
-    recurso: r.recurso || r.collection || '',
-    resumo: r.resumo || r.detalhes || r.description || '',
-    usuario: r.usuario || r.user_name || '',
+    acao: r.action || r.acao || '',
+    recurso: r.entity || r.recurso || r.collection || '',
+    resumo: r.detail || r.resumo || r.detalhes || r.description || '',
+    usuario: r.user_name || r.usuario || '',
   }
 }
 
@@ -351,38 +432,49 @@ export async function loadRelatorioData(
 ): Promise<RelatorioBundle> {
   const startIso = new Date(`${period.start}T00:00:00Z`).toISOString()
   const endIso = endOfDaySpIso(period.end)
-  const window = `data_email >= "${startIso}" && data_email <= "${endIso}"`
 
+  // Consultas paralelas tolerantes a coleções com ou sem dados
   const [serventia, execucoes, ocorrencias, nocs, audits] = await Promise.all([
     loadServentia(orgId).catch(() => null),
     pb
       .collection('backup_execucoes')
-      .getFullList<BackupExecucaoItem>({
-        filter: `org = "${orgId}" && ${window}`,
-        sort: '-data_email',
+      .getFullList<Record<string, any>>({
+        filter: `organization = "${orgId}"`,
+        sort: '-created',
+        expand: 'rotina,evidencia',
       })
-      .catch((): BackupExecucaoItem[] => []),
+      .catch((): Record<string, any>[] => []),
     pb
       .collection('backup_ocorrencias')
-      .getFullList<BackupOcorrenciaItem>({
-        filter: `org = "${orgId}" && created >= "${startIso}" && created <= "${endIso}"`,
+      .getFullList<Record<string, any>>({
+        filter: `organization = "${orgId}" && created >= "${startIso}" && created <= "${endIso}"`,
         sort: '-created',
       })
-      .catch((): BackupOcorrenciaItem[] => []),
+      .catch((): Record<string, any>[] => []),
     pb
       .collection('backup_monitoramentos_externos')
-      .getFullList<Record<string, any>>({ filter: `org = "${orgId}"`, sort: '-data_email' })
+      .getFullList<Record<string, any>>({
+        filter: `organization = "${orgId}"`,
+        sort: '-created',
+      })
       .catch((): Record<string, any>[] => []),
     pb
       .collection('audit_log')
       .getFullList<Record<string, any>>({
-        filter: `org = "${orgId}" && created >= "${startIso}" && created <= "${endIso}"`,
+        filter: `organization = "${orgId}" && created >= "${startIso}" && created <= "${endIso}"`,
         sort: '-created',
       })
       .catch((): Record<string, any>[] => []),
   ])
 
-  const rows = execucoes.map((e, i, arr) => mapExecucao(e, i, arr))
+  // Filtragem de execuções no período por data_email (ou data_inicio / created como fallback)
+  const rows = execucoes
+    .map((e) => mapExecucao(e))
+    .filter((r) => {
+      const dataIso = r.data_email || r.created
+      if (!dataIso) return true
+      return dataIso >= startIso && dataIso <= endIso
+    })
 
   // Agrupar por fonte (ativo) preservando ordem de primeira aparição
   const byFonte = new Map<string, ExecucaoRow[]>()
@@ -439,5 +531,3 @@ export async function loadRelatorioData(
     audit: audits.map(mapAudit),
   }
 }
-
-// (fim)
