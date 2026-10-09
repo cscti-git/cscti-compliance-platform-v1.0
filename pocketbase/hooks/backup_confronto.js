@@ -6,6 +6,10 @@
  * Avalia exigências normativas (local, nuvem, replicação) vs. fontes cadastradas
  * vs. comprovações reais dentro do RPO de forma auditável e factual.
  *
+ * CRITÉRIO RPO E EXECUÇÃO MAIS RECENTE:
+ * Utiliza a data do e-mail comprovante (COALESCE(data_email, data_inicio)) normalizada
+ * via parseDataComprovante(str), permitindo validação precisa em comprovações a cada 30 minutos.
+ *
  * REGRA CRÍTICA POCKETBASE JSVM: Todo o código e funções auxiliares ficam
  * estritamente DENTRO do corpo do callback para evitar erros de scoping entre VMs.
  */
@@ -79,6 +83,21 @@ routerAdd(
         }
       }
       return []
+    }
+
+    // Helper atômico: normaliza os dois formatos gravados (com "T" e com espaço: str.replace(' ', 'T'))
+    // e retorna getTime() em ms (ou NaN se inválido)
+    function parseDataComprovante(str) {
+      if (!str) return NaN
+      try {
+        const s = String(str).trim().replace(' ', 'T')
+        const t = new Date(s).getTime()
+        if (!isNaN(t)) return t
+        const fallback = new Date(str).getTime()
+        return isNaN(fallback) ? NaN : fallback
+      } catch (_) {
+        return NaN
+      }
     }
 
     function inferirModalidadePorTexto(texto) {
@@ -310,7 +329,9 @@ routerAdd(
     function formatarDataSimplesSp(isoStr) {
       if (!isoStr) return ''
       try {
-        const d = new Date(isoStr)
+        const norm = String(isoStr).trim().replace(' ', 'T')
+        const d = new Date(norm)
+        if (isNaN(d.getTime())) return String(isoStr)
         return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
       } catch (_) {
         return String(isoStr)
@@ -508,14 +529,15 @@ routerAdd(
       }
     } catch (_) {}
 
-    // 7. Carregar execuções de backup ordenadas por -data_inicio da organização
+    // 7. Carregar execuções de backup da organização
+    // CRITÉRIO DE OURO: Ordenar por COALESCE(data_email, data_inicio) DESC via ordenação em memória
     let execucoesRecords = []
     try {
       execucoesRecords = $app.findRecordsByFilter(
         'backup_execucoes',
         `organization = '${organizationId}'`,
-        '-data_inicio',
-        100,
+        '-created',
+        200,
         0,
       )
     } catch (errExecs) {
@@ -527,7 +549,11 @@ routerAdd(
       const exRec = execucoesRecords[eI]
       const exId = exRec.id
       const exStatus = exRec.getString('status') || 'sucesso'
-      const exDataInicio = exRec.getString('data_inicio') || exRec.getString('created')
+      const exDataEmail = exRec.getString('data_email') || ''
+      const exDataInicio = exRec.getString('data_inicio') || exRec.getString('created') || ''
+      const dataEfetiva = exDataEmail || exDataInicio
+      const dataEfetivaMs = parseDataComprovante(dataEfetiva)
+
       const exRotinaId = exRec.getString('rotina') || ''
       const exObs = exRec.getString('observacao') || ''
       const exRotinaInfo = rotinasMap[exRotinaId] || null
@@ -549,6 +575,10 @@ routerAdd(
           modInferidaExec,
           'obs:',
           exObs.slice(0, 50),
+          'data_email:',
+          exDataEmail,
+          'data_inicio:',
+          exDataInicio,
         )
       }
 
@@ -563,7 +593,10 @@ routerAdd(
       execucoesNormalizadas.push({
         id: exId,
         status: exStatus,
+        data_email: exDataEmail,
         data_inicio: exDataInicio,
+        data_efetiva: dataEfetiva,
+        data_efetiva_ms: isNaN(dataEfetivaMs) ? 0 : dataEfetivaMs,
         rotina_id: exRotinaId,
         rotina_nome: rotinaNome,
         observacao: exObs,
@@ -574,6 +607,13 @@ routerAdd(
         raw_record: exRec,
       })
     }
+
+    // Ordenação estrita DESC por COALESCE(data_email, data_inicio)
+    execucoesNormalizadas.sort((a, b) => {
+      const diff = (b.data_efetiva_ms || 0) - (a.data_efetiva_ms || 0)
+      if (diff !== 0) return diff
+      return String(b.id || '').localeCompare(String(a.id || ''))
+    })
 
     // 8. Montar o confronto para cada ativo ativo com exigências configuradas
     const now = new Date()
@@ -671,6 +711,8 @@ routerAdd(
         let vmsSucessoMaisRecente = []
         let obsMaisRecente = null
 
+        // Buscar execução mais recente para este ativo nesta modalidade
+        // As execuções já estão ordenadas por COALESCE(data_email, data_inicio) DESC
         for (let eK = 0; eK < execucoesNormalizadas.length; eK++) {
           const execItem = execucoesNormalizadas[eK]
           const execAtendeModalidade = executionMatchesModalidade(execItem, mod)
@@ -681,7 +723,8 @@ routerAdd(
           const resultadoAtivo = verificarAtivoNaExecucao(execItem, assetId, assetNome, mod)
           if (resultadoAtivo.encontrado) {
             statusDaMaisRecente = resultadoAtivo.status
-            dataMaisRecente = execItem.data_inicio
+            // Prioridade total: data_email (data/hora do e-mail comprovante), fallback data_inicio
+            dataMaisRecente = execItem.data_efetiva
             execucaoMaisRecenteId = execItem.id
             rotinaNomeMaisRecente =
               execItem.rotina_nome || (fonteCorrespondente ? fonteCorrespondente.rotina_nome : null)
@@ -702,12 +745,17 @@ routerAdd(
         if (statusDaMaisRecente === 'sucesso') {
           ultimaComprovacaoData = dataMaisRecente
           if (dataMaisRecente) {
-            const dtComp = new Date(dataMaisRecente)
-            horasDesdeUltima = Math.max(
-              0,
-              Math.round(((now.getTime() - dtComp.getTime()) / (1000 * 60 * 60)) * 10) / 10,
-            )
-            dentroDoRpo = horasDesdeUltima <= rpoHorasConfigurado
+            const dtCompMs = parseDataComprovante(dataMaisRecente)
+            if (!isNaN(dtCompMs)) {
+              horasDesdeUltima = Math.max(
+                0,
+                Math.round(((now.getTime() - dtCompMs) / (1000 * 60 * 60)) * 10) / 10,
+              )
+              dentroDoRpo = horasDesdeUltima <= rpoHorasConfigurado
+            } else {
+              dentroDoRpo = true
+              horasDesdeUltima = 0
+            }
           } else {
             dentroDoRpo = true
             horasDesdeUltima = 0
@@ -970,6 +1018,21 @@ routerAdd(
       return []
     }
 
+    // Helper atômico: normaliza os dois formatos gravados (com "T" e com espaço: str.replace(' ', 'T'))
+    // e retorna getTime() em ms (ou NaN se inválido)
+    function parseDataComprovante(str) {
+      if (!str) return NaN
+      try {
+        const s = String(str).trim().replace(' ', 'T')
+        const t = new Date(s).getTime()
+        if (!isNaN(t)) return t
+        const fallback = new Date(str).getTime()
+        return isNaN(fallback) ? NaN : fallback
+      } catch (_) {
+        return NaN
+      }
+    }
+
     function inferirModalidadePorTexto(texto) {
       const t = String(texto || '').trim()
       if (!t) return null
@@ -1199,7 +1262,9 @@ routerAdd(
     function formatarDataSimplesSp(isoStr) {
       if (!isoStr) return ''
       try {
-        const d = new Date(isoStr)
+        const norm = String(isoStr).trim().replace(' ', 'T')
+        const d = new Date(norm)
+        if (isNaN(d.getTime())) return String(isoStr)
         return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
       } catch (_) {
         return String(isoStr)
@@ -1391,13 +1456,15 @@ routerAdd(
       }
     } catch (_) {}
 
+    // 7. Carregar execuções de backup da organização
+    // CRITÉRIO DE OURO: Ordenar por COALESCE(data_email, data_inicio) DESC via ordenação em memória
     let execucoesRecords = []
     try {
       execucoesRecords = $app.findRecordsByFilter(
         'backup_execucoes',
         `organization = '${organizationId}'`,
-        '-data_inicio',
-        100,
+        '-created',
+        200,
         0,
       )
     } catch (errExecs) {
@@ -1409,7 +1476,11 @@ routerAdd(
       const exRec = execucoesRecords[eI]
       const exId = exRec.id
       const exStatus = exRec.getString('status') || 'sucesso'
-      const exDataInicio = exRec.getString('data_inicio') || exRec.getString('created')
+      const exDataEmail = exRec.getString('data_email') || ''
+      const exDataInicio = exRec.getString('data_inicio') || exRec.getString('created') || ''
+      const dataEfetiva = exDataEmail || exDataInicio
+      const dataEfetivaMs = parseDataComprovante(dataEfetiva)
+
       const exRotinaId = exRec.getString('rotina') || ''
       const exObs = exRec.getString('observacao') || ''
       const exRotinaInfo = rotinasMap[exRotinaId] || null
@@ -1431,6 +1502,10 @@ routerAdd(
           modInferidaExec,
           'obs:',
           exObs.slice(0, 50),
+          'data_email:',
+          exDataEmail,
+          'data_inicio:',
+          exDataInicio,
         )
       }
 
@@ -1445,7 +1520,10 @@ routerAdd(
       execucoesNormalizadas.push({
         id: exId,
         status: exStatus,
+        data_email: exDataEmail,
         data_inicio: exDataInicio,
+        data_efetiva: dataEfetiva,
+        data_efetiva_ms: isNaN(dataEfetivaMs) ? 0 : dataEfetivaMs,
         rotina_id: exRotinaId,
         rotina_nome: rotinaNome,
         observacao: exObs,
@@ -1456,6 +1534,13 @@ routerAdd(
         raw_record: exRec,
       })
     }
+
+    // Ordenação estrita DESC por COALESCE(data_email, data_inicio)
+    execucoesNormalizadas.sort((a, b) => {
+      const diff = (b.data_efetiva_ms || 0) - (a.data_efetiva_ms || 0)
+      if (diff !== 0) return diff
+      return String(b.id || '').localeCompare(String(a.id || ''))
+    })
 
     const now = new Date()
     const confrontoList = []
@@ -1552,6 +1637,8 @@ routerAdd(
         let vmsSucessoMaisRecente = []
         let obsMaisRecente = null
 
+        // Buscar execução mais recente para este ativo nesta modalidade
+        // As execuções já estão ordenadas por COALESCE(data_email, data_inicio) DESC
         for (let eK = 0; eK < execucoesNormalizadas.length; eK++) {
           const execItem = execucoesNormalizadas[eK]
           const execAtendeModalidade = executionMatchesModalidade(execItem, mod)
@@ -1562,7 +1649,8 @@ routerAdd(
           const resultadoAtivo = verificarAtivoNaExecucao(execItem, assetId, assetNome, mod)
           if (resultadoAtivo.encontrado) {
             statusDaMaisRecente = resultadoAtivo.status
-            dataMaisRecente = execItem.data_inicio
+            // Prioridade total: data_email (data/hora do e-mail comprovante), fallback data_inicio
+            dataMaisRecente = execItem.data_efetiva
             execucaoMaisRecenteId = execItem.id
             rotinaNomeMaisRecente =
               execItem.rotina_nome || (fonteCorrespondente ? fonteCorrespondente.rotina_nome : null)
@@ -1583,12 +1671,17 @@ routerAdd(
         if (statusDaMaisRecente === 'sucesso') {
           ultimaComprovacaoData = dataMaisRecente
           if (dataMaisRecente) {
-            const dtComp = new Date(dataMaisRecente)
-            horasDesdeUltima = Math.max(
-              0,
-              Math.round(((now.getTime() - dtComp.getTime()) / (1000 * 60 * 60)) * 10) / 10,
-            )
-            dentroDoRpo = horasDesdeUltima <= rpoHorasConfigurado
+            const dtCompMs = parseDataComprovante(dataMaisRecente)
+            if (!isNaN(dtCompMs)) {
+              horasDesdeUltima = Math.max(
+                0,
+                Math.round(((now.getTime() - dtCompMs) / (1000 * 60 * 60)) * 10) / 10,
+              )
+              dentroDoRpo = horasDesdeUltima <= rpoHorasConfigurado
+            } else {
+              dentroDoRpo = true
+              horasDesdeUltima = 0
+            }
           } else {
             dentroDoRpo = true
             horasDesdeUltima = 0
