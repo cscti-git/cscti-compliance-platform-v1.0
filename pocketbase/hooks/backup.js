@@ -704,11 +704,67 @@ routerAdd(
           lowerConteudo.includes('cartorio sertaozinho') ||
           lowerConteudo.includes('evidencias:')
 
-        // Parse da tabela Cliente | Status | Ações a realizadas pelo NOC para correção
+        // Helper para identificar se uma linha/célula é cabeçalho, rótulo ou metadado (não é VM/cliente)
+        const isRotuloMetadado = (texto) => {
+          if (!texto) return true
+          const t = texto.toLowerCase().trim()
+          const rotulosExatos = [
+            'name',
+            'nome',
+            'vm',
+            'vms',
+            'status',
+            'start time',
+            'end time',
+            'duration',
+            'total size',
+            'data read',
+            'transferred',
+            'success',
+            'warning',
+            'error',
+            'failed',
+            'cliente',
+            'cartório',
+            'cartorio',
+            'ação',
+            'acoes',
+            'ações',
+            'ações realizadas pelo noc',
+            'acoes realizadas pelo noc',
+          ]
+          if (rotulosExatos.includes(t)) return true
+
+          // Prefixo de job vai para observações/ação, não para lista de VMs
+          if (
+            t.startsWith('backup copy job') ||
+            t.startsWith('backup job') ||
+            t.startsWith('replication job')
+          ) {
+            return true
+          }
+          return false
+        }
+
+        // Helper para status de VM: sucesso se contém SUCCESS/SUCESSO/OK; falha apenas se FAILED/ERROR/FALHA/ERRO
+        const classificarStatusVm = (st) => {
+          const s = (st || '').toUpperCase().trim()
+          const isFalha =
+            s.includes('FAILED') ||
+            s.includes('FAIL') ||
+            s.includes('ERROR') ||
+            s.includes('ERRO') ||
+            s.includes('FALHA')
+          const isSucesso = s.includes('SUCCESS') || s.includes('SUCESSO') || s.includes('OK')
+          return { isSucesso, isFalha }
+        }
+
+        // Parse da tabela Cliente | Status | Ações realizadas pelo NOC para correção
         const clientesStatus = []
         let statusGeral = 'ok'
         let acaoRealizada = ''
         let evidenciasMencionadas = ''
+        let observacaoJobsNoc = []
 
         // Tentativa de parse em HTML
         const tableMatch = rawConteudo.match(/<table[\s\S]*?>([\s\S]*?)<\/table>/i)
@@ -727,19 +783,46 @@ routerAdd(
               const c0 = cells[0].trim()
               const c1 = cells[1].trim()
               const c2 = cells[2] ? cells[2].trim() : ''
-              if (c0.toLowerCase().includes('cliente') || c0.toLowerCase().includes('status')) {
+
+              // Se a linha começa com nome de job ("Backup Copy job:...", etc.), guardar como observação do job
+              const c0Lower = c0.toLowerCase()
+              if (
+                c0Lower.startsWith('backup copy job') ||
+                c0Lower.startsWith('backup job') ||
+                c0Lower.startsWith('replication job')
+              ) {
+                observacaoJobsNoc.push(`${c0} (${c1})`)
+                if (
+                  c2 &&
+                  !acaoRealizada &&
+                  c2.toLowerCase() !== 'nenhuma ação necessária' &&
+                  c2.toLowerCase() !== 'nenhuma acao necessaria'
+                ) {
+                  acaoRealizada = c2
+                }
                 continue
               }
+
+              // Descartar cabeçalhos, rótulos e contagens de metadados ("Name", "Status", "Success: 4", "Error: 0")
+              if (isRotuloMetadado(c0)) {
+                continue
+              }
+
               if (c0 || c1) {
-                const stUpper = c1.toUpperCase()
-                const isOk = stUpper === 'OK' || stUpper === 'SUCESSO' || stUpper === 'SUCCESS'
-                if (!isOk) statusGeral = 'falha'
+                const { isSucesso, isFalha } = classificarStatusVm(c1)
                 clientesStatus.push({
                   cliente: c0 || 'Serventia / Cartório',
-                  status: c1 || 'OK',
+                  status: isSucesso ? 'Success' : isFalha ? 'Failed' : c1 || 'OK',
                   acoes: c2 || 'Nenhuma ação necessária',
                 })
-                if (c2 && !acaoRealizada) acaoRealizada = c2
+                if (
+                  c2 &&
+                  !acaoRealizada &&
+                  c2.toLowerCase() !== 'nenhuma ação necessária' &&
+                  c2.toLowerCase() !== 'nenhuma acao necessaria'
+                ) {
+                  acaoRealizada = c2
+                }
               }
             }
           }
@@ -751,6 +834,7 @@ routerAdd(
           for (let l = 0; l < lines.length; l++) {
             const line = lines[l].trim()
             if (!line) continue
+            if (isRotuloMetadado(line)) continue
             if (
               (line.toLowerCase().includes('cartório') ||
                 line.toLowerCase().includes('cartorio') ||
@@ -759,15 +843,44 @@ routerAdd(
                 line.toUpperCase().includes('FALHA') ||
                 line.toUpperCase().includes('ERRO'))
             ) {
-              const isOk = line.toUpperCase().includes('OK')
-              if (!isOk) statusGeral = 'falha'
+              const isOk =
+                line.toUpperCase().includes('OK') || line.toUpperCase().includes('SUCCESS')
               clientesStatus.push({
-                cliente: line.replace(/OK|FALHA|ERRO/gi, '').trim() || 'Cartório',
+                cliente: line.replace(/OK|FALHA|ERRO|SUCCESS|FAILED/gi, '').trim() || 'Cartório',
                 status: isOk ? 'OK' : 'Falha',
                 acoes: '',
               })
             }
           }
+        }
+
+        // Determinação do veredito geral (statusGeral):
+        // Se o assunto contém "[Success]" ou "[Sucesso]" e nenhuma VM falhou → 'ok'
+        // Falha APENAS se alguma VM explicitamente falhou (FAILED/ERROR/FALHA/ERRO) ou se assunto indica erro sem sucesso
+        const temFalhaEmVm = clientesStatus.some((c) => {
+          const { isFalha } = classificarStatusVm(c.status)
+          return isFalha
+        })
+
+        const assuntoUpper = (assunto || '').toUpperCase()
+        const assuntoIndicaSucesso =
+          assuntoUpper.includes('[SUCCESS]') ||
+          assuntoUpper.includes('[SUCESSO]') ||
+          assuntoUpper.includes('SUCCESS') ||
+          assuntoUpper.includes('SUCESSO')
+
+        if (temFalhaEmVm) {
+          statusGeral = 'falha'
+        } else if (assuntoIndicaSucesso) {
+          statusGeral = 'ok'
+        } else if (
+          clientesStatus.length > 0 &&
+          clientesStatus.every((c) => classificarStatusVm(c.status).isSucesso)
+        ) {
+          statusGeral = 'ok'
+        } else {
+          // Se não há falha explícita de VM, manter 'ok' por padrão
+          statusGeral = 'ok'
         }
 
         // Se ainda vazio, não injetar cliente fallback default fictício
@@ -822,9 +935,11 @@ routerAdd(
         monRec.set('status_geral', statusGeral)
         monRec.set('clientes_status', clientesStatus)
         monRec.set('acoes_realizadas', acaoRealizada)
+        const obsJobsTexto =
+          observacaoJobsNoc.length > 0 ? ` Jobs monitorados: ${observacaoJobsNoc.join('; ')}.` : ''
         monRec.set(
           'observacoes',
-          `Relatório diário de monitoramento preventivo emitido pela equipe do NOC. Avaliação geral: ${statusGeral.toUpperCase()}.`,
+          `Relatório diário de monitoramento preventivo emitido pela equipe do NOC. Avaliação geral: ${statusGeral.toUpperCase()}.${obsJobsTexto}`,
         )
         monRec.set('evidencias_mencionadas', evidenciasMencionadas)
         monRec.set('comprovante_tem_imagem', temImagem)

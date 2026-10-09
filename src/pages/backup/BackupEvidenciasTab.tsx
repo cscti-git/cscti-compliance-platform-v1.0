@@ -2073,25 +2073,77 @@ Lista de atividades (1 dia):
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {selectedMonit.clientes_status?.map((c, i) => (
-                          <tr key={i} className="hover:bg-slate-50">
-                            <td className="py-2 px-3 font-semibold text-slate-900">{c.cliente}</td>
-                            <td className="py-2 px-3">
-                              <Badge
-                                className={`text-[10px] font-bold ${
-                                  c.status.toUpperCase() === 'OK'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}
-                              >
-                                {c.status}
-                              </Badge>
-                            </td>
-                            <td className="py-2 px-3 text-slate-600">
-                              {c.acoes || 'Nenhuma intervenção necessária.'}
-                            </td>
-                          </tr>
-                        ))}
+                        {selectedMonit.clientes_status
+                          ?.filter((c) => {
+                            if (!c || !c.cliente) return false
+                            const cl = c.cliente.toLowerCase().trim()
+                            const rotulosEspurios = [
+                              'name',
+                              'nome',
+                              'vm',
+                              'vms',
+                              'status',
+                              'start time',
+                              'end time',
+                              'duration',
+                              'total size',
+                              'data read',
+                              'transferred',
+                              'success',
+                              'warning',
+                              'error',
+                              'failed',
+                              'cliente',
+                              'cartório',
+                              'cartorio',
+                              'ação',
+                              'ações',
+                              'acoes',
+                              'ações realizadas pelo noc',
+                              'acoes realizadas pelo noc',
+                            ]
+                            if (rotulosEspurios.includes(cl)) return false
+                            if (
+                              cl.startsWith('backup copy job') ||
+                              cl.startsWith('backup job') ||
+                              cl.startsWith('replication job')
+                            ) {
+                              return false
+                            }
+                            return true
+                          })
+                          .map((c, i) => {
+                            const stUpper = (c.status || '').toUpperCase().trim()
+                            const isStatusOk =
+                              stUpper === 'OK' ||
+                              stUpper === 'SUCCESS' ||
+                              stUpper === 'SUCESSO' ||
+                              stUpper.startsWith('SUCCESS') ||
+                              stUpper.startsWith('SUCESSO') ||
+                              stUpper.startsWith('OK')
+
+                            return (
+                              <tr key={i} className="hover:bg-slate-50">
+                                <td className="py-2 px-3 font-semibold text-slate-900">
+                                  {c.cliente}
+                                </td>
+                                <td className="py-2 px-3">
+                                  <Badge
+                                    className={`text-[10px] font-bold ${
+                                      isStatusOk
+                                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                        : 'bg-red-100 text-red-800 border-red-300'
+                                    }`}
+                                  >
+                                    {c.status}
+                                  </Badge>
+                                </td>
+                                <td className="py-2 px-3 text-slate-600">
+                                  {c.acoes || 'Nenhuma intervenção necessária.'}
+                                </td>
+                              </tr>
+                            )
+                          })}
                       </tbody>
                     </table>
                   </div>
