@@ -78,14 +78,14 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
       case 'alta':
       case 'critica':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-100 text-red-700 border border-red-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-100/90 text-red-700 border border-red-200">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
             Crítica
           </span>
         )
       case 'media':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100/90 text-amber-700 border border-amber-200">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Média
           </span>
@@ -93,7 +93,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
       case 'baixa':
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100/90 text-emerald-700 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             Baixa
           </span>
@@ -105,31 +105,22 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
     switch (st) {
       case 'ativo':
         return (
-          <Badge
-            variant="outline"
-            className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-medium"
-          >
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/90">
             Em operação
-          </Badge>
+          </span>
         )
       case 'inativo':
         return (
-          <Badge
-            variant="outline"
-            className="bg-amber-50 text-amber-700 border-amber-200 text-[11px] font-medium"
-          >
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200/90">
             Em manutenção
-          </Badge>
+          </span>
         )
       case 'desativado':
       default:
         return (
-          <Badge
-            variant="outline"
-            className="bg-slate-100 text-slate-600 border-slate-300 text-[11px] font-medium"
-          >
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-300">
             Desativado
-          </Badge>
+          </span>
         )
     }
   }
@@ -138,60 +129,60 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
     switch (conf) {
       case 'conforme':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-            <ShieldCheck className="w-3 h-3 text-emerald-600" /> Conforme
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Conforme
           </span>
         )
       case 'pendente':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-            <AlertTriangle className="w-3 h-3 text-amber-600" /> Pendente
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Pendente
           </span>
         )
       case 'nao_conforme':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
-            <XCircle className="w-3 h-3 text-red-600" /> Não conforme
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
+            <XCircle className="w-3.5 h-3.5 text-red-600" /> Não conforme
           </span>
         )
       default:
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-            <HelpCircle className="w-3 h-3 text-slate-400" /> Não avaliado
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+            <HelpCircle className="w-3.5 h-3.5 text-slate-400" /> Não avaliado
           </span>
         )
     }
   }
 
   return (
-    <Card className="bg-white border-slate-200/90 shadow-sm flex flex-col h-full rounded-xl overflow-hidden">
+    <Card className="bg-white border-slate-200/90 shadow-2xs flex flex-col h-full rounded-xl overflow-hidden">
       {/* Header do Card com Botão X */}
-      <CardHeader className="p-4 pb-3 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
-        <span className="text-sm font-bold text-slate-900">Detalhes do Ativo</span>
+      <CardHeader className="p-3.5 sm:p-4 pb-2.5 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+        <span className="text-xs sm:text-sm font-bold text-slate-900">Detalhes do Ativo</span>
         <Button
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="h-7 w-7 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full"
+          className="h-6 w-6 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full"
           title="Fechar painel de detalhes"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </Button>
       </CardHeader>
 
-      <CardContent className="p-4 flex-1 flex flex-col justify-between space-y-4">
-        <div className="space-y-4">
+      <CardContent className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between space-y-3">
+        <div className="space-y-3">
           {/* Identificação Superior: Ícone, Nome, Código e Badges */}
-          <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-700 shrink-0 mt-0.5">
-              {getAssetTypeIcon(asset.tipo, 'w-6 h-6 text-slate-700')}
+          <div className="flex items-start gap-2.5">
+            <div className="p-2 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-700 shrink-0 mt-0.5">
+              {getAssetTypeIcon(asset.tipo, 'w-5 h-5 text-slate-700')}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight truncate">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate">
                 {asset.name}
               </h3>
-              <p className="text-xs font-mono text-slate-400 mt-0.5">{asset.displayCode}</p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <p className="text-[11px] font-mono text-slate-400 mt-0.5">{asset.displayCode}</p>
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                 {getCriticidadeBadge(asset.criticidade)}
                 {getEstadoBadge(asset.status)}
               </div>
@@ -199,11 +190,11 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
           </div>
 
           {/* Abas Internas: Visão Geral / Proteção / Relacionamentos */}
-          <div className="border-b border-slate-200 flex items-center gap-4 text-xs font-medium">
+          <div className="border-b border-slate-200 flex items-center gap-3 text-[11px] font-medium">
             <button
               type="button"
               onClick={() => setActiveTab('visao_geral')}
-              className={`pb-2 border-b-2 transition-colors ${
+              className={`pb-1.5 border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'visao_geral'
                   ? 'border-blue-600 text-blue-600 font-semibold'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -214,7 +205,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('protecao')}
-              className={`pb-2 border-b-2 transition-colors ${
+              className={`pb-1.5 border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'protecao'
                   ? 'border-blue-600 text-blue-600 font-semibold'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -225,7 +216,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('relacionamentos')}
-              className={`pb-2 border-b-2 transition-colors ${
+              className={`pb-1.5 border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'relacionamentos'
                   ? 'border-blue-600 text-blue-600 font-semibold'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -237,53 +228,55 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
 
           {/* Conteúdo da Aba */}
           {activeTab === 'visao_geral' ? (
-            <div className="space-y-3 text-xs">
+            <div className="space-y-2 text-[11px] leading-relaxed">
               <div>
-                <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">
+                <span className="text-[10px] font-semibold text-slate-400 block tracking-wider">
                   Categoria
                 </span>
-                <span className="text-slate-800 font-medium">{asset.subtipoFormatado}</span>
+                <span className="text-slate-800 font-medium block truncate">
+                  {asset.subtipoFormatado}
+                </span>
               </div>
 
               <div>
-                <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">
+                <span className="text-[10px] font-semibold text-slate-400 block tracking-wider">
                   Descrição
                 </span>
-                <span className="text-slate-700 leading-relaxed block">
+                <span className="text-slate-700 leading-snug block line-clamp-2">
                   {asset.descricao || 'Nenhuma descrição técnica informada.'}
                 </span>
               </div>
 
               <div>
-                <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">
+                <span className="text-[10px] font-semibold text-slate-400 block tracking-wider">
                   Responsável
                 </span>
-                <span className="text-slate-800 font-medium">
+                <span className="text-slate-800 font-medium block truncate">
                   {asset.expand?.responsavel?.name || 'Equipe de TI'}
                 </span>
               </div>
 
               <div>
-                <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">
+                <span className="text-[10px] font-semibold text-slate-400 block tracking-wider">
                   Localização
                 </span>
-                <span className="text-slate-800 font-medium">
+                <span className="text-slate-800 font-medium block truncate">
                   {asset.localizacao || 'Sala de servidores'}
                   {asset.ip_address ? ` • IP ${asset.ip_address}` : ''}
                 </span>
               </div>
 
               <div>
-                <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">
+                <span className="text-[10px] font-semibold text-slate-400 block tracking-wider">
                   Classificação da Informação
                 </span>
-                <span className="text-slate-800 font-medium">
+                <span className="text-slate-800 font-medium block truncate">
                   {asset.classificacaoInformacao || 'Restrito'}
                 </span>
               </div>
 
               <div>
-                <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider mb-1">
+                <span className="text-[10px] font-semibold text-slate-400 block tracking-wider mb-0.5">
                   Conformidade
                 </span>
                 <div>{getConformidadeBadge(asset.conformidadeStatus)}</div>
@@ -291,7 +284,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
 
               <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">
+                  <span className="text-[10px] font-semibold text-slate-400 block tracking-wider">
                     Última Validação
                   </span>
                   <span className="text-slate-800 font-medium font-mono text-[11px]">
@@ -299,7 +292,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
                   </span>
                 </div>
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">
+                  <span className="text-[10px] font-semibold text-slate-400 block tracking-wider">
                     Próxima Revisão
                   </span>
                   <span className="text-slate-800 font-medium font-mono text-[11px]">
@@ -385,17 +378,17 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
         </div>
 
         {/* Botões de Ação na base do painel */}
-        <div className="space-y-2 pt-2 border-t border-slate-100">
+        <div className="space-y-2 pt-2 border-t border-slate-100 shrink-0">
           <Button
             onClick={() => onViewFullSheet && onViewFullSheet(asset)}
-            className="w-full bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-9 gap-1.5 shadow-sm"
+            className="w-full bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-8 sm:h-9 gap-1.5 shadow-sm"
           >
             <ExternalLink className="w-3.5 h-3.5" /> Ver ficha completa
           </Button>
           <Button
             variant="outline"
             onClick={() => onEdit(asset)}
-            className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold h-9 gap-1.5"
+            className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium h-8 sm:h-9 gap-1.5"
           >
             <Edit2 className="w-3.5 h-3.5 text-slate-500" /> Editar ativo
           </Button>

@@ -240,16 +240,10 @@ export const AssetsPage: React.FC = () => {
     })
   }, [assets, confronto])
 
-  // Selecionar o primeiro ativo por padrão se nenhum estiver selecionado
-  useEffect(() => {
-    if (displayAssets.length > 0 && !selectedAssetId) {
-      setSelectedAssetId(displayAssets[0].id)
-    }
-  }, [displayAssets, selectedAssetId])
-
-  // Ativo atualmente selecionado para o painel lateral
+  // Ativo atualmente selecionado para o painel lateral (apenas se selectedAssetId não for null)
   const currentAsset = useMemo(() => {
-    return displayAssets.find((a) => a.id === selectedAssetId) || displayAssets[0] || null
+    if (!selectedAssetId) return null
+    return displayAssets.find((a) => a.id === selectedAssetId) || null
   }, [displayAssets, selectedAssetId])
 
   // CÁLCULOS DOS 4 CARDS SUPERIORES
@@ -825,110 +819,130 @@ export const AssetsPage: React.FC = () => {
             </Card>
           </div>
 
-          {/* 4. LINHA DE 3 PAINÉIS ANALÍTICOS + PAINEL LATERAL DE DETALHES */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Bloco dos 3 gráficos da esquerda (8 colunas no desktop) */}
-            <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Gráfico 1: Ativos por Categoria */}
-              <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 mb-3">Ativos por Categoria</h3>
-                  <div className="flex justify-center my-2">
-                    <SvgDonutChart
-                      data={categoryStats.map((c) => ({
-                        label: c.label,
-                        value: c.value,
-                        color: c.color,
-                      }))}
-                      totalLabel={String(totalAssetsCount)}
-                      subLabel="Ativos"
-                      size={120}
-                      strokeWidth={20}
-                    />
-                  </div>
+          {/* 4. LINHA ANALÍTICA + PAINEL LATERAL "DETALHES DO ATIVO" */}
+          {/*
+            No esboço do usuário, quando aberto, "Detalhes do Ativo" ocupa a 4ª coluna à direita
+            na mesma linha dos 3 painéis analíticos (Ativos por Categoria, Criticidade, Situação de Conformidade).
+            Quando fechado, os 3 painéis ocupam a largura total (grid de 3 colunas).
+          */}
+          <div
+            className={
+              currentAsset
+                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-stretch'
+                : 'grid grid-cols-1 md:grid-cols-3 gap-4'
+            }
+          >
+            {/* Gráfico 1: Ativos por Categoria */}
+            <Card
+              className={`bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between ${
+                currentAsset ? 'lg:col-span-3' : ''
+              }`}
+            >
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 mb-2.5">Ativos por Categoria</h3>
+                <div className="flex justify-center my-1.5">
+                  <SvgDonutChart
+                    data={categoryStats.map((c) => ({
+                      label: c.label,
+                      value: c.value,
+                      color: c.color,
+                    }))}
+                    totalLabel={String(totalAssetsCount)}
+                    subLabel="Ativos"
+                    size={currentAsset ? 110 : 124}
+                    strokeWidth={currentAsset ? 18 : 20}
+                  />
                 </div>
+              </div>
 
-                {/* Legenda com contagem e % */}
-                <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px]">
-                  {categoryStats.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-slate-600">
-                      <div className="flex items-center gap-2 truncate pr-1">
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="truncate">{item.label}</span>
-                      </div>
-                      <span className="font-semibold text-slate-800 whitespace-nowrap">
-                        {item.value}{' '}
-                        <span className="font-normal text-slate-400">({item.percent}%)</span>
-                      </span>
+              {/* Legenda com contagem e % */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px]">
+                {categoryStats.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-slate-600">
+                    <div className="flex items-center gap-2 truncate pr-1">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="truncate">{item.label}</span>
                     </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Gráfico 2: Classificação de Criticidade (Barras) */}
-              <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 mb-3">
-                    Classificação de Criticidade
-                  </h3>
-                  <div className="my-1">
-                    <SvgBarChart data={criticalityStats} maxVal={120} />
+                    <span className="font-semibold text-slate-800 whitespace-nowrap">
+                      {item.value}{' '}
+                      <span className="font-normal text-slate-400">({item.percent}%)</span>
+                    </span>
                   </div>
-                </div>
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Total crítico:</span>
-                  <strong className="text-red-600 font-bold">{criticalAssetsCount} ativos</strong>
-                </div>
-              </Card>
+                ))}
+              </div>
+            </Card>
 
-              {/* Gráfico 3: Situação de Conformidade */}
-              <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 mb-3">
-                    Situação de Conformidade
-                  </h3>
-                  <div className="flex justify-center my-2">
-                    <SvgDonutChart
-                      data={conformidadeStats.map((c) => ({
-                        label: c.label,
-                        value: c.value,
-                        color: c.color,
-                      }))}
-                      totalLabel={String(totalAssetsCount)}
-                      subLabel="Ativos"
-                      size={120}
-                      strokeWidth={20}
-                    />
-                  </div>
+            {/* Gráfico 2: Classificação de Criticidade (Barras) */}
+            <Card
+              className={`bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between ${
+                currentAsset ? 'lg:col-span-3' : ''
+              }`}
+            >
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 mb-2.5">
+                  Classificação de Criticidade
+                </h3>
+                <div className="my-1">
+                  <SvgBarChart data={criticalityStats} maxVal={120} />
                 </div>
+              </div>
+              <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Total crítico:</span>
+                <strong className="text-red-600 font-bold">{criticalAssetsCount} ativos</strong>
+              </div>
+            </Card>
 
-                {/* Legenda com contagem e % */}
-                <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px]">
-                  {conformidadeStats.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-slate-600">
-                      <div className="flex items-center gap-2 truncate pr-1">
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="truncate">{item.label}</span>
-                      </div>
-                      <span className="font-semibold text-slate-800 whitespace-nowrap">
-                        {item.value}{' '}
-                        <span className="font-normal text-slate-400">({item.percent}%)</span>
-                      </span>
+            {/* Gráfico 3: Situação de Conformidade */}
+            <Card
+              className={`bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between ${
+                currentAsset ? 'lg:col-span-3' : ''
+              }`}
+            >
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 mb-2.5">
+                  Situação de Conformidade
+                </h3>
+                <div className="flex justify-center my-1.5">
+                  <SvgDonutChart
+                    data={conformidadeStats.map((c) => ({
+                      label: c.label,
+                      value: c.value,
+                      color: c.color,
+                    }))}
+                    totalLabel={String(totalAssetsCount)}
+                    subLabel="Ativos"
+                    size={currentAsset ? 110 : 124}
+                    strokeWidth={currentAsset ? 18 : 20}
+                  />
+                </div>
+              </div>
+
+              {/* Legenda com contagem e % */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px]">
+                {conformidadeStats.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-slate-600">
+                    <div className="flex items-center gap-2 truncate pr-1">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="truncate">{item.label}</span>
                     </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
+                    <span className="font-semibold text-slate-800 whitespace-nowrap">
+                      {item.value}{' '}
+                      <span className="font-normal text-slate-400">({item.percent}%)</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
 
-            {/* Painel lateral direito: Detalhes do Ativo (4 colunas no desktop) */}
-            <div className="lg:col-span-4">
-              {currentAsset ? (
+            {/* Painel lateral direito: Detalhes do Ativo (4ª coluna na mesma linha em desktop) */}
+            {currentAsset && (
+              <div className="md:col-span-2 lg:col-span-3 h-full">
                 <AssetDetailsDrawer
                   asset={currentAsset}
                   onClose={() => setSelectedAssetId(null)}
@@ -938,16 +952,8 @@ export const AssetsPage: React.FC = () => {
                   }}
                   onViewFullSheet={(asset) => setFullSheetAsset(asset)}
                 />
-              ) : (
-                <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-6 text-center text-slate-400 h-full flex flex-col items-center justify-center">
-                  <Server className="w-10 h-10 text-slate-300 mb-2" />
-                  <p className="text-xs font-semibold text-slate-600">Nenhum ativo selecionado</p>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Clique em qualquer linha da tabela para abrir a ficha de detalhes.
-                  </p>
-                </Card>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* 5. BARRA DE FILTROS */}
