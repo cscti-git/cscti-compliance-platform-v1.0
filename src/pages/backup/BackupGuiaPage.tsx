@@ -16,11 +16,14 @@ import {
   Info,
   Clock,
   ShieldCheck,
+  ShieldAlert,
+  UserCheck,
+  Mail,
+  Percent,
   ChevronRight,
   ExternalLink,
   Sparkles,
   ArrowRight,
-  HelpCircle,
   Terminal,
   Server,
 } from 'lucide-react'
@@ -108,8 +111,8 @@ export const BackupGuiaPage: React.FC = () => {
     {
       id: 'etapa-4-fontes',
       num: '4',
-      title: 'Fontes',
-      subtitle: 'Itens, VMs e Aliases',
+      title: 'Regras & Adapt.',
+      subtitle: 'Fontes (Rotinas) vs Regras',
       icon: HardDrive,
       tab: 'regras',
     },
@@ -144,6 +147,14 @@ export const BackupGuiaPage: React.FC = () => {
       subtitle: 'Restauração Provada',
       icon: CheckCircle2,
       tab: 'testes',
+    },
+    {
+      id: 'etapa-9-noc',
+      num: '9',
+      title: 'Validação Humana (NOC)',
+      subtitle: 'Atestado Diário & Convergência',
+      icon: UserCheck,
+      tab: 'evidencias',
     },
   ]
 
@@ -215,7 +226,7 @@ export const BackupGuiaPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2.5">
             {roadmapSteps.map((st) => {
               const Icon = st.icon
               return (
@@ -454,6 +465,25 @@ export const BackupGuiaPage: React.FC = () => {
           </CardHeader>
 
           <CardContent className="p-5 space-y-4 text-xs sm:text-sm text-slate-700">
+            {/* Delimitação de abas: Fontes mora na aba 3; Regras & Adaptadores é a aba própria */}
+            <div className="p-3.5 rounded-lg border-2 border-teal-200 bg-teal-50/60 text-teal-950 flex items-start gap-3">
+              <Info className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs">
+                <span className="font-bold">Onde configurar o quê (abas separadas):</span>
+                <p className="leading-relaxed">
+                  As <strong>Fontes Protegidas</strong> são geridas dentro da aba{' '}
+                  <strong>3. Rotinas &amp; Fontes</strong>, no modal &quot;Fontes &amp; Ativos&quot;
+                  de cada rotina — é lá que se cadastra cada VM/banco, o tipo de fonte e os aliases
+                  literais do comprovante. Já a aba <strong>Regras &amp; Adaptadores</strong> (menu
+                  lateral) é uma etapa própria e independente: nela se cria as{' '}
+                  <strong>regras de identificação</strong> (remetente, assunto e padrão de conteúdo)
+                  e se escolhe o <strong>adaptador de extração</strong> que interpreta cada tipo de
+                  comprovante. Fonte é <em>o que</em> é protegido; regra é <em>como</em> o sistema
+                  reconhece e lê o e-mail que prova essa proteção.
+                </p>
+              </div>
+            </div>
+
             {/* O que é */}
             <div className="space-y-1">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">O que é</h4>
@@ -827,7 +857,7 @@ export const BackupGuiaPage: React.FC = () => {
         </Card>
       </section>
 
-      {/* ETAPA 4 — FONTES */}
+      {/* ETAPA 4 — REGRAS & ADAPTADORES (E SEPARAÇÃO CLARA DE FONTES) */}
       <section id="etapa-4-fontes" className="scroll-mt-6 space-y-3">
         <Card className="border-slate-200 shadow-2xs">
           <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 pb-3">
@@ -839,43 +869,79 @@ export const BackupGuiaPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-lg font-bold text-slate-900">
-                      Etapa 4 — Fontes Protegidas e Cobertura de Ativos
+                      Etapa 4 — Regras &amp; Adaptadores (Separação de Fontes)
                     </CardTitle>
                     <Badge
                       variant="outline"
                       className="text-[10px] font-bold text-teal-800 bg-teal-50 border-teal-200"
                     >
-                      Granularidade de VMs e Bancos
+                      Reconhecimento Automático
                     </Badge>
                   </div>
                   <CardDescription className="text-xs">
-                    Cada item físico, virtual ou lógico contido no backup, com cobertura e aliases
-                    literais.
+                    Separação fundamental: a aba real chama-se &quot;Regras &amp; Adaptadores&quot;,
+                    enquanto &quot;Fontes&quot; fica dentro de &quot;Rotinas &amp; Fontes&quot;.
                   </CardDescription>
                 </div>
               </div>
-              <Link to="/backup?tab=rotinas">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs font-semibold text-teal-700 border-teal-200 hover:bg-teal-50 gap-1"
-                >
-                  Gerenciar Fontes <ArrowRight className="w-3.5 h-3.5" />
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link to="/backup?tab=regras">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs font-semibold text-teal-700 border-teal-200 hover:bg-teal-50 gap-1"
+                  >
+                    Regras &amp; Adaptadores <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </Link>
+                <Link to="/backup?tab=rotinas">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-100 gap-1"
+                  >
+                    Rotinas &amp; Fontes <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </Link>
+              </div>
             </div>
           </CardHeader>
 
           <CardContent className="p-5 space-y-4 text-xs sm:text-sm text-slate-700">
+            {/* Esclarecimento de Separação de Abas */}
+            <div className="p-4 rounded-xl border-2 border-teal-400 bg-teal-50/90 text-teal-950 space-y-2 shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-teal-900">
+                <Sliders className="w-4 h-4 text-teal-700 shrink-0" />
+                <span>
+                  Separação Obrigatória: &quot;Fontes&quot; vs &quot;Regras &amp; Adaptadores&quot;
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-semibold leading-relaxed text-teal-950">
+                • <strong>Fontes Protegidas</strong> (o que é protegido): ficam dentro da aba{' '}
+                <strong>Rotinas &amp; Fontes</strong> (Etapa 3), acessíveis pelo botão{' '}
+                <strong>&quot;Fontes &amp; Ativos&quot;</strong> de cada rotina.
+                <br />• <strong>Regras &amp; Adaptadores</strong> (como reconhecer o comprovante): é
+                uma <strong>aba dedicada</strong> no menu do módulo Backup, responsável por filtrar
+                remetente, assunto e acionar os adaptadores de extração (VEEAM_HTML, ACRONIS_PDF,
+                NOC_DIARIO, EMAIL_HTML_GENERICO).
+              </p>
+              <p className="text-[11px] text-teal-800 leading-snug">
+                Nunca confunda as duas configurações: cadastrar a fonte na rotina vincula o ativo;
+                cadastrar a regra ensina o sistema a identificar o e-mail que chega à caixa postal.
+              </p>
+            </div>
+
             {/* O que é */}
             <div className="space-y-1">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">O que é</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                O que são Fontes (dentro de Rotinas &amp; Fontes)
+              </h4>
               <p className="leading-relaxed">
                 As Fontes são os elementos específicos resguardados dentro de uma rotina: uma
                 Máquina Virtual (snapshot/imagem), uma base de dados relacional (ex.: PostgreSQL,
                 SQL Server, Oracle), uma pasta de rede ou um plano de proteção na nuvem. Cada fonte
                 é ligada a um <strong>Ativo do Inventário</strong> e possui seus próprios{' '}
-                <strong>Aliases</strong>.
+                <strong>Aliases</strong> literais para conferência contra os comprovantes.
               </p>
             </div>
 
@@ -992,6 +1058,27 @@ export const BackupGuiaPage: React.FC = () => {
 
             {/* Subseção: Regras de Identificação — como o sistema reconhece seus e-mails */}
             <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div className="p-3.5 rounded-lg border-2 border-slate-300 bg-white shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded bg-slate-800 text-white">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                    Delimitação: Fontes (aba 3) × Regras &amp; Adaptadores (aba própria, menu
+                    lateral)
+                  </h4>
+                </div>
+                <p className="text-xs leading-relaxed text-slate-600 mt-2">
+                  A subseção abaixo — <strong>Regras de Identificação</strong> e{' '}
+                  <strong>Adaptadores de Extração</strong> — documenta a aba{' '}
+                  <strong>separada</strong> &quot;Regras &amp; Adaptadores&quot; (entrada própria no
+                  menu lateral do módulo /backup), e não o modal &quot;Fontes &amp; Ativos&quot; da
+                  Etapa 3. Fonte é <em>o que</em> é protegido (Etapa 3, aba Rotinas &amp; Fontes);
+                  regra é <em>como</em> o sistema reconhece e interpreta o e-mail que prova a
+                  proteção (aba Regras &amp; Adaptadores).
+                </p>
+              </div>
+
               <div className="flex items-center gap-2">
                 <div className="p-1 rounded bg-teal-100 text-teal-800">
                   <Sliders className="w-4 h-4" />
@@ -1016,15 +1103,15 @@ export const BackupGuiaPage: React.FC = () => {
                   <div className="p-2 rounded bg-white border border-slate-200">
                     <strong className="text-slate-900 block mb-0.5">Filtro Remetente</strong>
                     <span className="text-slate-600">
-                      Endereço ou domínio de envio (ex.: <em>newsletter@proitcs.com.br</em> ou{' '}
-                      <em>veeam@</em>).
+                      Endereço ou domínio de envio (ex.: <em>@proitcs.com.br</em> ou <em>veeam@</em>
+                      ).
                     </span>
                   </div>
                   <div className="p-2 rounded bg-white border border-slate-200">
                     <strong className="text-slate-900 block mb-0.5">Filtro Assunto</strong>
                     <span className="text-slate-600">
-                      Palavras-chave contidas no subject (ex.: <em>Backup Copy</em>,{' '}
-                      <em>Replication</em>, <em>SocNoc</em>).
+                      Palavras-chave contidas no subject (ex.: <em>ANALISE PREVENTIVA DIARIA</em>,{' '}
+                      <em>Backup Copy</em>, <em>Replication</em>, <em>SocNoc</em>).
                     </span>
                   </div>
                   <div className="p-2 rounded bg-white border border-slate-200">
@@ -1222,6 +1309,65 @@ export const BackupGuiaPage: React.FC = () => {
               </div>
             </div>
 
+            {/* REGRA DA DATA OPERACIONAL: data_email como verdade do comprovante */}
+            <div className="space-y-2 pt-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-purple-700" />
+                Regra da Data Operacional — o relógio da prova é a data do comprovante (data_email)
+              </h4>
+              <div className="p-3.5 rounded-lg border-2 border-purple-300 bg-purple-50/60 text-purple-950 space-y-2">
+                <p className="text-xs leading-relaxed">
+                  O <strong>RPO</strong> (Recovery Point Objective), a{' '}
+                  <strong>&quot;execução mais recente&quot;</strong> e a{' '}
+                  <strong>janela de comprovação</strong> sempre utilizam a{' '}
+                  <strong>data/hora do e-mail comprovante</strong> (campo <code>data_email</code>),{' '}
+                  <strong>nunca a data de processamento no sistema</strong> — requisito técnico
+                  indispensável para a comprovação contínua (ex.: rotinas a cada 30 minutos).
+                </p>
+                <div className="p-2.5 rounded bg-white border border-purple-200 text-xs space-y-1">
+                  <span className="font-bold text-purple-900 block">
+                    Ordem rigorosa de extração da data_email:
+                  </span>
+                  <ol className="list-decimal pl-4 space-y-0.5 text-slate-700 text-[11px]">
+                    <li>
+                      <strong>Data por extenso no corpo do relatório:</strong> ex.{' '}
+                      <code className="font-mono bg-purple-50 text-purple-900 px-1">
+                        &quot;sexta-feira, 9 de outubro de 2026 08:35:08&quot;
+                      </code>
+                    </li>
+                    <li>
+                      <strong>Cabeçalho MIME:</strong> header{' '}
+                      <code className="font-mono">Date:</code> do arquivo EML
+                    </li>
+                    <li>
+                      <strong>Campo do agente local:</strong> carimbo de transmissão do agente
+                      homologado
+                    </li>
+                    <li>
+                      <strong>Carimbos adicionais do corpo:</strong> timestamps estruturados de
+                      início e fim da tarefa
+                    </li>
+                  </ol>
+                  <p className="text-[11px] font-semibold text-red-700 pt-1">
+                    ⚠️ A linha <code className="font-mono">&quot;Created by ... at ...&quot;</code>{' '}
+                    do Veeam é <strong>explicitamente IGNORADA</strong> pelo extrator: ela indica a
+                    data/hora em que o job foi criado na console do Veeam, e não a data em que o
+                    backup foi executado.
+                  </p>
+                </div>
+                <p className="text-xs leading-relaxed">
+                  Cada execução comprova <strong>somente a modalidade que o job demonstra</strong>:{' '}
+                  <code className="font-mono">Backup job:</code> → <strong>Local</strong>,{' '}
+                  <code className="font-mono">Copy job:</code> → <strong>Nuvem</strong>,{' '}
+                  <code className="font-mono">Replication job:</code> → <strong>Replicação</strong>.
+                  Job ambíguo <strong>não comprova nada</strong>. Um comprovante novo para o mesmo
+                  job gera uma execução nova e <strong>substitui a anterior no cálculo</strong> — o
+                  processo é idempotente pelo hash SHA-256 do conteúdo (o mesmo e-mail nunca é
+                  processado duas vezes).
+                </p>
+              </div>
+            </div>
+
             {/* O que o "Ver Laudo" avalia */}
             <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/80 space-y-2">
               <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-slate-800">
@@ -1339,6 +1485,13 @@ export const BackupGuiaPage: React.FC = () => {
                 entanto, <strong>a justificativa da exclusão é estritamente obrigatória</strong>
                 e é gravada de forma indelével na <em>Trilha de Auditoria</em> do sistema,
                 registrando quem excluiu, quando, o motivo e os dados do item.
+              </p>
+              <p className="text-xs leading-relaxed text-slate-600">
+                Execuções excluídas <strong>somem do cômputo</strong> da Proteção Efetiva, do
+                confronto por ativo e do Relatório Comprobatório — a justificativa permanece
+                disponível na Trilha de Auditoria, garantindo rastreabilidade append-only. A data
+                exibida em cada execução é a <strong>data do comprovante (data_email)</strong>, no
+                fuso de São Paulo, e não a data de processamento.
               </p>
             </div>
           </CardContent>
@@ -1460,6 +1613,93 @@ export const BackupGuiaPage: React.FC = () => {
         </Card>
       </section>
 
+      {/* COMPLEMENTO — PROTEÇÃO EFETIVA EM % (BLOCO EXPLICATIVO) */}
+      <section id="etapa-protecao-efetiva" className="scroll-mt-6 space-y-3">
+        <Card className="border-slate-200 shadow-2xs">
+          <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 pb-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[#0B2545] text-white flex items-center justify-center shadow-2xs">
+                  <Percent className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg font-bold text-slate-900">
+                      Complemento — Proteção Efetiva em % (Visão Geral)
+                    </CardTitle>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-bold text-blue-800 bg-blue-50 border-blue-200"
+                    >
+                      Métrica Honesta
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xs">
+                    O número do card &quot;Proteção Efetiva&quot; mede proteção por ativo, não
+                    sucesso de jobs.
+                  </CardDescription>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-5 space-y-4 text-xs sm:text-sm text-slate-700">
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Como o percentual é calculado
+              </h4>
+              <p className="leading-relaxed">
+                O percentual é a <strong>média de proteção por ativo</strong>: para cada ativo com
+                exigências, conta-se quantas modalidades (Local, Nuvem, Replicação) estão
+                comprovadas <strong>dentro do RPO</strong> — até 3 — e divide-se por 3. A média
+                desses quocientes, de 0 a 100%, é a &quot;Proteção Efetiva&quot; exibida no card da
+                Visão Geral.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Como ler o card
+              </h4>
+              <p className="leading-relaxed">
+                A contagem &quot;
+                <strong>X de Y ativos parcialmente protegidos · Z com proteção completa</strong>
+                &quot; distingue os ativos que possuem comprovação recente em ao menos uma
+                modalidade (X) daqueles que cumpriram todas as exigências configuradas (Z). A
+                validação é rigorosa com o relógio: ela considera a <strong>janela de RPO</strong>{' '}
+                de cada modalidade e plano cadastrado.
+              </p>
+            </div>
+            <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-950 flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-xs">
+                <span className="font-bold">Comprovantes fora da janela de RPO:</span>
+                <p className="leading-relaxed">
+                  Se um backup foi realizado no passado mas excedeu a janela estipulada (ex.: 24h
+                  para backup diário ou 30 min para contínuo), o sistema sinaliza a modalidade como{' '}
+                  <strong className="text-amber-900">&quot;FORA do RPO&quot;</strong> e exibe
+                  explicitamente a <strong>idade do comprovante</strong> (ex.:{' '}
+                  <em>&quot;FORA do RPO (há 2 dias)&quot;</em> ou{' '}
+                  <em>&quot;FORA do RPO (há 45 min)&quot;</em>). Modalidades fora do RPO não pontuam
+                  na proteção efetiva, pois backup defasado não constitui proteção ativa perante a
+                  fiscalização.
+                </p>
+              </div>
+            </div>
+            <div className="p-3.5 rounded-lg border border-blue-200 bg-blue-50/60 text-blue-950 flex items-start gap-3">
+              <Info className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-xs">
+                <span className="font-bold">Banner &quot;X% protegido perante a rotina&quot;:</span>
+                <p>
+                  O percentual grande do card alimenta também o banner de status perante a rotina
+                  cadastrada: 100% significa que toda exigência de todo ativo está comprovada dentro
+                  do RPO. Qualquer valor menor indica modalidades sem fonte, nunca comprovadas ou
+                  fora do RPO — o detalhe por ativo está na tabela de confronto logo abaixo.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
       {/* ETAPA 8 — TESTES DE RECUPERAÇÃO */}
       <section id="etapa-8-testes" className="scroll-mt-6 space-y-3">
         <Card className="border-slate-200 shadow-2xs">
@@ -1498,9 +1738,7 @@ export const BackupGuiaPage: React.FC = () => {
               </Link>
             </div>
           </CardHeader>
-
           <CardContent className="p-5 space-y-4 text-xs sm:text-sm text-slate-700">
-            {/* O que é */}
             <div className="space-y-1">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">O que é</h4>
               <p className="leading-relaxed">
@@ -1591,6 +1829,169 @@ export const BackupGuiaPage: React.FC = () => {
         </Card>
       </section>
 
+      {/* ETAPA 9 — VALIDAÇÃO HUMANA (ATESTADO NOC) */}
+      <section id="etapa-9-noc" className="scroll-mt-6 space-y-3">
+        <Card className="border-2 border-purple-200 shadow-sm">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-white border-b border-purple-100 pb-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-700 text-white flex items-center justify-center font-bold text-base shadow-2xs">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg font-bold text-slate-900">
+                      Validação Humana NOC (Monitoramento Externo) e Dupla Camada
+                    </CardTitle>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-bold text-purple-800 bg-purple-50 border-purple-200"
+                    >
+                      Dupla Camada de Conformidade
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xs">
+                    Validação diária por agente humano externo, pipeline de ingestão resiliente e
+                    prova incontestável para auditorias.
+                  </CardDescription>
+                </div>
+              </div>
+              <Link to="/backup?tab=evidencias&sub=monitoramento_externo">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs font-semibold text-purple-700 border-purple-200 hover:bg-purple-50 gap-1"
+                >
+                  Sub-aba Monitoramento NOC <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-5 space-y-4 text-xs sm:text-sm text-slate-700">
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Rotina Diária do Agente Humano do NOC
+              </h4>
+              <p className="leading-relaxed">
+                Todo dia, um agente humano do NOC (Network Operations Center) conecta-se diretamente
+                no servidor de backup e valida as rotinas de backup do Veeam; caso encontre qualquer
+                anomalia ou falha de replicação/cópia, ele reporta imediatamente as ações tomadas e
+                o status de cada máquina.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border-2 border-purple-300 bg-purple-50/70 text-purple-950 space-y-2 shadow-2xs">
+              <span className="font-bold text-xs uppercase tracking-wide text-purple-900 flex items-center gap-1.5">
+                <Mail className="w-4 h-4 text-purple-700" />
+                Pipeline de E-mail Automático Tolerante a Acentos e Travessões
+              </span>
+              <p className="text-xs leading-relaxed">
+                O e-mail do NOC chega com o assunto exato{' '}
+                <strong>
+                  &quot;PRO IT CLOUD SOLUTIONS | NOC – ANALISE PREVENTIVA DIARIA DE BACKUP&quot;
+                </strong>{' '}
+                originado do remetente <strong>@proitcs.com.br</strong>. O pipeline de e-mail do
+                sistema é{' '}
+                <strong>
+                  detectado automaticamente de forma tolerante a acentos e variações de
+                  travessão/hífen
+                </strong>{' '}
+                (– / -).
+              </p>
+              <p className="text-xs leading-relaxed">
+                Cada relatório processado é convertido em um{' '}
+                <strong>&quot;Atestado Humano Diário&quot;</strong>, contendo:
+              </p>
+              <ul className="list-disc pl-5 text-[11px] space-y-1 text-purple-950 font-medium">
+                <li>
+                  <strong>Status por VM:</strong> lista exata das máquinas virtuais com o veredito
+                  do técnico (Sucesso, Atenção ou Falha);
+                </li>
+                <li>
+                  <strong>Ações do técnico:</strong> descritivo de eventuais correções, reinício de
+                  jobs ou ajustes de storage executados;
+                </li>
+                <li>
+                  <strong>Data correta do relatório:</strong> extraída fielmente do corpo do e-mail
+                  do técnico, <strong>nunca a data de criação do job no console do Veeam</strong>.
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                Onde usar no sistema
+              </h4>
+              <p className="leading-relaxed">
+                • <strong>Sub-aba &quot;Monitoramento Externo (NOC)&quot;</strong> dentro da aba{' '}
+                <strong>5. Evidências</strong>: histórico completo dos atestados diários, tabela por
+                VM e data do relatório.
+                <br />• <strong>Botão &quot;Registrar Avaliação Manual&quot;</strong>: disponível
+                para perfis <strong>Administrador</strong> e <strong>Suporte</strong> para
+                lançamento imediato de laudos técnicos em dias sem tráfego de e-mail.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-lg border border-purple-200 bg-purple-50/60 text-purple-950 space-y-1.5">
+              <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-purple-900">
+                <ShieldCheck className="w-4 h-4 text-purple-700 shrink-0" />
+                <span>
+                  Card &quot;Validação Humana (NOC)&quot; na Visão Geral e Selo de Convergência
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed">
+                Na tela inicial da Visão Geral, ao lado da tabela &quot;Proteção por Ativo&quot;, o
+                card <strong>&quot;Validação Humana (NOC)&quot;</strong> apresenta o selo de
+                convergência do dia:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-950">
+                  <span className="font-bold flex items-center gap-1.5 text-emerald-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    &quot;NOC concorda com a análise do sistema&quot;
+                  </span>
+                  <p className="text-[11px] mt-1 text-emerald-900">
+                    O atestado humano converge integralmente com os laudos técnicos automáticos
+                    gerados a partir dos comprovantes.
+                  </p>
+                </div>
+                <div className="p-2.5 rounded bg-amber-50 border border-amber-200 text-amber-950">
+                  <span className="font-bold flex items-center gap-1.5 text-amber-800">
+                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                    &quot;Divergência detectada&quot;
+                  </span>
+                  <p className="text-[11px] mt-1 text-amber-900">
+                    A divergência NOC × sistema é <strong>REGISTRADA para auditoria</strong> e{' '}
+                    <strong>NUNCA sobrescreve o veredito do sistema</strong> (o motor permanece
+                    fonte da verdade técnica).
+                  </p>
+                </div>
+              </div>
+              <p className="text-[11px] text-purple-900 pt-1 font-semibold">
+                Essa é a <strong>dupla camada de conformidade</strong> (prova automática via
+                evidência criptográfica + validação humana diária) que se apresenta ao juiz
+                corregedor e auditores.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-950 flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-xs">
+                <span className="font-bold">
+                  Ciclo de Ocorrências: Abertura por Fato Real e Encerramento Automático
+                </span>
+                <p className="leading-relaxed">
+                  Falha reportada pelo NOC <strong>abre ocorrência automaticamente</strong> com o
+                  fato real detalhado por VM. Um relatório posterior de sucesso do NOC{' '}
+                  <strong>encerra as ocorrências automaticamente</strong>, registrando o parecer de
+                  normalização e restabelecendo o status positivo na trilha de auditoria.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
       {/* Resumo Final / Chamada para o Relatório A4 */}
       <Card className="border-slate-200 bg-slate-50/70 p-6 text-center rounded-xl space-y-3">
         <h3 className="text-base font-bold text-slate-900">
@@ -1607,7 +2008,7 @@ export const BackupGuiaPage: React.FC = () => {
               <ShieldCheck className="w-4 h-4" /> Ir para a Visão Geral do Backup
             </Button>
           </Link>
-          <Link to="/relatorios/backup" target="_blank">
+          <Link to="/backup/relatorio" target="_blank">
             <Button
               variant="outline"
               className="text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-100 gap-1.5"

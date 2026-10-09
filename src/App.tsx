@@ -177,7 +177,14 @@ export const App = () => (
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/backup/relatorio"
+            element={
+              <ProtectedRoute>
+                <BackupReportPage />
+              </ProtectedRoute>
+            }
+          />
           {/* 404 Fallback */}
           <Route path="*" element={<NotFound />} />
         </Routes>

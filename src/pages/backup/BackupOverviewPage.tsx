@@ -301,15 +301,15 @@ export const BackupOverviewPage: React.FC = () => {
               <HelpCircle className="w-4 h-4 text-blue-700" /> Guia / Ajuda (?)
             </Button>
           </Link>
-          <Link to="/relatorios/backup" target="_blank">
+          <Link to="/backup/relatorio" target="_blank">
             <Button
               variant="outline"
               size="sm"
-              className="text-xs font-semibold text-slate-700 border-slate-300 hover:bg-slate-100 gap-1.5 shadow-2xs"
+              className="text-xs font-semibold text-slate-700 hover:bg-slate-50 gap-1.5"
             >
               <Printer className="w-4 h-4 text-slate-600" /> Relatório Comprobatório
             </Button>
-          </Link>
+          </Link>{' '}
           <Button
             variant="ghost"
             size="sm"
@@ -1023,14 +1023,14 @@ export const BackupOverviewPage: React.FC = () => {
                     geração de relatórios comprobatórios.
                   </div>
                 )}
-                <Link to="/relatorios/backup" target="_blank" className="block pt-2">
+                <Link to="/backup/relatorio" target="_blank" className="block pt-2">
                   <Button
-                    variant="secondary"
-                    className="w-full justify-start text-xs font-semibold text-slate-800"
+                    variant="outline"
+                    className="w-full text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     <Printer className="w-4 h-4 mr-2 text-slate-600" /> Emitir Relatório A4
                   </Button>
-                </Link>
+                </Link>{' '}
               </CardContent>
             </Card>
           </div>
