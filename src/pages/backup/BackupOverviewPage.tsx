@@ -291,6 +291,16 @@ export const BackupOverviewPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <Link to="/backup/preview">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs font-bold text-amber-900 border-amber-300 bg-amber-50 hover:bg-amber-100 gap-1.5 shadow-2xs"
+              title="Abrir a Prévia Visual de Homologação da Visão Geral"
+            >
+              <Sparkles className="w-4 h-4 text-amber-600" /> Prévia Visual
+            </Button>
+          </Link>
           <Link to="/backup/guia">
             <Button
               variant="outline"

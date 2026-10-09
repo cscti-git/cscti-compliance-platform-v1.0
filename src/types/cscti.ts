@@ -526,7 +526,8 @@ export interface BackupExecucaoItem {
   tamanho_formatado?: string
   destino?: string
   observacao?: string
-  detalhes_vms?: BackupVmDetailItem[]
+  data_email?: string
+  detalhes_vms?: (BackupVmDetailItem & { ativo_id?: string })[]
   confronto_escopo?: BackupConfrontoEscopo
   created?: string
   updated?: string

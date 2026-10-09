@@ -18,6 +18,7 @@ import AuditPage from './pages/AuditPage'
 import AssetsPage from './pages/inventory/AssetsPage'
 import InventoryReportPage from './pages/inventory/InventoryReportPage'
 import BackupOverviewPage from './pages/backup/BackupOverviewPage'
+import BackupOverviewPreviewPage from './pages/backup/BackupOverviewPreviewPage'
 import BackupGuiaPage from './pages/backup/BackupGuiaPage'
 import BackupReportPage from './pages/backup/BackupReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
@@ -147,6 +148,7 @@ export const App = () => (
             />
             {/* 6. Continuidade e Backup (Fase 3) */}
             <Route path="/backup" element={<BackupOverviewPage />} />
+            <Route path="/backup/preview" element={<BackupOverviewPreviewPage />} />
             <Route path="/backup/guia" element={<BackupGuiaPage />} />
             <Route path="/backup/escopo" element={<BackupOverviewPage />} />
             <Route path="/backup/planos" element={<BackupOverviewPage />} />
