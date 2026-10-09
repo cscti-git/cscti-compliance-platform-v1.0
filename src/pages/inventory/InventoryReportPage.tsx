@@ -31,8 +31,8 @@ import {
 // Categorias mapeadas conforme agrupamento oficial do sistema
 const CATEGORY_FILTER_OPTIONS = [
   { value: 'todas', label: 'Todas as Categorias' },
+  { value: 'servidor', label: 'Servidores virtualizados' },
   { value: 'estacao', label: 'Estações de trabalho' },
-  { value: 'servidor', label: 'Servidores' },
   { value: 'rede', label: 'Rede e segurança' },
   { value: 'sistema', label: 'Sistemas e aplicações' },
   { value: 'dados', label: 'Dados e outros' },

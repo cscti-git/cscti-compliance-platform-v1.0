@@ -18,8 +18,8 @@ export const SvgDonutChart: React.FC<SvgDonutChartProps> = ({
   data,
   totalLabel,
   subLabel = 'Ativos',
-  size = 136,
-  strokeWidth = 22,
+  size = 120,
+  strokeWidth = 18,
 }) => {
   const total = data.reduce((acc, cur) => acc + cur.value, 0)
   const radius = (size - strokeWidth) / 2
@@ -114,10 +114,10 @@ export const SvgBarChart: React.FC<SvgBarChartProps> = ({ data, maxVal }) => {
   ]
 
   return (
-    <div className="flex-1 flex flex-col justify-between h-40 pt-1">
+    <div className="w-full flex flex-col justify-between h-40 pt-1">
       <div className="flex-1 flex items-stretch">
         {/* Eixo Y */}
-        <div className="w-7 flex flex-col justify-between text-[10px] font-mono text-slate-400 text-right pr-2 select-none py-1">
+        <div className="w-6 flex flex-col justify-between text-[10px] font-mono text-slate-400 text-right pr-2 select-none py-1">
           {ticks.map((t) => (
             <span key={t} className="leading-none">
               {t}
@@ -126,7 +126,7 @@ export const SvgBarChart: React.FC<SvgBarChartProps> = ({ data, maxVal }) => {
         </div>
 
         {/* Grade e Barras */}
-        <div className="flex-1 relative flex items-end justify-around px-2 border-l border-b border-slate-200">
+        <div className="flex-1 relative flex items-end justify-between px-2 sm:px-4 border-l border-b border-slate-200">
           {/* Linhas de grade sutis */}
           <div className="absolute inset-x-0 top-0 border-t border-slate-100" />
           <div className="absolute inset-x-0 top-1/4 border-t border-slate-100" />
@@ -134,11 +134,14 @@ export const SvgBarChart: React.FC<SvgBarChartProps> = ({ data, maxVal }) => {
           <div className="absolute inset-x-0 top-3/4 border-t border-slate-100" />
 
           {data.map((item, idx) => {
-            const heightPercent = Math.min(100, Math.max(4, (item.value / calculatedMax) * 100))
+            const heightPercent = Math.min(
+              100,
+              Math.max(item.value > 0 ? 8 : 2, (item.value / calculatedMax) * 100),
+            )
             return (
               <div
                 key={idx}
-                className="relative flex flex-col items-center justify-end h-full z-10 w-12 sm:w-14 group"
+                className="relative flex-1 max-w-[52px] mx-1 flex flex-col items-center justify-end h-full z-10 group"
               >
                 {/* Valor acima da barra */}
                 <span className="text-[11px] font-bold text-slate-700 mb-1 leading-none group-hover:scale-110 transition-transform">
@@ -160,9 +163,13 @@ export const SvgBarChart: React.FC<SvgBarChartProps> = ({ data, maxVal }) => {
       </div>
 
       {/* Rótulos do Eixo X */}
-      <div className="flex items-center justify-around pl-7 pr-2 pt-1 text-[11px] font-medium text-slate-600">
+      <div className="flex items-center justify-between pl-6 pr-2 sm:pr-4 pt-1.5 text-[11px] font-medium text-slate-600">
         {data.map((item, idx) => (
-          <span key={idx} className="w-12 sm:w-14 text-center truncate">
+          <span
+            key={idx}
+            className="flex-1 max-w-[52px] mx-1 text-center truncate"
+            title={item.label}
+          >
             {item.label}
           </span>
         ))}

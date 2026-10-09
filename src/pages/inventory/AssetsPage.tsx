@@ -78,8 +78,8 @@ import {
 // Categorias padronizadas da visualização
 const CATEGORY_GROUPS = [
   { value: 'todas', label: 'Todas as Categorias' },
+  { value: 'servidor', label: 'Servidores virtualizados' },
   { value: 'estacao', label: 'Estações de trabalho' },
-  { value: 'servidor', label: 'Servidores' },
   { value: 'rede', label: 'Rede e segurança' },
   { value: 'sistema', label: 'Sistemas e aplicações' },
   { value: 'dados', label: 'Dados e outros' },
@@ -207,9 +207,9 @@ export const AssetsPage: React.FC = () => {
       }
 
       // Categoria e Subtipo visual
-      let subtipoFormatado = 'Servidor'
-      if (a.tipo === 'servidor_aplicacao') subtipoFormatado = 'Servidor de Aplicação'
-      else if (a.tipo === 'servidor_virtualizado') subtipoFormatado = 'Servidor Virtualizado'
+      let subtipoFormatado = 'Servidor virtualizado'
+      if (a.tipo === 'servidor_virtualizado') subtipoFormatado = 'Servidor virtualizado'
+      else if (a.tipo === 'servidor_aplicacao') subtipoFormatado = 'Servidor de Aplicação'
       else if (a.tipo === 'banco_dados') subtipoFormatado = 'Banco de dados'
       else if (a.tipo === 'storage_backup') subtipoFormatado = 'Storage e Backup'
       else if (a.tipo === 'estacao') subtipoFormatado = 'Estação de trabalho'
@@ -285,16 +285,16 @@ export const AssetsPage: React.FC = () => {
 
     const list = [
       {
-        label: 'Estações de trabalho',
-        value: estacoes,
-        percent: totalAssetsCount > 0 ? Math.round((estacoes / total) * 100) : 0,
-        color: '#2563EB', // azul royal como no esboço
-      },
-      {
-        label: 'Servidores',
+        label: 'Servidores virtualizados',
         value: servidores,
         percent: totalAssetsCount > 0 ? Math.round((servidores / total) * 100) : 0,
         color: '#38BDF8', // sky-400 / ciano claro
+      },
+      {
+        label: 'Estações de trabalho',
+        value: estacoes,
+        percent: totalAssetsCount > 0 ? Math.round((estacoes / total) * 100) : 0,
+        color: '#2563EB', // azul royal
       },
       {
         label: 'Rede e segurança',
@@ -312,7 +312,7 @@ export const AssetsPage: React.FC = () => {
         label: 'Dados e outros',
         value: dados,
         percent: totalAssetsCount > 0 ? Math.round((dados / total) * 100) : 0,
-        color: '#C084FC', // roxo/lilás como no topo do donut do esboço
+        color: '#C084FC', // roxo/lilás
       },
     ]
 
@@ -838,13 +838,13 @@ export const AssetsPage: React.FC = () => {
           </div>
 
           {/* 4. LINHA ANALÍTICA (3 painéis fixos em grid de 3 colunas, NUNCA sofrem reflow) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Gráfico 1: Ativos por Categoria — Donut à esquerda + Legenda descritiva ao lado como na referência */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4.5 flex flex-col justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Gráfico 1: Ativos por Categoria — Donut à esquerda + Legenda descritiva ao lado com espaçamento generoso */}
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-5 sm:p-6 flex flex-col justify-between min-h-[230px]">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 mb-3">Ativos por Categoria</h3>
-                <div className="flex flex-col sm:flex-row items-center sm:items-center justify-between gap-4 py-1">
-                  {/* Donut com total no centro */}
+                <h3 className="text-sm font-bold text-slate-900 mb-4">Ativos por Categoria</h3>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 py-0.5">
+                  {/* Donut com total no centro com respiro */}
                   <div className="shrink-0 flex items-center justify-center">
                     <SvgDonutChart
                       data={categoryStats.map((c) => ({
@@ -854,26 +854,28 @@ export const AssetsPage: React.FC = () => {
                       }))}
                       totalLabel={String(totalAssetsCount)}
                       subLabel="Ativos"
-                      size={132}
-                      strokeWidth={20}
+                      size={118}
+                      strokeWidth={18}
                     />
                   </div>
 
-                  {/* Legenda ao lado com NOME, QUANTIDADE REAL e PERCENTUAL: Estações de trabalho 120 (48%) */}
-                  <div className="flex-1 w-full space-y-2 text-xs">
+                  {/* Legenda ao lado com NOME, QUANTIDADE REAL e PERCENTUAL alinhado à direita com respiro */}
+                  <div className="flex-1 w-full space-y-2.5 text-xs">
                     {categoryStats.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between gap-2 text-slate-700"
+                        className="flex items-center justify-between gap-3 text-slate-700 hover:text-slate-900 transition-colors"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 pr-1">
                           <span
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: item.color }}
                           />
-                          <span className="text-xs text-slate-600 truncate">{item.label}</span>
+                          <span className="text-xs text-slate-600 truncate" title={item.label}>
+                            {item.label}
+                          </span>
                         </div>
-                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1">
+                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1 text-right">
                           {item.value}{' '}
                           <span className="font-normal text-slate-500">({item.percent}%)</span>
                         </span>
@@ -884,27 +886,27 @@ export const AssetsPage: React.FC = () => {
               </div>
             </Card>
 
-            {/* Gráfico 2: Classificação de Criticidade (Barras com escala dinâmica honesta) */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4.5 flex flex-col justify-between">
+            {/* Gráfico 2: Classificação de Criticidade (Barras com escala dinâmica honesta e altura consistente) */}
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-5 sm:p-6 flex flex-col justify-between min-h-[230px]">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 mb-3">
                   Classificação de Criticidade
                 </h3>
-                <div className="my-1">
+                <div className="my-0.5">
                   <SvgBarChart data={criticalityStats} />
                 </div>
               </div>
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <div className="pt-3 mt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>Total crítico / alta:</span>
                 <strong className="text-red-600 font-bold">{criticalAssetsCount} ativos</strong>
               </div>
             </Card>
 
-            {/* Gráfico 3: Situação de Conformidade — Donut à esquerda + Legenda descritiva ao lado como na referência */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4.5 flex flex-col justify-between">
+            {/* Gráfico 3: Situação de Conformidade — Donut à esquerda + Legenda descritiva ao lado com respiro */}
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-5 sm:p-6 flex flex-col justify-between min-h-[230px]">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 mb-3">Situação de Conformidade</h3>
-                <div className="flex flex-col sm:flex-row items-center sm:items-center justify-between gap-4 py-1">
+                <h3 className="text-sm font-bold text-slate-900 mb-4">Situação de Conformidade</h3>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 py-0.5">
                   {/* Donut com total no centro */}
                   <div className="shrink-0 flex items-center justify-center">
                     <SvgDonutChart
@@ -915,26 +917,28 @@ export const AssetsPage: React.FC = () => {
                       }))}
                       totalLabel={String(totalAssetsCount)}
                       subLabel="Ativos"
-                      size={132}
-                      strokeWidth={20}
+                      size={118}
+                      strokeWidth={18}
                     />
                   </div>
 
-                  {/* Legenda ao lado com NOME, QUANTIDADE REAL e PERCENTUAL: Conforme 186 (75%) */}
-                  <div className="flex-1 w-full space-y-2 text-xs">
+                  {/* Legenda ao lado com NOME, QUANTIDADE REAL e PERCENTUAL alinhado à direita com respiro */}
+                  <div className="flex-1 w-full space-y-2.5 text-xs">
                     {conformidadeStats.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between gap-2 text-slate-700"
+                        className="flex items-center justify-between gap-3 text-slate-700 hover:text-slate-900 transition-colors"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 pr-1">
                           <span
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: item.color }}
                           />
-                          <span className="text-xs text-slate-600 truncate">{item.label}</span>
+                          <span className="text-xs text-slate-600 truncate" title={item.label}>
+                            {item.label}
+                          </span>
                         </div>
-                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1">
+                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1 text-right">
                           {item.value}{' '}
                           <span className="font-normal text-slate-500">({item.percent}%)</span>
                         </span>
@@ -969,12 +973,12 @@ export const AssetsPage: React.FC = () => {
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todas">Todas</SelectItem>
-                    <SelectItem value="estacao">Estações</SelectItem>
-                    <SelectItem value="servidor">Servidores</SelectItem>
-                    <SelectItem value="rede">Rede e Seg.</SelectItem>
-                    <SelectItem value="sistema">Sistemas</SelectItem>
-                    <SelectItem value="dados">Dados</SelectItem>
+                    <SelectItem value="todas">Todas as categorias</SelectItem>
+                    <SelectItem value="servidor">Servidores virtualizados</SelectItem>
+                    <SelectItem value="estacao">Estações de trabalho</SelectItem>
+                    <SelectItem value="rede">Rede e segurança</SelectItem>
+                    <SelectItem value="sistema">Sistemas e aplicações</SelectItem>
+                    <SelectItem value="dados">Dados e outros</SelectItem>
                   </SelectContent>
                 </Select>
 
