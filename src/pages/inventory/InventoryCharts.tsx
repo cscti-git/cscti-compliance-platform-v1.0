@@ -92,8 +92,25 @@ interface SvgBarChartProps {
 }
 
 export const SvgBarChart: React.FC<SvgBarChartProps> = ({ data, maxVal }) => {
-  const calculatedMax = maxVal || Math.max(...data.map((d) => d.value), 120)
-  const ticks = [120, 90, 60, 30, 0]
+  const maxValueInData = Math.max(...data.map((d) => d.value), 0)
+  // Escala dinâmica honesta com base nos dados reais
+  const calculatedMax =
+    maxVal ||
+    (maxValueInData <= 4
+      ? 4
+      : maxValueInData <= 10
+        ? 10
+        : maxValueInData <= 50
+          ? 50
+          : Math.ceil(maxValueInData * 1.25))
+
+  const ticks = [
+    calculatedMax,
+    Math.round(calculatedMax * 0.75),
+    Math.round(calculatedMax * 0.5),
+    Math.round(calculatedMax * 0.25),
+    0,
+  ]
 
   return (
     <div className="flex-1 flex flex-col justify-between h-40 pt-1">

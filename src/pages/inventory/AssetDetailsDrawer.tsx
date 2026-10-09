@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,8 +19,21 @@ import {
   Wifi,
   Printer,
   Boxes,
+  CheckCircle2,
+  Clock,
+  Layers,
+  FileCheck,
+  RefreshCw,
 } from 'lucide-react'
-import type { InventoryAssetItem, AssetType } from '@/types/cscti'
+import type {
+  InventoryAssetItem,
+  AssetType,
+  ConfrontoAtivoItem,
+  BackupEscopoItem,
+  BackupPlanoItem,
+  BackupFonteItem,
+} from '@/types/cscti'
+import { listBackupEscopos, listBackupPlanos, listBackupFontes } from '@/services/backupService'
 
 export interface AssetDisplayItem extends InventoryAssetItem {
   displayCode: string
@@ -33,6 +46,8 @@ export interface AssetDisplayItem extends InventoryAssetItem {
 
 interface AssetDetailsDrawerProps {
   asset: AssetDisplayItem | null
+  confrontoAtivo?: ConfrontoAtivoItem | null
+  orgId?: string
   onClose: () => void
   onEdit: (asset: InventoryAssetItem) => void
   onViewFullSheet?: (asset: AssetDisplayItem) => void
@@ -63,6 +78,8 @@ export const getAssetTypeIcon = (tipo: AssetType, className = 'w-5 h-5') => {
 
 export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
   asset,
+  confrontoAtivo,
+  orgId,
   onClose,
   onEdit,
   onViewFullSheet,
@@ -70,6 +87,51 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<'visao_geral' | 'protecao' | 'relacionamentos'>(
     'visao_geral',
   )
+
+  // Estado para relacionamentos reais
+  const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])
+  const [planos, setPlanos] = useState<BackupPlanoItem[]>([])
+  const [fontes, setFontes] = useState<BackupFonteItem[]>([])
+  const [loadingRelations, setLoadingRelations] = useState(false)
+
+  // Carregar dados reais de relacionamento quando o ativo mudar
+  useEffect(() => {
+    if (!asset || !orgId) return
+    let isCancelled = false
+    setLoadingRelations(true)
+
+    Promise.all([
+      listBackupEscopos(orgId).catch(() => []),
+      listBackupPlanos(orgId).catch(() => []),
+      listBackupFontes(orgId).catch(() => []),
+    ])
+      .then(([escoposData, planosData, fontesData]) => {
+        if (!isCancelled) {
+          // Filtrar apenas o que referencia este ativo
+          const matchedEscopos = escoposData.filter(
+            (e) => Array.isArray(e.ativos) && e.ativos.includes(asset.id),
+          )
+          const matchedFontes = fontesData.filter(
+            (f) => f.ativo_inventario === asset.id || f.caminho_identificacao === asset.name,
+          )
+          const matchedEscopoIds = new Set(matchedEscopos.map((e) => e.id))
+          const matchedPlanos = planosData.filter((p) => p.escopo && matchedEscopoIds.has(p.escopo))
+
+          setEscopos(matchedEscopos)
+          setPlanos(matchedPlanos)
+          setFontes(matchedFontes)
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setLoadingRelations(false)
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [asset?.id, orgId])
 
   if (!asset) return null
 
@@ -151,6 +213,19 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
             <HelpCircle className="w-3.5 h-3.5 text-slate-400" /> Não avaliado
           </span>
         )
+    }
+  }
+
+  const formatComprovacaoData = (isoDate: string | null | undefined) => {
+    if (!isoDate) return 'Sem comprovação recente'
+    try {
+      const d = new Date(isoDate)
+      return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`
+    } catch {
+      return isoDate
     }
   }
 
@@ -243,7 +318,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
                   Descrição
                 </span>
                 <span className="text-slate-700 leading-snug block line-clamp-2">
-                  {asset.descricao || 'Nenhuma descrição técnica informada.'}
+                  {asset.descricao?.trim() ? asset.descricao : 'Não informada'}
                 </span>
               </div>
 
@@ -252,7 +327,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
                   Responsável
                 </span>
                 <span className="text-slate-800 font-medium block truncate">
-                  {asset.expand?.responsavel?.name || 'Equipe de TI'}
+                  {asset.expand?.responsavel?.name || 'Não informado'}
                 </span>
               </div>
 
@@ -261,7 +336,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
                   Localização
                 </span>
                 <span className="text-slate-800 font-medium block truncate">
-                  {asset.localizacao || 'Sala de servidores'}
+                  {asset.localizacao || 'Não informada'}
                   {asset.ip_address ? ` • IP ${asset.ip_address}` : ''}
                 </span>
               </div>
@@ -271,7 +346,7 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
                   Classificação da Informação
                 </span>
                 <span className="text-slate-800 font-medium block truncate">
-                  {asset.classificacaoInformacao || 'Restrito'}
+                  {asset.classificacaoInformacao}
                 </span>
               </div>
 
@@ -302,53 +377,111 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
               </div>
             </div>
           ) : activeTab === 'protecao' ? (
-            <div className="space-y-3 text-xs">
+            <div className="space-y-2.5 text-xs">
               <p className="text-slate-500 text-[11px] leading-relaxed">
-                Salvaguardas e exigências de continuidade associadas a este ativo:
+                Salvaguardas e comprovações reais de continuidade vinculadas a este ativo:
               </p>
-              <div className="space-y-2">
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span className="text-slate-700 font-medium">Backup Local</span>
-                  <Badge
-                    variant="outline"
-                    className={
-                      asset.exige_backup_local
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-slate-100 text-slate-500'
-                    }
-                  >
-                    {asset.exige_backup_local ? 'Exigido' : 'Não exigido'}
-                  </Badge>
+
+              {/* Modalidades de Backup configuradas e comprovadas */}
+              <div className="space-y-1.5">
+                {/* 1. Backup Local */}
+                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-800 font-semibold text-[11px]">Backup Local</span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] ${
+                        asset.exige_backup_local
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {asset.exige_backup_local ? 'Exigido' : 'Não exigido'}
+                    </Badge>
+                  </div>
+                  {confrontoAtivo?.modalidades?.local?.ultima_comprovacao && (
+                    <div className="mt-1 pt-1 border-t border-slate-200/60 text-[10px] text-slate-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span>
+                        Comprovado:{' '}
+                        {formatComprovacaoData(confrontoAtivo.modalidades.local.ultima_comprovacao)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span className="text-slate-700 font-medium">Backup em Nuvem</span>
-                  <Badge
-                    variant="outline"
-                    className={
-                      asset.exige_backup_nuvem
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-slate-100 text-slate-500'
-                    }
-                  >
-                    {asset.exige_backup_nuvem ? 'Exigido' : 'Não exigido'}
-                  </Badge>
+
+                {/* 2. Backup em Nuvem */}
+                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-800 font-semibold text-[11px]">
+                      Backup em Nuvem
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] ${
+                        asset.exige_backup_nuvem
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {asset.exige_backup_nuvem ? 'Exigido' : 'Não exigido'}
+                    </Badge>
+                  </div>
+                  {confrontoAtivo?.modalidades?.nuvem?.ultima_comprovacao && (
+                    <div className="mt-1 pt-1 border-t border-slate-200/60 text-[10px] text-slate-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span>
+                        Comprovado:{' '}
+                        {formatComprovacaoData(confrontoAtivo.modalidades.nuvem.ultima_comprovacao)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <span className="text-slate-700 font-medium">Replicação Contínua</span>
-                  <Badge
-                    variant="outline"
-                    className={
-                      asset.exige_backup_replicacao
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-slate-100 text-slate-500'
-                    }
-                  >
-                    {asset.exige_backup_replicacao ? 'Exigido' : 'Não exigido'}
-                  </Badge>
+
+                {/* 3. Replicação Contínua */}
+                <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-800 font-semibold text-[11px]">
+                      Replicação Contínua
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] ${
+                        asset.exige_backup_replicacao
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {asset.exige_backup_replicacao ? 'Exigido' : 'Não exigido'}
+                    </Badge>
+                  </div>
+                  {confrontoAtivo?.modalidades?.replicacao?.ultima_comprovacao && (
+                    <div className="mt-1 pt-1 border-t border-slate-200/60 text-[10px] text-slate-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span>
+                        Comprovado:{' '}
+                        {formatComprovacaoData(
+                          confrontoAtivo.modalidades.replicacao.ultima_comprovacao,
+                        )}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="pt-2 text-[11px] text-slate-400">
-                Origem:{' '}
+
+              {/* Status consolidado do confronto */}
+              {confrontoAtivo && (
+                <div className="p-2 rounded-lg bg-blue-50/70 border border-blue-100 text-[11px] text-blue-900 flex items-center justify-between">
+                  <span>Proteção atendida:</span>
+                  <strong className="font-semibold">
+                    {confrontoAtivo.total_atendidas} de {confrontoAtivo.exigencias.total_exigidas}{' '}
+                    exigência(s)
+                  </strong>
+                </div>
+              )}
+
+              <div className="pt-1 text-[11px] text-slate-400">
+                Origem do ativo:{' '}
                 <strong className="text-slate-600">
                   {asset.origem === 'glpi' ? `GLPI #${asset.external_id || ''}` : 'Cadastro Manual'}
                 </strong>
@@ -357,22 +490,58 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
           ) : (
             <div className="space-y-3 text-xs">
               <p className="text-slate-500 text-[11px] leading-relaxed">
-                Relações deste ativo com outros recursos tecnológicos e sistemas:
+                Vínculos reais deste ativo com escopos e planos de backup cadastrados:
               </p>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Serviços atendidos:</span>
-                  <span className="font-medium text-slate-800">Notas / Protesto / RTD</span>
+
+              {loadingRelations ? (
+                <div className="py-4 text-center text-slate-400 text-[11px]">
+                  <RefreshCw className="w-4 h-4 animate-spin mx-auto text-blue-600 mb-1" />
+                  Carregando relacionamentos...
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Unidade gestora:</span>
-                  <span className="font-medium text-slate-800">Sede Principal</span>
+              ) : escopos.length === 0 && planos.length === 0 && fontes.length === 0 ? (
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-center text-[11px] text-slate-500">
+                  Nenhum vínculo ou plano de proteção associado a este ativo no momento.
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Plano de backup:</span>
-                  <span className="font-medium text-blue-600">Plano Contínuo 30m</span>
+              ) : (
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 space-y-2 text-[11px]">
+                  {escopos.length > 0 && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">
+                        Escopo de Proteção:
+                      </span>
+                      {escopos.map((e) => (
+                        <div key={e.id} className="font-medium text-slate-800">
+                          {e.nome}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {planos.length > 0 && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">
+                        Plano de Backup:
+                      </span>
+                      {planos.map((p) => (
+                        <div key={p.id} className="font-medium text-blue-600">
+                          {p.nome}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {fontes.length > 0 && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">
+                        Fontes / Rotinas vinculadas:
+                      </span>
+                      <div className="text-slate-700 font-mono text-[10px]">
+                        {fontes.length} fonte(s) mapeada(s) no motor
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>

@@ -246,6 +246,12 @@ export const AssetsPage: React.FC = () => {
     return displayAssets.find((a) => a.id === selectedAssetId) || null
   }, [displayAssets, selectedAssetId])
 
+  // Confronto do ativo atualmente selecionado (se houver)
+  const currentConfrontoAtivo = useMemo(() => {
+    if (!selectedAssetId || !confronto?.confronto) return null
+    return confronto.confronto.find((item) => item.id === selectedAssetId) || null
+  }, [confronto, selectedAssetId])
+
   // CÁLCULOS DOS 4 CARDS SUPERIORES
   const totalAssetsCount = displayAssets.length
   const criticalAssetsCount = displayAssets.filter(
@@ -316,15 +322,16 @@ export const AssetsPage: React.FC = () => {
   }, [displayAssets, totalAssetsCount])
 
   // DADOS DO GRÁFICO 2: CLASSIFICAÇÃO DE CRITICIDADE (Barras)
+  // Baseado unicamente nas contagens reais dos ativos da organização
   const criticalityStats = useMemo(() => {
-    const critica = displayAssets.filter((a) => a.criticidade === 'alta').length
-    // Subdivisão para visualização detalhada ou contagens reais
+    const critica = displayAssets.filter(
+      (a) => a.criticidade === 'alta' || (a as any).criticidade === 'critica',
+    ).length
     const media = displayAssets.filter((a) => a.criticidade === 'media').length
     const baixa = displayAssets.filter((a) => a.criticidade === 'baixa').length
 
     return [
       { label: 'Crítica', value: critica, color: '#EF4444' }, // red
-      { label: 'Alta', value: Math.max(Math.round(critica * 0.7), 0), color: '#F97316' }, // orange
       { label: 'Média', value: media, color: '#FBBF24' }, // yellow
       { label: 'Baixa', value: baixa, color: '#10B981' }, // green
     ]
@@ -520,7 +527,7 @@ export const AssetsPage: React.FC = () => {
   }
 
   const getUserInitials = () => {
-    const name = user?.name || user?.email || 'JS'
+    const name = user?.name || user?.email || 'TI'
     const parts = name.split(' ').filter(Boolean)
     if (parts.length >= 2) {
       return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
@@ -586,15 +593,20 @@ export const AssetsPage: React.FC = () => {
               onClick={() => {
                 toast({
                   title: 'Notificações',
-                  description: 'Nenhum alerta crítico pendente no momento.',
+                  description:
+                    pendingAssetsCount > 0
+                      ? `${pendingAssetsCount} ativo(s) com pendência no momento.`
+                      : 'Nenhum alerta crítico pendente no momento.',
                 })
               }}
             >
               <Bell className="w-4 h-4" />
             </Button>
-            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-600 text-[10px] font-bold text-white flex items-center justify-center pointer-events-none ring-2 ring-white">
-              3
-            </span>
+            {pendingAssetsCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-600 text-[10px] font-bold text-white flex items-center justify-center pointer-events-none ring-2 ring-white">
+                {pendingAssetsCount}
+              </span>
+            )}
           </div>
 
           {/* Avatar e Perfil */}
@@ -604,7 +616,7 @@ export const AssetsPage: React.FC = () => {
             </div>
             <div className="text-left hidden sm:block leading-tight">
               <span className="text-xs font-bold text-slate-900 block truncate max-w-[140px]">
-                {user?.name || user?.email || 'João Silva'}
+                {user?.name || user?.email || 'Usuário'}
               </span>
               <span className="text-[11px] text-slate-500 block">{getRoleLabel()}</span>
             </div>
@@ -731,12 +743,9 @@ export const AssetsPage: React.FC = () => {
                     <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
                       {totalAssetsCount}
                     </span>
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <ArrowUp className="w-2.5 h-2.5" /> 12%
-                    </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-2 font-medium">
-                    + 26 desde o último mês
+                    Ativos cadastrados na serventia
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
@@ -755,9 +764,6 @@ export const AssetsPage: React.FC = () => {
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
                       {criticalAssetsCount}
-                    </span>
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <ArrowUp className="w-2.5 h-2.5" /> 6%
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-2 font-medium">
@@ -781,12 +787,11 @@ export const AssetsPage: React.FC = () => {
                     <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
                       {validatedAssetsCount}
                     </span>
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <ArrowUp className="w-2.5 h-2.5" /> {validatedPercent}%
-                    </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-2 font-medium">
-                    Dados validados e completos
+                    {totalAssetsCount > 0 && validatedAssetsCount === totalAssetsCount
+                      ? 'Dados validados e completos'
+                      : `${validatedPercent}% dos ativos validados`}
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
@@ -804,12 +809,11 @@ export const AssetsPage: React.FC = () => {
                     <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
                       {pendingAssetsCount}
                     </span>
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                      <ArrowUp className="w-2.5 h-2.5" /> {pendingPercent}%
-                    </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-2 font-medium">
-                    Necessitam de atenção
+                    {pendingAssetsCount === 0
+                      ? 'Nenhuma pendência identificada'
+                      : `${pendingPercent}% requerem atenção`}
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
@@ -886,7 +890,7 @@ export const AssetsPage: React.FC = () => {
                   Classificação de Criticidade
                 </h3>
                 <div className="my-1">
-                  <SvgBarChart data={criticalityStats} maxVal={120} />
+                  <SvgBarChart data={criticalityStats} />
                 </div>
               </div>
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
@@ -945,6 +949,8 @@ export const AssetsPage: React.FC = () => {
               <div className="md:col-span-2 lg:col-span-3 h-full">
                 <AssetDetailsDrawer
                   asset={currentAsset}
+                  confrontoAtivo={currentConfrontoAtivo}
+                  orgId={orgId}
                   onClose={() => setSelectedAssetId(null)}
                   onEdit={(asset) => {
                     setEditingAsset(asset)
@@ -1229,7 +1235,7 @@ export const AssetsPage: React.FC = () => {
 
                           {/* Responsável */}
                           <td className="py-3 px-3.5 whitespace-nowrap text-slate-700 font-medium">
-                            {asset.expand?.responsavel?.name || 'Equipe de TI'}
+                            {asset.expand?.responsavel?.name || '—'}
                           </td>
 
                           {/* Última Validação */}
@@ -1464,7 +1470,7 @@ export const AssetsPage: React.FC = () => {
                       Responsável Designado
                     </span>
                     <span className="text-slate-800">
-                      {fullSheetAsset.expand?.responsavel?.name || 'Equipe de TI'}
+                      {fullSheetAsset.expand?.responsavel?.name || 'Não informado'}
                     </span>
                   </div>
                 </div>
