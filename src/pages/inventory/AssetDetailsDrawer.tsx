@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -56,21 +55,20 @@ interface AssetDetailsDrawerProps {
 export const getAssetTypeIcon = (tipo: AssetType, className = 'w-5 h-5') => {
   switch (tipo) {
     case 'servidor_aplicacao':
-      return <Server className={className} />
     case 'servidor_virtualizado':
-      return <Cpu className={className} />
+      return <Server className={className} />
+    case 'estacao':
+      return <Monitor className={className} />
+    case 'equipamento_rede':
+      return <ShieldCheck className={className} />
+    case 'servico_nuvem':
+      return <Layers className={className} />
+    case 'impressora_multifuncional':
+      return <Printer className={className} />
     case 'banco_dados':
       return <Database className={className} />
     case 'storage_backup':
       return <HardDrive className={className} />
-    case 'servico_nuvem':
-      return <Cloud className={className} />
-    case 'estacao':
-      return <Monitor className={className} />
-    case 'equipamento_rede':
-      return <Wifi className={className} />
-    case 'impressora_multifuncional':
-      return <Printer className={className} />
     default:
       return <Boxes className={className} />
   }
@@ -230,22 +228,22 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
   }
 
   return (
-    <Card className="bg-white border-slate-200/90 shadow-2xs flex flex-col h-full rounded-xl overflow-hidden">
-      {/* Header do Card com Botão X */}
-      <CardHeader className="p-3.5 sm:p-4 pb-2.5 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
-        <span className="text-xs sm:text-sm font-bold text-slate-900">Detalhes do Ativo</span>
+    <div className="bg-white flex flex-col h-full overflow-hidden">
+      {/* Header do Painel com Botão X */}
+      <div className="p-4 border-b border-slate-100 flex flex-row items-center justify-between shrink-0">
+        <span className="text-sm font-bold text-slate-900">Detalhes do Ativo</span>
         <Button
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="h-6 w-6 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full"
+          className="h-7 w-7 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full"
           title="Fechar painel de detalhes"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-4 h-4" />
         </Button>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between space-y-3">
+      <div className="p-4 flex-1 overflow-y-auto flex flex-col justify-between space-y-4">
         <div className="space-y-3">
           {/* Identificação Superior: Ícone, Nome, Código e Badges */}
           <div className="flex items-start gap-2.5">
@@ -547,22 +545,22 @@ export const AssetDetailsDrawer: React.FC<AssetDetailsDrawerProps> = ({
         </div>
 
         {/* Botões de Ação na base do painel */}
-        <div className="space-y-2 pt-2 border-t border-slate-100 shrink-0">
+        <div className="space-y-2 pt-3 border-t border-slate-100 shrink-0 mt-4">
           <Button
             onClick={() => onViewFullSheet && onViewFullSheet(asset)}
-            className="w-full bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-8 sm:h-9 gap-1.5 shadow-sm"
+            className="w-full bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-9 gap-1.5 shadow-sm"
           >
             <ExternalLink className="w-3.5 h-3.5" /> Ver ficha completa
           </Button>
           <Button
             variant="outline"
             onClick={() => onEdit(asset)}
-            className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium h-8 sm:h-9 gap-1.5"
+            className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium h-9 gap-1.5"
           >
             <Edit2 className="w-3.5 h-3.5 text-slate-500" /> Editar ativo
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

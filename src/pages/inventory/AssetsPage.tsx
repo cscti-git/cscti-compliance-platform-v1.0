@@ -77,6 +77,13 @@ import {
   Layers,
   ArrowUp,
   Server,
+  CheckCircle2,
+  Clock,
+  Monitor,
+  Shield,
+  LayoutGrid,
+  FileText as FileTextIcon,
+  HardDrive,
 } from 'lucide-react'
 
 // Categorias padronizadas da visualização
@@ -324,16 +331,18 @@ export const AssetsPage: React.FC = () => {
   // DADOS DO GRÁFICO 2: CLASSIFICAÇÃO DE CRITICIDADE (Barras)
   // Baseado unicamente nas contagens reais dos ativos da organização
   const criticalityStats = useMemo(() => {
-    const critica = displayAssets.filter(
-      (a) => a.criticidade === 'alta' || (a as any).criticidade === 'critica',
-    ).length
+    // Ordem fixa do esboço: Crítica, Alta, Média, Baixa
+    // No backend/formulário criticidade pode ser 'critica' ou 'alta' ou 'media' ou 'baixa'
+    const critica = displayAssets.filter((a) => (a as any).criticidade === 'critica').length
+    const alta = displayAssets.filter((a) => a.criticidade === 'alta').length
     const media = displayAssets.filter((a) => a.criticidade === 'media').length
     const baixa = displayAssets.filter((a) => a.criticidade === 'baixa').length
 
     return [
-      { label: 'Crítica', value: critica, color: '#EF4444' }, // red
-      { label: 'Média', value: media, color: '#FBBF24' }, // yellow
-      { label: 'Baixa', value: baixa, color: '#10B981' }, // green
+      { label: 'Crítica', value: critica, color: '#EF4444' }, // red-500
+      { label: 'Alta', value: alta, color: '#FB923C' }, // orange-400
+      { label: 'Média', value: media, color: '#FBBF24' }, // amber-400
+      { label: 'Baixa', value: baixa, color: '#10B981' }, // emerald-500
     ]
   }, [displayAssets])
 
@@ -734,114 +743,99 @@ export const AssetsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: Total de Ativos */}
             <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-4 flex items-start justify-between">
-                <div>
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                  <Boxes className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
                   <span className="text-xs font-semibold text-slate-500 block">
                     Total de Ativos
                   </span>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
                       {totalAssetsCount}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2 font-medium">
+                  <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
                     Ativos cadastrados na serventia
                   </p>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
-                  <Boxes className="w-5 h-5" />
                 </div>
               </CardContent>
             </Card>
 
             {/* Card 2: Ativos Críticos */}
             <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-4 flex items-start justify-between">
-                <div>
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
                   <span className="text-xs font-semibold text-slate-500 block">
                     Ativos Críticos
                   </span>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
                       {criticalAssetsCount}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2 font-medium">
+                  <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
                     {criticalPercent}% do total
                   </p>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100">
-                  <AlertTriangle className="w-5 h-5" />
                 </div>
               </CardContent>
             </Card>
 
             {/* Card 3: Inventário Validado */}
             <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-4 flex items-start justify-between">
-                <div>
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
                   <span className="text-xs font-semibold text-slate-500 block">
                     Inventário Validado
                   </span>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
                       {validatedAssetsCount}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2 font-medium">
+                  <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
                     {totalAssetsCount > 0 && validatedAssetsCount === totalAssetsCount
                       ? 'Dados validados e completos'
                       : `${validatedPercent}% dos ativos validados`}
                   </p>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                  <ShieldCheck className="w-5 h-5" />
                 </div>
               </CardContent>
             </Card>
 
             {/* Card 4: Com Pendências */}
             <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-4 flex items-start justify-between">
-                <div>
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
                   <span className="text-xs font-semibold text-slate-500 block">Com Pendências</span>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
                       {pendingAssetsCount}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2 font-medium">
+                  <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
                     {pendingAssetsCount === 0
                       ? 'Nenhuma pendência identificada'
                       : `${pendingPercent}% requerem atenção`}
                   </p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
-                  <HelpCircle className="w-5 h-5" />
-                </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* 4. LINHA ANALÍTICA + PAINEL LATERAL "DETALHES DO ATIVO" */}
-          {/*
-            No esboço do usuário, quando aberto, "Detalhes do Ativo" ocupa a 4ª coluna à direita
-            na mesma linha dos 3 painéis analíticos (Ativos por Categoria, Criticidade, Situação de Conformidade).
-            Quando fechado, os 3 painéis ocupam a largura total (grid de 3 colunas).
-          */}
-          <div
-            className={
-              currentAsset
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-stretch'
-                : 'grid grid-cols-1 md:grid-cols-3 gap-4'
-            }
-          >
+          {/* 4. LINHA ANALÍTICA (3 painéis fixos em grid de 3 colunas, NUNCA sofrem reflow) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Gráfico 1: Ativos por Categoria */}
-            <Card
-              className={`bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between ${
-                currentAsset ? 'lg:col-span-3' : ''
-              }`}
-            >
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
               <div>
                 <h3 className="text-xs font-bold text-slate-900 mb-2.5">Ativos por Categoria</h3>
                 <div className="flex justify-center my-1.5">
@@ -853,8 +847,8 @@ export const AssetsPage: React.FC = () => {
                     }))}
                     totalLabel={String(totalAssetsCount)}
                     subLabel="Ativos"
-                    size={currentAsset ? 110 : 124}
-                    strokeWidth={currentAsset ? 18 : 20}
+                    size={124}
+                    strokeWidth={20}
                   />
                 </div>
               </div>
@@ -880,11 +874,7 @@ export const AssetsPage: React.FC = () => {
             </Card>
 
             {/* Gráfico 2: Classificação de Criticidade (Barras) */}
-            <Card
-              className={`bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between ${
-                currentAsset ? 'lg:col-span-3' : ''
-              }`}
-            >
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
               <div>
                 <h3 className="text-xs font-bold text-slate-900 mb-2.5">
                   Classificação de Criticidade
@@ -900,11 +890,7 @@ export const AssetsPage: React.FC = () => {
             </Card>
 
             {/* Gráfico 3: Situação de Conformidade */}
-            <Card
-              className={`bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between ${
-                currentAsset ? 'lg:col-span-3' : ''
-              }`}
-            >
+            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl p-4 flex flex-col justify-between">
               <div>
                 <h3 className="text-xs font-bold text-slate-900 mb-2.5">
                   Situação de Conformidade
@@ -918,8 +904,8 @@ export const AssetsPage: React.FC = () => {
                     }))}
                     totalLabel={String(totalAssetsCount)}
                     subLabel="Ativos"
-                    size={currentAsset ? 110 : 124}
-                    strokeWidth={currentAsset ? 18 : 20}
+                    size={124}
+                    strokeWidth={20}
                   />
                 </div>
               </div>
@@ -943,23 +929,6 @@ export const AssetsPage: React.FC = () => {
                 ))}
               </div>
             </Card>
-
-            {/* Painel lateral direito: Detalhes do Ativo (4ª coluna na mesma linha em desktop) */}
-            {currentAsset && (
-              <div className="md:col-span-2 lg:col-span-3 h-full">
-                <AssetDetailsDrawer
-                  asset={currentAsset}
-                  confrontoAtivo={currentConfrontoAtivo}
-                  orgId={orgId}
-                  onClose={() => setSelectedAssetId(null)}
-                  onEdit={(asset) => {
-                    setEditingAsset(asset)
-                    setModalOpen(true)
-                  }}
-                  onViewFullSheet={(asset) => setFullSheetAsset(asset)}
-                />
-              </div>
-            )}
           </div>
 
           {/* 5. BARRA DE FILTROS */}
@@ -1148,13 +1117,13 @@ export const AssetsPage: React.FC = () => {
                             />
                           </td>
 
-                          {/* Código com ícone do tipo */}
+                          {/* Código com ícone circular do tipo (conforme esboço de referência) */}
                           <td className="py-3 px-3.5 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <div className="p-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0 border border-slate-200/60">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200/80 shadow-2xs">
                                 {getAssetTypeIcon(asset.tipo, 'w-4 h-4 text-slate-700')}
                               </div>
-                              <span className="font-mono text-xs font-semibold text-slate-700">
+                              <span className="font-mono text-xs font-bold text-slate-700">
                                 {asset.displayCode}
                               </span>
                             </div>
@@ -1560,6 +1529,36 @@ export const AssetsPage: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* PAINEL DESLIZANTE LATERAL (DRAWER SOBREPOSTO) - SEM REFLOW DOS PAINÉIS ANALÍTICOS */}
+      {currentAsset && (
+        <>
+          {/* Backdrop suave que fecha ao clicar */}
+          <div
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-[1px] z-40 transition-opacity animate-in fade-in duration-200"
+            onClick={() => setSelectedAssetId(null)}
+            aria-hidden="true"
+          />
+
+          {/* Drawer sobreposto à direita com slide-in suave e sombra */}
+          <aside
+            aria-label="Detalhes do Ativo"
+            className="fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] md:w-[420px] bg-white shadow-2xl border-l border-slate-200/90 flex flex-col transition-transform transform duration-300 ease-out animate-in slide-in-from-right"
+          >
+            <AssetDetailsDrawer
+              asset={currentAsset}
+              confrontoAtivo={currentConfrontoAtivo}
+              orgId={orgId}
+              onClose={() => setSelectedAssetId(null)}
+              onEdit={(asset) => {
+                setEditingAsset(asset)
+                setModalOpen(true)
+              }}
+              onViewFullSheet={(asset) => setFullSheetAsset(asset)}
+            />
+          </aside>
+        </>
+      )}
     </div>
   )
 }
