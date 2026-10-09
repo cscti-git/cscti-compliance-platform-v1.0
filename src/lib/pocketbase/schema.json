@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-08T23:51:37.805Z",
+  "generatedAt": "2026-10-09T00:23:31.869Z",
   "collections": [
     {
       "name": "users",
@@ -1806,6 +1806,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "data_email",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1981,6 +1987,12 @@
         {
           "name": "confronto_escopo",
           "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_email",
+          "type": "text",
           "required": false,
           "system": false
         }
