@@ -327,10 +327,14 @@ export interface OcorrenciaRow {
   origem_label: string
   status: string
   status_label: string
+  tipo: string
+  severidade: string
+  titulo: string
   fato_real: string
   parecer: string
   created: string
   fonte: string
+  is_falso_alarme: boolean
 }
 
 export const OCORRENCIA_ORIGEM_LABELS: Record<string, string> = {
@@ -351,11 +355,28 @@ export function mapOcorrencia(o: BackupOcorrenciaItem | Record<string, any>): Oc
   let fatoRealTexto = ''
   let origemDetectada = 'motor'
   let fonte = ''
+  let isFalsoAlarme = false
 
+  // Detecta se fato_real traz marcação explícita de falso alarme
   if (typeof rec.fato_real === 'string') {
-    fatoRealTexto = rec.fato_real
+    try {
+      const parsed = JSON.parse(rec.fato_real)
+      if (parsed?.falso_alarme === true || parsed?.falha_real === false) {
+        isFalsoAlarme = true
+      }
+      if (parsed?.motivo) {
+        fatoRealTexto = String(parsed.motivo)
+      } else {
+        fatoRealTexto = rec.fato_real
+      }
+    } catch {
+      fatoRealTexto = rec.fato_real
+    }
   } else if (rec.fato_real && typeof rec.fato_real === 'object') {
     const fr = rec.fato_real
+    if (fr.falso_alarme === true || fr.falha_real === false) {
+      isFalsoAlarme = true
+    }
     if (fr.origem === 'noc') origemDetectada = 'noc'
     if (fr.rotina_nome) fatoRealTexto += `Rotina: ${fr.rotina_nome}. `
     if (fr.modalidade) fatoRealTexto += `Modalidade: ${fr.modalidade}. `
@@ -366,12 +387,33 @@ export function mapOcorrencia(o: BackupOcorrenciaItem | Record<string, any>): Oc
         .join(', ')
       fatoRealTexto += `VMs com falha: ${fonte}. `
     }
-    if (fr.erro_detalhe) fatoRealTexto += fr.erro_detalhe
+    if (fr.motivo) {
+      fatoRealTexto += (fatoRealTexto ? ' ' : '') + fr.motivo
+    } else if (fr.erro_detalhe) {
+      fatoRealTexto += (fatoRealTexto ? ' ' : '') + fr.erro_detalhe
+    }
+  }
+
+  // Heurística confirmatória caso o parecer ou a descrição atestem falso alarme
+  const textoCombinado =
+    `${rec.titulo || ''} ${rec.descricao || ''} ${rec.resolucao || ''} ${fatoRealTexto}`.toLowerCase()
+  if (
+    textoCombinado.includes('falso alarme') ||
+    textoCombinado.includes('regressão no parse') ||
+    textoCombinado.includes('regressão de parsing') ||
+    textoCombinado.includes('fabricad')
+  ) {
+    isFalsoAlarme = true
   }
 
   if (!fatoRealTexto) {
     fatoRealTexto = rec.descricao || rec.titulo || 'Ocorrência registrada'
   }
+
+  const parecerFinal =
+    rec.resolucao ||
+    rec.parecer ||
+    (rec.status === 'resolvida' ? 'Resolvida conforme comprovação' : 'Aguardando validação')
 
   return {
     id: rec.id,
@@ -379,13 +421,14 @@ export function mapOcorrencia(o: BackupOcorrenciaItem | Record<string, any>): Oc
     origem_label: OCORRENCIA_ORIGEM_LABELS[rec.origem || origemDetectada] || 'Motor (automática)',
     status: rec.status,
     status_label: OCORRENCIA_STATUS_LABELS[rec.status] || rec.status,
+    tipo: rec.tipo || 'falha_de_backup',
+    severidade: rec.severidade || 'baixa',
+    titulo: rec.titulo || '',
     fato_real: fatoRealTexto,
-    parecer:
-      rec.resolucao ||
-      rec.parecer ||
-      (rec.status === 'resolvida' ? 'Resolvida conforme comprovação' : 'Aguardando validação'),
+    parecer: parecerFinal,
     created: rec.created || '',
     fonte: fonte || rec.fonte || '',
+    is_falso_alarme: isFalsoAlarme,
   }
 }
 

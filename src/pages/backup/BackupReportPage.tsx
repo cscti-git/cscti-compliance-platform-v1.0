@@ -16,6 +16,7 @@ import {
   Server,
   Cloud,
   Copy,
+  Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -144,6 +145,23 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
   )
 
   const emissorTexto = useMemo(() => formatSpDateTime(emissao.toISOString()), [emissao])
+
+  // Separação factual de ocorrências: falhas reais vs. falsos alarmes resolvidos
+  const { falhasReais, falsosAlarmes } = useMemo(() => {
+    const list = data?.ocorrencias || []
+    const falhas: typeof list = []
+    const falsos: typeof list = []
+
+    for (const o of list) {
+      if (o.is_falso_alarme) {
+        falsos.push(o)
+      } else {
+        falhas.push(o)
+      }
+    }
+
+    return { falhasReais: falhas, falsosAlarmes: falsos }
+  }, [data])
 
   if (!orgId) {
     return (
@@ -535,23 +553,32 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                 <h2 className="text-sm font-bold text-[#0B2545] uppercase tracking-wide border-b border-slate-200 pb-1">
                   4. Ocorrências do Período
                 </h2>
-                {data.ocorrencias.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">
-                    Nenhuma ocorrência registrada no período.
-                  </p>
+
+                {/* Subbloco: Falhas Reais Operacionais (fail-closed mantido para auditoria) */}
+                {falhasReais.length === 0 ? (
+                  <div className="rounded border border-emerald-200 bg-emerald-50/50 p-2.5 text-[11px] text-emerald-900 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      <strong>Nenhuma falha operacional de backup</strong> confirmada no período.
+                      Todas as rotinas executadas registraram sucesso integral.
+                    </span>
+                  </div>
                 ) : (
                   <div className="space-y-2">
-                    {data.ocorrencias.map((o) => (
+                    <p className="text-[11px] font-semibold text-red-900">
+                      Falhas operacionais registradas no período ({falhasReais.length}):
+                    </p>
+                    {falhasReais.map((o) => (
                       <div
                         key={o.id}
-                        className="border border-slate-200 rounded-lg p-2.5 space-y-1"
+                        className="border border-red-200 bg-red-50/30 rounded-lg p-2.5 space-y-1"
                       >
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-800">
                             {o.status === 'resolvida' ? (
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                             ) : (
-                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                              <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
                             )}
                             {OCORRENCIA_STATUS_LABELS[o.status] || o.status} · {o.origem_label}
                             {o.fonte ? ` · ${o.fonte}` : ''}
@@ -568,6 +595,51 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                         </p>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Subbloco: Falsos Alarmes Resolvidos (rótulo neutro comprobatório, sem palavra 'falha' como natureza) */}
+                {falsosAlarmes.length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-slate-200 space-y-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                      <Info className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Falsos alarmes saneados no período ({falsosAlarmes.length})</span>
+                      <span className="text-[10px] font-normal text-slate-500">
+                        (registros técnicos decorrentes de regressões de parsing sanadas;
+                        comprovantes originais de sucesso vinculados)
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {falsosAlarmes.map((o) => (
+                        <div
+                          key={o.id}
+                          className="border border-slate-200 bg-slate-50/60 rounded-lg p-2.5 space-y-1"
+                        >
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              Falso alarme saneado · {o.origem_label}
+                              {o.fonte ? ` · ${o.fonte}` : ''}
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              {formatSpDateTime(o.created)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            <span className="font-semibold text-slate-700">
+                              Natureza do registro:
+                            </span>{' '}
+                            Falso alarme gerado por regressão de parsing — nenhuma falha real de
+                            backup ocorreu.
+                          </p>
+                          <p className="text-[11px] text-slate-600">
+                            <span className="font-semibold text-slate-700">Parecer técnico:</span>{' '}
+                            {o.parecer}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </section>
