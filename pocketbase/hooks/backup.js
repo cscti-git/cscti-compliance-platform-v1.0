@@ -6,9 +6,12 @@
 // Cron:
 // - backup_imap_fetch_cron (a cada 15 minutos)
 //
-// ATESTADO HUMANO DIÁRIO (NOC): o núcleo do atestado do NOC vive em
-// pocketbase/hooks/backup_noc.js (processarNocAtestado — publicado em
-// globalThis) e é consumido pelo adaptador NOC_DIARIO abaixo.
+// ATESTADO HUMANO DIÁRIO (NOC): o núcleo do atestado do NOC vive 100% INLINE
+// no adaptador NOC_DIARIO abaixo (regra dura da JSVM do PocketBase: nada em
+// nível superior — nem via globalThis.<declaração> — é garantido dentro de
+// callbacks, que rodam em pool de VM separado). O endpoint
+// /backend/v1/backup/noc/avaliacao-manual vive em backup_noc.js, também
+// autossuficiente — não existe mais dependência entre hooks.
 
 // -------------------------------------------------------------------
 // 1. Processamento manual/avulso de evidência de backup (ou multipart com PDF)
@@ -1159,12 +1162,444 @@ routerAdd(
         $app.save(procRec)
 
         // -------------------------------------------------------------
-        // ATESTADO HUMANO DIÁRIO — delega ao módulo backup_noc.js:
+        // ATESTADO HUMANO DIÁRIO — NÚCLEO 100% INLINE (regra dura da JSVM:
+        // nada em nível superior — nem via globalThis.<declaração> — é
+        // garantido dentro de callbacks, que rodam em pool de VM separado;
+        // a publicação globalThis.processarNocAtestado do backup_noc.js era
+        // resolvida como undefined aqui dentro e derrubava TODA a aba
+        // Evidências com "Object has no member 'processarNocAtestado'").
         // (a) ocorrência com FATO REAL estruturado por VM de falha;
         // (b) resolução automática de ocorrências NOC quando relatório OK chega;
         // (c) divergência NOC × sistema (veredito do sistema intacto).
         // -------------------------------------------------------------
-        const nocRes = globalThis.processarNocAtestado(
+        const nocLerJson = (valor) => {
+          if (valor === null || valor === undefined) return null
+          try {
+            if (typeof valor === 'string') {
+              const s = valor.trim()
+              if (!s || s === 'null') return null
+              if (s.startsWith('{') || s.startsWith('[')) return JSON.parse(s)
+              return null
+            }
+            if (Array.isArray(valor)) {
+              if (valor.length === 0) return null
+              // Array de bytes (números) vindo do JSVM
+              if (typeof valor[0] === 'number') {
+                let s = ''
+                for (let i = 0; i < valor.length; i++) s += String.fromCharCode(valor[i])
+                const t = s.trim()
+                if (t.startsWith('{') || t.startsWith('[')) return JSON.parse(t)
+                return null
+              }
+              return valor
+            }
+            if (typeof valor === 'object' && typeof valor.string === 'function') {
+              const s = valor.string()
+              if (typeof s === 'string' && (s.trim().startsWith('{') || s.trim().startsWith('['))) {
+                return JSON.parse(s)
+              }
+            }
+            return valor
+          } catch (_) {
+            return null
+          }
+        }
+
+        const nocFormatarDataSp = (iso) => {
+          try {
+            if (!iso) return ''
+            const d = new Date(iso)
+            if (isNaN(d.getTime())) return ''
+            const dSp = new Date(d.getTime() - 3 * 60 * 60 * 1000)
+            const pad2 = (n) => (n < 10 ? '0' + n : String(n))
+            return (
+              pad2(dSp.getUTCDate()) +
+              '/' +
+              pad2(dSp.getUTCMonth() + 1) +
+              '/' +
+              dSp.getUTCFullYear() +
+              ' ' +
+              pad2(dSp.getUTCHours()) +
+              ':' +
+              pad2(dSp.getUTCMinutes())
+            )
+          } catch (_) {
+            return ''
+          }
+        }
+
+        const nocAuditEscrita = (orgIdLocal, authLocal, action, detail, metadata) => {
+          try {
+            const auditColLocal = $app.findCollectionByNameOrId('audit_log')
+            const auditRecLocal = new Record(auditColLocal)
+            auditRecLocal.set('organization', orgIdLocal)
+            auditRecLocal.set('user', authLocal && authLocal.id ? authLocal.id : '')
+            auditRecLocal.set(
+              'user_name',
+              authLocal ? authLocal.getString('name') || authLocal.getString('email') : 'sistema',
+            )
+            auditRecLocal.set('user_email', authLocal ? authLocal.getString('email') : '')
+            auditRecLocal.set('action', action)
+            auditRecLocal.set('entity', 'Backup e Continuidade')
+            auditRecLocal.set('detail', detail)
+            auditRecLocal.set('metadata', metadata || {})
+            $app.save(auditRecLocal)
+          } catch (_) {}
+        }
+
+        // Vincula os ativos do inventário citados no relatório do NOC
+        // (casamento tolerante por nome, isolado por organização)
+        const nocVincularAtivos = (orgIdLocal, clientesStatusLocal) => {
+          const vinculados = []
+          try {
+            const itensLoc = Array.isArray(clientesStatusLocal) ? clientesStatusLocal : []
+            if (itensLoc.length === 0) return vinculados
+            const ativosNoc = $app.findRecordsByFilter(
+              'inventory_assets',
+              `organization = '${orgIdLocal}'`,
+              '+name',
+              200,
+              0,
+            )
+            const normNoc = (s) =>
+              String(s || '')
+                .trim()
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, ' ')
+            for (let i = 0; i < itensLoc.length; i++) {
+              const nome = String((itensLoc[i] && itensLoc[i].cliente) || '').trim()
+              if (!nome) continue
+              const nNorm = normNoc(nome)
+              for (let a = 0; a < ativosNoc.length; a++) {
+                const aNome = String(ativosNoc[a].getString('name') || '').trim()
+                if (!aNome) continue
+                const aNorm = normNoc(aNome)
+                if (aNorm && (aNorm === nNorm || aNorm.includes(nNorm) || nNorm.includes(aNorm))) {
+                  vinculados.push({ ativo_id: ativosNoc[a].id, ativo_nome: aNome, item_noc: nome })
+                  break
+                }
+              }
+            }
+          } catch (_) {}
+          return vinculados
+        }
+
+        // Confronto NOC × sistema no mesmo dia (fuso America/Sao_Paulo).
+        // O veredito do sistema NUNCA é alterado pelo NOC — a divergência só é registrada.
+        const nocDetectarDivergencia = (orgIdLocal, statusGeralLocal, dataEmailIsoLocal) => {
+          const res = { estado: 'sem_dados_sistema', divergencias: [], execucoes_analisadas: 0 }
+          try {
+            if (!dataEmailIsoLocal) return res
+            const dObj = new Date(dataEmailIsoLocal)
+            if (isNaN(dObj.getTime())) return res
+
+            // Janela do dia local (UTC-3): 00:00–24:00 de SP, expressa em UTC
+            const spShift = new Date(dObj.getTime() - 3 * 60 * 60 * 1000)
+            const ini = new Date(
+              Date.UTC(
+                spShift.getUTCFullYear(),
+                spShift.getUTCMonth(),
+                spShift.getUTCDate(),
+                3,
+                0,
+                0,
+              ),
+            )
+            const fim = new Date(ini.getTime() + 24 * 60 * 60 * 1000)
+
+            // data_email é texto (formato ISO misto) — filtra por data em JS, não em SQL
+            let execsDia = []
+            try {
+              execsDia = $app.findRecordsByFilter(
+                'backup_execucoes',
+                `organization = '${orgIdLocal}'`,
+                '-created',
+                400,
+                0,
+              )
+            } catch (_) {
+              return res
+            }
+
+            let temSucesso = false
+            let temFalha = false
+            const execsIds = []
+            for (let i = 0; i < execsDia.length; i++) {
+              const ex = execsDia[i]
+              const dtRaw = ex.getString('data_email') || ex.getString('data_inicio') || ''
+              if (!dtRaw) continue
+              const t = new Date(dtRaw).getTime()
+              if (isNaN(t) || t < ini.getTime() || t >= fim.getTime()) continue
+              execsIds.push(ex.id)
+              const st = String(ex.getString('status') || '').toLowerCase()
+              if (st === 'sucesso') temSucesso = true
+              else if (st === 'erro' || st === 'falha') temFalha = true
+            }
+
+            res.execucoes_analisadas = execsIds.length
+            if (execsIds.length === 0) return res
+
+            res.estado = 'convergente'
+            const nocOkLocal = String(statusGeralLocal) === 'ok'
+            const agoraIso = new Date().toISOString()
+
+            if (nocOkLocal && temFalha) {
+              res.estado = 'divergente'
+              res.divergencias.push({
+                tipo: 'noc_ok_sistema_falha',
+                descricao:
+                  'O NOC reportou ambiente OK, porém o sistema registrou execução(ões) de backup com falha no mesmo dia. Veredito do sistema mantido.',
+                detectado_em: agoraIso,
+                data_referencia: dataEmailIsoLocal,
+                status_noc: String(statusGeralLocal),
+                sistema: { execucoes: execsIds, tem_sucesso: temSucesso, tem_falha: temFalha },
+              })
+            } else if (!nocOkLocal && temSucesso && !temFalha) {
+              res.estado = 'divergente'
+              res.divergencias.push({
+                tipo: 'noc_falha_sistema_ok',
+                descricao:
+                  'O NOC reportou falha no ambiente, porém o sistema registrou apenas execuções de backup com sucesso no mesmo dia. Veredito do sistema mantido.',
+                detectado_em: agoraIso,
+                data_referencia: dataEmailIsoLocal,
+                status_noc: String(statusGeralLocal),
+                sistema: { execucoes: execsIds, tem_sucesso: temSucesso, tem_falha: temFalha },
+              })
+            }
+            return res
+          } catch (_) {
+            return res
+          }
+        }
+
+        // Núcleo do Atestado Humano Diário — inline:
+        // (a) ocorrência com fato real estruturado por VM de falha
+        // (b) resolução automática de ocorrências NOC abertas quando relatório OK chega
+        // (c) divergência NOC × sistema (veredito do sistema intacto)
+        const nocAtestadoCore = (
+          orgIdLocal,
+          plainTextLocal,
+          clientesStatusLocal,
+          statusGeralLocal,
+          acaoRealizadaLocal,
+          dataEmailIsoLocal,
+          remetenteLocal,
+          assuntoLocal,
+          evidenciaRecLocal,
+          monRecLocal,
+          authLocal,
+        ) => {
+          const resultadoNoc = {
+            ocorrencia_id: null,
+            ocorrencia_criada: false,
+            resolvidas: 0,
+            divergencias: [],
+            ativos_vinculados: [],
+            estado_confronto: 'sem_dados_sistema',
+          }
+          try {
+            // --- FATO REAL estruturado por VM/cliente ---
+            const itensNoc = Array.isArray(clientesStatusLocal) ? clientesStatusLocal : []
+            const vmsFalhas = []
+            const vmsOk = []
+            for (let i = 0; i < itensNoc.length; i++) {
+              const it = itensNoc[i] || {}
+              const nome = String(it.cliente || it.nome || '').trim() || 'Item não identificado'
+              const st = String(it.status || '').toUpperCase()
+              const isFalhaNoc =
+                st.includes('FAIL') ||
+                st.includes('ERROR') ||
+                st.includes('ERRO') ||
+                st.includes('FALHA')
+              const det = String(it.acoes || it.detalhe || '').trim()
+              if (isFalhaNoc) {
+                vmsFalhas.push({
+                  cliente: nome,
+                  status: String(it.status || 'Falha'),
+                  detalhe: det,
+                })
+              } else {
+                vmsOk.push({ cliente: nome, status: String(it.status || 'OK'), detalhe: det })
+              }
+            }
+
+            const dataHoraSp = nocFormatarDataSp(dataEmailIsoLocal)
+            const fatoReal = {
+              origem: 'noc',
+              monitoramento_id: monRecLocal ? monRecLocal.id : null,
+              vms_falhas: vmsFalhas,
+              vms_ok: vmsOk,
+              acoes: String(acaoRealizadaLocal || ''),
+              data_hora_sp: dataHoraSp,
+              data_iso: String(dataEmailIsoLocal || ''),
+              remetente: String(remetenteLocal || ''),
+              assunto: String(assuntoLocal || ''),
+            }
+
+            // --- (c) Divergência NOC × sistema ---
+            const conv = nocDetectarDivergencia(orgIdLocal, statusGeralLocal, dataEmailIsoLocal)
+            resultadoNoc.divergencias = conv.divergencias
+            resultadoNoc.estado_confronto = conv.estado
+            const ativosNocVinc = nocVincularAtivos(orgIdLocal, clientesStatusLocal)
+            resultadoNoc.ativos_vinculados = ativosNocVinc
+            if (monRecLocal) {
+              monRecLocal.set('divergencias', conv.divergencias)
+              monRecLocal.set('ativos_vinculados', ativosNocVinc)
+              $app.save(monRecLocal)
+            }
+
+            // --- (b) Resolução automática: relatório NOC OK fecha ocorrências NOC abertas ---
+            if (String(statusGeralLocal) === 'ok') {
+              try {
+                const abertasNoc = $app.findRecordsByFilter(
+                  'backup_ocorrencias',
+                  `organization = '${orgIdLocal}' && status = 'aberta'`,
+                  '-created',
+                  50,
+                  0,
+                )
+                for (let i = 0; i < abertasNoc.length; i++) {
+                  const ocNoc = abertasNoc[i]
+                  const fr = nocLerJson(ocNoc.get('fato_real'))
+                  if (!fr || typeof fr !== 'object' || fr.origem !== 'noc') continue
+
+                  const parecer =
+                    `Ocorrência NOC #${ocNoc.id} resolvida automaticamente: o relatório diário posterior do NOC (${dataHoraSp || 'data do relatório'}) ` +
+                    `reportou todos os backups do ambiente OK, confirmando a normalização do incidente. ` +
+                    `Relatório citado: monitoramento #${monRecLocal ? monRecLocal.id : 'n/d'}` +
+                    (evidenciaRecLocal ? `, evidência #${evidenciaRecLocal.id}` : '') +
+                    ` ('${String(assuntoLocal || '')}').`
+
+                  ocNoc.set('status', 'resolvida')
+                  ocNoc.set('resolvida_automaticamente', true)
+                  if (evidenciaRecLocal) ocNoc.set('resolvida_por_evidencia', evidenciaRecLocal.id)
+                  ocNoc.set('resolvida_em', new Date().toISOString())
+                  ocNoc.set('resolucao', parecer)
+                  $app.save(ocNoc)
+                  resultadoNoc.resolvidas++
+
+                  nocAuditEscrita(
+                    orgIdLocal,
+                    authLocal,
+                    'NOC_OCORRENCIA_RESOLVED_AUTO',
+                    `Ocorrência NOC #${ocNoc.id} encerrada automaticamente pelo atestado humano posterior do NOC (status OK) em ${dataHoraSp}.`,
+                    {
+                      ocorrencia_id: ocNoc.id,
+                      monitoramento_id: monRecLocal ? monRecLocal.id : null,
+                      evidencia_id: evidenciaRecLocal ? evidenciaRecLocal.id : null,
+                      origem: 'noc',
+                    },
+                  )
+                }
+              } catch (_) {}
+            }
+
+            // --- (a) Ocorrência com fato real estruturado por VM de falha ---
+            if (String(statusGeralLocal) !== 'ok') {
+              try {
+                // Deduplicação: não reabrir para o mesmo monitoramento
+                let jaExisteNoc = false
+                try {
+                  const existentesNoc = $app.findRecordsByFilter(
+                    'backup_ocorrencias',
+                    `organization = '${orgIdLocal}' && status != 'resolvida'`,
+                    '-created',
+                    100,
+                    0,
+                  )
+                  for (let i = 0; i < existentesNoc.length; i++) {
+                    const frEx = nocLerJson(existentesNoc[i].get('fato_real'))
+                    if (
+                      frEx &&
+                      typeof frEx === 'object' &&
+                      frEx.origem === 'noc' &&
+                      String(frEx.monitoramento_id || '') ===
+                        String(monRecLocal ? monRecLocal.id : '')
+                    ) {
+                      jaExisteNoc = true
+                      resultadoNoc.ocorrencia_id = existentesNoc[i].id
+                      break
+                    }
+                  }
+                } catch (_) {}
+
+                if (!jaExisteNoc) {
+                  // Descrição factual por VM de falha (nome real reportado pelo NOC)
+                  let descricaoNoc = ''
+                  for (let v = 0; v < vmsFalhas.length; v++) {
+                    const vmF = vmsFalhas[v]
+                    descricaoNoc +=
+                      `O NOC (PRO IT CLOUD SOLUTIONS) reportou em ${dataHoraSp || 'data não informada'} ` +
+                      `falha no backup da VM ${vmF.cliente}` +
+                      (vmF.detalhe ? `: ${vmF.detalhe}.` : '.') +
+                      ' '
+                  }
+                  if (vmsFalhas.length === 0) {
+                    const trecho = String(plainTextLocal || '')
+                      .replace(/\s+/g, ' ')
+                      .trim()
+                      .slice(0, 240)
+                    descricaoNoc =
+                      `O NOC (PRO IT CLOUD SOLUTIONS) reportou em ${dataHoraSp || 'data não informada'} ` +
+                      `inconformidade geral no ambiente de backup${trecho ? ': ' + trecho : '.'} `
+                  }
+                  if (acaoRealizadaLocal) {
+                    descricaoNoc += `Ações do técnico NOC: ${acaoRealizadaLocal}.`
+                  }
+                  if (conv.estado === 'divergente') {
+                    descricaoNoc +=
+                      ' [Divergência NOC × sistema detectada — veredito do sistema mantido.]'
+                  }
+
+                  const ocColNoc = $app.findCollectionByNameOrId('backup_ocorrencias')
+                  const ocNocNova = new Record(ocColNoc)
+                  ocNocNova.set('organization', orgIdLocal)
+                  ocNocNova.set('tipo', 'falha_de_backup')
+                  ocNocNova.set('severidade', 'alta')
+                  ocNocNova.set('status', 'aberta')
+                  ocNocNova.set(
+                    'titulo',
+                    `NOC (PRO IT CLOUD SOLUTIONS) reportou falha no backup (${dataHoraSp || 'Diário'})`,
+                  )
+                  ocNocNova.set('descricao', descricaoNoc.trim())
+                  if (evidenciaRecLocal) ocNocNova.set('evidencia', evidenciaRecLocal.id)
+                  ocNocNova.set('fato_real', fatoReal)
+                  $app.save(ocNocNova)
+
+                  resultadoNoc.ocorrencia_id = ocNocNova.id
+                  resultadoNoc.ocorrencia_criada = true
+                }
+              } catch (_) {}
+            }
+
+            // Sinaliza divergência na auditoria append-only
+            if (conv.estado === 'divergente') {
+              nocAuditEscrita(
+                orgIdLocal,
+                authLocal,
+                'NOC_DIVERGENCIA_SISTEMA',
+                `Divergência NOC × sistema no backup: ${conv.divergencias
+                  .map((d) => d.descricao)
+                  .join(' ')} (relatório NOC de ${dataHoraSp}).`,
+                {
+                  monitoramento_id: monRecLocal ? monRecLocal.id : null,
+                  evidencia_id: evidenciaRecLocal ? evidenciaRecLocal.id : null,
+                  divergencias: conv.divergencias,
+                  origem: 'noc',
+                },
+              )
+            }
+
+            return resultadoNoc
+          } catch (errNoc) {
+            console.error('[noc:atestado]', errNoc && (errNoc.stack || errNoc.message))
+            return resultadoNoc
+          }
+        }
+
+        const nocRes = nocAtestadoCore(
           organizationId,
           plainText,
           clientesStatus,
