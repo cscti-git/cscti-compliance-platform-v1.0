@@ -629,10 +629,34 @@ export interface BackupNocClienteStatusItem {
   acoes?: string
 }
 
+// Atestado Humano Diário — divergência NOC × sistema (veredito do sistema é mantido)
+export interface BackupNocDivergenciaItem {
+  tipo: 'noc_ok_sistema_falha' | 'noc_falha_sistema_ok'
+  descricao: string
+  detectado_em?: string
+  data_referencia?: string
+  status_noc?: string
+  sistema?: {
+    execucoes?: string[]
+    tem_sucesso?: boolean
+    tem_falha?: boolean
+  }
+}
+
+// Ativo do inventário vinculado ao item do relatório do NOC
+export interface BackupNocAtivoVinculadoItem {
+  ativo_id: string
+  ativo_nome: string
+  item_noc: string
+}
+
 export interface BackupMonitoramentoExternoItem {
   id: string
   organization: string
   data_monitoramento?: string
+  /** 'email' = relatório diário do NOC; 'manual' = atestado registrado pela equipe */
+  origem_tipo?: 'email' | 'manual'
+  registrado_por?: string
   origem_remetente?: string
   assunto?: string
   status_geral: 'ok' | 'falha' | 'atencao'
@@ -644,11 +668,20 @@ export interface BackupMonitoramentoExternoItem {
   hash_conteudo: string
   evidencia?: string
   conteudo_bruto?: string
+  divergencias?: BackupNocDivergenciaItem[] | null
+  ativos_vinculados?: BackupNocAtivoVinculadoItem[] | null
   created?: string
   updated?: string
   expand?: {
     evidencia?: BackupEvidenciaItem
+    registrado_por?: PersonItem
   }
+}
+
+export interface BackupOcorrenciaNocVmFalha {
+  cliente: string
+  status?: string
+  detalhe?: string
 }
 
 export interface BackupOcorrenciaFatoReal {
@@ -657,14 +690,20 @@ export interface BackupOcorrenciaFatoReal {
   modalidade?: string
   data_hora_sp?: string
   data_iso?: string
-  vms_falhas?: string[]
-  vms_sucesso?: string[]
+  vms_falhas?: string[] | BackupOcorrenciaNocVmFalha[]
+  vms_sucesso?: string[] | BackupOcorrenciaNocVmFalha[]
   total_vms?: number
   execucao_id?: string
   evidencia_id?: string
   job_nome?: string
   erro_detalhe?: string
   adaptador?: string
+  /** Atestado Humano Diário (NOC): origem='noc' identifica o atestado humano */
+  origem?: 'noc'
+  monitoramento_id?: string
+  acoes?: string
+  remetente?: string
+  assunto?: string
 }
 
 export interface BackupOcorrenciaItem {

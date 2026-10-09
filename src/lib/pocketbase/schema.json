@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-09T16:58:12.010Z",
+  "generatedAt": "2026-10-09T17:58:30.492Z",
   "collections": [
     {
       "name": "users",
@@ -2321,11 +2321,11 @@
       "name": "backup_monitoramentos_externos",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && @request.auth.system_role = 'admin'"
       },
       "fields": [
         {
@@ -2422,6 +2422,32 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "origem_tipo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["email", "manual"]
+        },
+        {
+          "name": "registrado_por",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "divergencias",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ativos_vinculados",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

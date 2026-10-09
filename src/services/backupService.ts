@@ -880,6 +880,42 @@ export async function deleteBackupMonitoramento(
   return true
 }
 
+export interface NocAvaliacaoManualPayload {
+  status_geral: 'ok' | 'falha' | 'atencao'
+  clientes_status?: import('@/types/cscti').BackupNocClienteStatusItem[]
+  acoes_realizadas?: string
+  observacoes?: string
+  data_avaliacao?: string
+  conteudo: string
+}
+
+export interface NocAvaliacaoManualResponse {
+  success: boolean
+  idempotent?: boolean
+  monitoramento_id: string
+  ocorrencia_id?: string | null
+  ocorrencias_resolvidas?: number
+  divergencias?: import('@/types/cscti').BackupNocDivergenciaItem[]
+  ativos_vinculados?: import('@/types/cscti').BackupNocAtivoVinculadoItem[]
+  estado_confronto?: 'convergente' | 'divergente' | 'sem_dados_sistema'
+  message: string
+}
+
+/**
+ * Atestado Humano Diário (NOC) — registro manual (origem_tipo='manual').
+ * Cria o monitoramento externo com hash do conteúdo (idempotência), fato real
+ * por VM, resolução automática de ocorrências NOC e auditoria append-only.
+ * Exige perfil admin/suporte (validado também no backend).
+ */
+export async function registrarAvaliacaoNocManual(
+  payload: NocAvaliacaoManualPayload,
+): Promise<NocAvaliacaoManualResponse> {
+  return pb.send<NocAvaliacaoManualResponse>('/backend/v1/backup/noc/avaliacao-manual', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 export async function excluirBackupExecucoes(payload: {
   execucaoId?: string
   execucaoIds?: string[]

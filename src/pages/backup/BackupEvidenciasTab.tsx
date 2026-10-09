@@ -47,14 +47,17 @@ import {
   deleteBackupMonitoramento,
   fetchEvidenciasImap,
   getBackupAvaliacaoByEvidencia,
+  registrarAvaliacaoNocManual,
 } from '@/services/backupService'
 import { getIntegrations } from '@/services/csctiService'
 import { BackupLaudoCard } from '@/components/backup/BackupLaudoCard'
+import { NocAvaliacaoManualModal } from './NocAvaliacaoManualModal'
 import type {
   BackupEvidenciaItem,
   BackupRotinaItem,
   BackupProcessamentoItem,
   BackupMonitoramentoExternoItem,
+  BackupNocDivergenciaItem,
   BackupAvaliacaoItem,
   EvidenciaStatus,
   IntegrationItem,
@@ -181,10 +184,11 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
     'evidencias',
   )
 
-  // Monitoramentos Externos do NOC
+  // Monitoramentos Externos do NOC (Atestado Humano Diário)
   const [monitoramentos, setMonitoramentos] = useState<BackupMonitoramentoExternoItem[]>([])
   const [selectedMonit, setSelectedMonit] = useState<BackupMonitoramentoExternoItem | null>(null)
   const [monitModalOpen, setMonitModalOpen] = useState(false)
+  const [nocManualModalOpen, setNocManualModalOpen] = useState(false)
 
   // Tipo de comprovante no modal de registro
   const [formTipo, setFormTipo] = useState<'veeam' | 'acronis_pdf' | 'noc_diario' | 'generico'>(
@@ -230,6 +234,9 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
         .catch((err) => console.error(err))
     }
   }
+
+  // O registro manual usa o NocAvaliacaoManualModal (chama registrarAvaliacaoNocManual
+  // via endpoint /backend/v1/backup/noc/avaliacao-manual e dispara onSuccess).
 
   useEffect(() => {
     let isMounted = true
@@ -1235,6 +1242,23 @@ Lista de atividades (1 dia):
                 {monitoramentos.length} registro(s)
               </Badge>
             </div>
+            {canOperate && (
+              <div className="mt-2.5 flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setNocManualModalOpen(true)}
+                  className="h-7 text-xs font-semibold text-purple-800 border-purple-300 bg-purple-50/60 hover:bg-purple-100 gap-1.5"
+                  title="Registrar manualmente o atestado humano diário (conexão e verificação das rotinas no servidor)"
+                >
+                  <UserCheck className="w-3.5 h-3.5" /> Registrar Avaliação Manual
+                </Button>
+                <span className="text-[10px] text-slate-500">
+                  Para os dias em que a validação humana é feita fora do e-mail do NOC. Fica
+                  arquivada com hash, autor e auditoria.
+                </span>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">

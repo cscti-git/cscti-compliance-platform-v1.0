@@ -5,6 +5,10 @@
 // - POST /backend/v1/backup/imap-fetch
 // Cron:
 // - backup_imap_fetch_cron (a cada 15 minutos)
+//
+// ATESTADO HUMANO DIÁRIO (NOC): o núcleo do atestado do NOC vive em
+// pocketbase/hooks/backup_noc.js (processarNocAtestado — publicado em
+// globalThis) e é consumido pelo adaptador NOC_DIARIO abaixo.
 
 // -------------------------------------------------------------------
 // 1. Processamento manual/avulso de evidência de backup (ou multipart com PDF)
@@ -669,15 +673,47 @@ routerAdd(
         lowerPdfTexto.includes('atividades diárias - socnoc') ||
         lowerPdfTexto.includes('atividades diarias - socnoc')
 
+      // -------------------------------------------------------------
+      // Detecção NOC TOLERANTE (Atestado Humano Diário)
+      // Normaliza acentos, caixa, travessões ("–"/"-") e espaços antes de casar.
+      // NUNCA usar assunto exato: o remetente real é @proitcs.com.br e o assunto
+      // "PRO IT CLOUD SOLUTIONS | NOC – ANALISE PREVENTIVA DIARIA DE BACKUP" varia
+      // (data anexada, maiúsculas/minúsculas, hífen vs. travessão).
+      // -------------------------------------------------------------
+      const normalizarNoc = (str) => {
+        if (!str) return ''
+        return String(str)
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[\u2013\u2014]/g, '-')
+          .replace(/\s+/g, ' ')
+          .trim()
+      }
+      const nocAssuntoNorm = normalizarNoc(assunto)
+      const nocConteudoNorm = normalizarNoc(rawConteudo) + ' ' + normalizarNoc(pdfExtraidoTexto)
+      const nocRemetenteNorm = normalizarNoc(remetente)
+
+      const temRemetenteNoc =
+        nocRemetenteNorm.includes('@proitcs.com.br') ||
+        nocRemetenteNorm.includes('proitcs.com.br') ||
+        nocRemetenteNorm.includes('noc')
+      const temConteudoNoc =
+        nocConteudoNorm.includes('informacoes do ambiente') &&
+        (nocConteudoNorm.includes('acoes a realizadas pelo noc') ||
+          nocConteudoNorm.includes('acoes realizadas pelo noc'))
       const isNocDetected =
         (regraCasada && regraCasada.getString('adaptador') === 'NOC_DIARIO') ||
-        lowerAssunto.includes('analise preventiva diaria de backup') ||
-        lowerAssunto.includes('análise preventiva diária de backup') ||
-        (lowerAssunto.includes('noc') && lowerAssunto.includes('backup')) ||
-        (lowerConteudo.includes('informações do ambiente') &&
-          lowerConteudo.includes('ações a realizadas pelo noc')) ||
-        (lowerConteudo.includes('informacoes do ambiente') &&
-          lowerConteudo.includes('acoes a realizadas pelo noc'))
+        (nocAssuntoNorm.includes('noc') &&
+          nocAssuntoNorm.includes('analise preventiva') &&
+          nocAssuntoNorm.includes('backup')) ||
+        temRemetenteNoc ||
+        temConteudoNoc
+
+      // Fail-closed do atestado: se o único indício de NOC é o assunto (sem
+      // remetente do NOC e sem o corpo padrão do relatório), o e-mail NÃO é
+      // tratado como atestado humano — apenas evidência descartada com aviso.
+      const nocNaoReconhecida = isNocDetected && !temRemetenteNoc && !temConteudoNoc
 
       const isVeeamDetected =
         !isAcronisDetected &&
@@ -697,15 +733,16 @@ routerAdd(
           lowerConteudo.includes('spcm-tdepj') ||
           lowerConteudo.includes('spcm-regwin'))
       const isGenericBackup =
-        isAcronisDetected ||
-        isNocDetected ||
-        isVeeamDetected ||
-        lowerAssunto.includes('backup') ||
-        lowerConteudo.includes('backup') ||
-        lowerConteudo.includes('sucesso') ||
-        lowerConteudo.includes('success') ||
-        lowerConteudo.includes('job') ||
-        lowerConteudo.includes('concluído')
+        !nocNaoReconhecida &&
+        (isAcronisDetected ||
+          isNocDetected ||
+          isVeeamDetected ||
+          lowerAssunto.includes('backup') ||
+          lowerConteudo.includes('backup') ||
+          lowerConteudo.includes('sucesso') ||
+          lowerConteudo.includes('success') ||
+          lowerConteudo.includes('job') ||
+          lowerConteudo.includes('concluído'))
 
       if (!regraCasada && !isGenericBackup) {
         evidenciaRec.set('status_processamento', 'nao_reconhecida')
@@ -783,7 +820,44 @@ routerAdd(
 
       // -------------------------------------------------------------
       // CASO 1: ADAPTADOR NOC_DIARIO (MONITORAMENTO EXTERNO HUMANO)
+      // Atestado Humano Diário — fail-closed para indícios fracos
       // -------------------------------------------------------------
+      if (isNocDetected && nocNaoReconhecida) {
+        // Não é um atestado NOC plausível: descarta com aviso e auditoria,
+        // sem monitoramento e sem ocorrência automática.
+        evidenciaRec.set('status_processamento', 'nao_reconhecida')
+        $app.save(evidenciaRec)
+        try {
+          const auditCol = $app.findCollectionByNameOrId('audit_log')
+          const auditRec = new Record(auditCol)
+          auditRec.set('organization', organizationId)
+          auditRec.set('user', auth.id)
+          auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
+          auditRec.set('user_email', auth.getString('email'))
+          auditRec.set('action', 'NOC_ATESTADO_DESCARTADO')
+          auditRec.set('entity', 'Backup e Continuidade')
+          auditRec.set(
+            'detail',
+            `Mensagem com indício de NOC não confirmado descartada (remetente "${remetente}", assunto "${assunto}"). Requer remetente @proitcs.com.br ou corpo padrão do relatório do NOC.`,
+          )
+          auditRec.set('metadata', {
+            evidencia_id: evidenciaRec.id,
+            remetente: remetente,
+            assunto: assunto,
+            motivo: 'noc_nao_confirmado',
+          })
+          $app.save(auditRec)
+        } catch (_) {}
+        return e.json(200, {
+          success: false,
+          idempotent: !isNovaEvidencia,
+          evidencia_id: evidenciaRec.id,
+          status: 'nao_reconhecida',
+          message:
+            'Mensagem com indício de NOC não confirmada: exige remetente @proitcs.com.br ou o corpo padrão do relatório do NOC. Nada foi arquivado como atestado humano.',
+        })
+      }
+
       if (isNocDetected) {
         const adaptadorUsado = 'NOC_DIARIO'
         const versaoAdaptador = '1.0.0'
@@ -1023,9 +1097,15 @@ routerAdd(
           monRec.set('hash_conteudo', monHash)
         }
 
-        // Converter data do assunto para ISO se possível
-        let dataMonIso = nowIso
-        if (dataAssunto) {
+        // -------------------------------------------------------------
+        // DATA MONITORAMENTO = DATA DO E-MAIL (NUNCA data de processamento).
+        // dataEmailCalculada vem de extrairDataEmailDefensiva — prioriza a data
+        // por extenso do corpo (ex.: "terça-feira, 6 de outubro de 2026 08:05:06"),
+        // e JAMAIS a linha "Created by ... at ..." (sanitizada).
+        // Fallback: data dd/mm/aaaa do assunto (mantida para compatibilidade).
+        // -------------------------------------------------------------
+        let dataMonIso = dataEmailCalculada || nowIso
+        if (!dataEmailCalculada && dataAssunto) {
           const dParts = dataAssunto.split('/')
           if (dParts.length === 3) {
             dataMonIso = `${dParts[2]}-${dParts[1]}-${dParts[0]}T12:00:00Z`
@@ -1033,6 +1113,7 @@ routerAdd(
         }
 
         monRec.set('data_monitoramento', dataMonIso)
+        monRec.set('origem_tipo', 'email')
         monRec.set('origem_remetente', remetente)
         monRec.set('assunto', assunto)
         monRec.set('status_geral', statusGeral)
@@ -1077,26 +1158,27 @@ routerAdd(
         })
         $app.save(procRec)
 
-        // Se status_geral indicar falha, abrir ocorrência automática
-        if (statusGeral !== 'ok') {
-          try {
-            const ocCol = $app.findCollectionByNameOrId('backup_ocorrencias')
-            const oc = new Record(ocCol)
-            oc.set('organization', organizationId)
-            oc.set('tipo', 'falha_de_backup')
-            oc.set('severidade', 'alta')
-            oc.set('status', 'aberta')
-            oc.set('titulo', `NOC detectou inconformidade no backup (${dataAssunto || 'Diário'})`)
-            oc.set(
-              'descricao',
-              `O e-mail de análise preventiva diária do NOC (${remetente}) indicou falha no ambiente do cliente. Ações registradas: ${acaoRealizada || 'Aguardando intervenção técnica'}.`,
-            )
-            oc.set('evidencia', evidenciaRec.id)
-            $app.save(oc)
-          } catch (_) {}
-        }
+        // -------------------------------------------------------------
+        // ATESTADO HUMANO DIÁRIO — delega ao módulo backup_noc.js:
+        // (a) ocorrência com FATO REAL estruturado por VM de falha;
+        // (b) resolução automática de ocorrências NOC quando relatório OK chega;
+        // (c) divergência NOC × sistema (veredito do sistema intacto).
+        // -------------------------------------------------------------
+        const nocRes = globalThis.processarNocAtestado(
+          organizationId,
+          plainText,
+          clientesStatus,
+          statusGeral,
+          acaoRealizada,
+          dataMonIso,
+          remetente,
+          assunto,
+          evidenciaRec,
+          monRec,
+          auth,
+        )
 
-        // Auditoria append-only
+        // Auditoria append-only (mantida no arquivo principal)
         try {
           const auditCol = $app.findCollectionByNameOrId('audit_log')
           const auditRec = new Record(auditCol)
@@ -1104,19 +1186,35 @@ routerAdd(
           auditRec.set('user', auth.id)
           auditRec.set('user_name', auth.getString('name') || auth.getString('email'))
           auditRec.set('user_email', auth.getString('email'))
-          auditRec.set('action', 'NOC_DAILY_MONITORING_PROCESSED')
+          auditRec.set('action', 'NOC_ATESTADO_HUMANO_PROCESSADO')
           auditRec.set('entity', 'Backup e Continuidade')
           auditRec.set(
             'detail',
-            `Análise preventiva do NOC processada. Status geral: ${statusGeral.toUpperCase()}. Registro de monitoramento #${monRec.id}.`,
+            `Atestado humano diário do NOC processado. Status geral: ${statusGeral.toUpperCase()}. ` +
+              `Monitoramento #${monRec.id}` +
+              (nocRes.ocorrencia_criada
+                ? `. Ocorrência #${nocRes.ocorrencia_id} aberta com fato real por VM.`
+                : '') +
+              (nocRes.resolvidas > 0
+                ? ` ${nocRes.resolvidas} ocorrência(s) NOC resolvida(s) automaticamente.`
+                : '') +
+              (nocRes.estado_confronto === 'divergente'
+                ? ' Divergência NOC × sistema registrada (veredito do sistema mantido).'
+                : ''),
           )
           auditRec.set('metadata', {
             evidencia_id: evidenciaRec.id,
             monitoramento_id: monRec.id,
             remetente: remetente,
+            assunto: assunto,
             status_geral: statusGeral,
             clientes_count: clientesStatus.length,
             comprovante_tem_imagem: temImagem,
+            origem_tipo: 'email',
+            data_monitoramento: dataMonIso,
+            ocorrencia_id: nocRes.ocorrencia_id,
+            ocorrencias_resolvidas: nocRes.resolvidas,
+            estado_confronto: nocRes.estado_confronto,
           })
           $app.save(auditRec)
         } catch (_) {}
@@ -1136,8 +1234,13 @@ routerAdd(
             clientes_status: clientesStatus,
             acoes: acaoRealizada,
             tem_imagem: temImagem,
+            data_monitoramento: dataMonIso,
+            origem_tipo: 'email',
+            ocorrencia_id: nocRes.ocorrencia_id,
+            ocorrencias_resolvidas: nocRes.resolvidas,
+            estado_confronto: nocRes.estado_confronto,
           },
-          message: 'Relatório diário do NOC processado e arquivado no Monitoramento Externo.',
+          message: 'Atestado humano diário do NOC processado e arquivado no Monitoramento Externo.',
         })
       }
 
