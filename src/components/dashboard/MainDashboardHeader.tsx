@@ -1,0 +1,143 @@
+import React from 'react'
+import { Link } from 'react-router-dom'
+import { ShieldCheck, Building2, RefreshCw, HelpCircle, FileText } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbPage,
+} from '@/components/ui/breadcrumb'
+
+export interface MainDashboardHeaderProps {
+  serventiaNome: string
+  serventiaAtiva?: boolean
+  lastUpdated?: string
+  loading?: boolean
+  onReload?: () => void
+  className?: string
+}
+
+export const MainDashboardHeader: React.FC<MainDashboardHeaderProps> = ({
+  serventiaNome,
+  serventiaAtiva = true,
+  lastUpdated,
+  loading = false,
+  onReload,
+  className = '',
+}) => {
+  return (
+    <div className={`space-y-2.5 ${className}`}>
+      {/* 1. Breadcrumb no topo: "Dashboard > Visão Geral" */}
+      <Breadcrumb aria-label="Navegação estrutural">
+        <BreadcrumbList className="text-xs text-slate-500 font-medium">
+          <BreadcrumbItem>
+            <span className="text-slate-500 font-medium">CSCTI - Compliance</span>
+          </BreadcrumbItem>
+          <span className="text-slate-300">/</span>
+          <BreadcrumbItem>
+            <BreadcrumbPage className="font-semibold text-slate-800">
+              Dashboard Principal
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
+      {/* 2. Linha principal do cabeçalho */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        {/* Identidade à esquerda: Ícone em quadrado azul-escuro + Título + Subtítulo */}
+        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+          <div
+            className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0B2545] to-[#124E78] text-white flex items-center justify-center shrink-0 shadow-sm border border-[#124E78]/30"
+            aria-hidden="true"
+          >
+            <ShieldCheck className="w-6 h-6 text-white" />
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5 flex-nowrap">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-tight whitespace-nowrap">
+                Dashboard
+              </h1>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 shrink-0 whitespace-nowrap">
+                Compliance & Governança
+              </span>
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 leading-snug">
+              Visão geral da conformidade, riscos e proteção dos ativos
+            </p>
+          </div>
+        </div>
+
+        {/* Lado direito: Pílula Última atualização + Card Serventia Atual + Botão Atualizar */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0 justify-start xl:justify-end">
+          {/* Pílula / Botão de Última Atualização com recarga funcional */}
+          {lastUpdated && (
+            <div
+              onClick={onReload}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onReload?.()
+                }
+              }}
+              className="flex items-center gap-2 text-right cursor-pointer hover:bg-slate-50 transition-colors bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 shrink-0"
+              title="Clique para recarregar todos os dados da dashboard"
+              aria-label={`Última atualização às ${lastUpdated}. Clique para recarregar.`}
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 text-blue-600 shrink-0 ${loading ? 'animate-spin' : ''}`}
+              />
+              <div className="text-left leading-tight">
+                <span className="text-[10px] text-slate-400 font-medium block">
+                  Última atualização
+                </span>
+                <span className="text-[11px] font-semibold text-slate-700 font-mono block whitespace-nowrap">
+                  {lastUpdated}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Card da Serventia Real */}
+          <div
+            className="flex items-center gap-2.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs shrink-0"
+            title={`Serventia cadastrada: ${serventiaNome}`}
+          >
+            <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200/60">
+              <Building2 className="w-4 h-4 text-slate-700" />
+            </div>
+            <div className="min-w-0 pr-1">
+              <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wider leading-none">
+                Serventia Atual
+              </span>
+              <span className="text-xs font-bold text-slate-900 truncate block mt-0.5 max-w-[150px] sm:max-w-[200px]">
+                {serventiaNome}
+              </span>
+            </div>
+            <Badge
+              variant="outline"
+              className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+            >
+              {serventiaAtiva ? 'Ativo' : 'Inativo'}
+            </Badge>
+          </div>
+
+          {/* Botão de Atualizar primário */}
+          <Button
+            onClick={onReload}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold h-9 px-3 gap-1.5 rounded-xl shadow-2xs shrink-0"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
