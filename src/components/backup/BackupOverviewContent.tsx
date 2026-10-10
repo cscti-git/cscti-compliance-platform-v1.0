@@ -234,46 +234,170 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
   }, [assets])
 
   // ---------------------------------------------------------------------------
-  // 1. DADOS DOS 4 KPIS SUPERIORES (alinhados com BackupOverviewPage e motor de confronto)
+  // 1. DADOS DOS 4 KPIS SUPERIORES
+  // Comprovações efetivas registradas no histórico e confronto por ativo
   // ---------------------------------------------------------------------------
+  const normalizarNomeAtivo = (txt?: string) => {
+    if (!txt) return ''
+    return txt
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .trim()
+  }
+
+  // Mapa de comprovações efetivas reais registradas por ativo e por modalidade
+  // (exclusivamente execuções reais de backup com sucesso, jamais NOC)
+  const ativosProtecaoEfetiva = useMemo(() => {
+    return ativosExigemBackup.map((ativo) => {
+      const normId = ativo.id
+      const normNome = normalizarNomeAtivo(ativo.name)
+
+      const comprovacoesPorMod = {
+        local: false,
+        nuvem: false,
+        replicacao: false,
+      }
+
+      // 1. Verificar através das execuções reais de backup com sucesso
+      execucoes
+        .filter((e) => e.status === 'sucesso')
+        .forEach((exec) => {
+          const rotina = rotinasMap.get(exec.rotina)
+          const rotinaNome = rotina?.nome || ''
+          const modalidadeInfo = inferirModalidadeInfo(
+            exec.observacao || '',
+            rotinaNome,
+            exec.destino || '',
+          )
+          const modKey = modalidadeInfo.key
+
+          let bateuAtivo = false
+
+          // Verifica em detalhes_vms
+          if (Array.isArray(exec.detalhes_vms)) {
+            for (const vm of exec.detalhes_vms) {
+              const st = String(vm?.status || '').toLowerCase()
+              const isOk = st === 'success' || st === 'ok' || !st
+              if (isOk && (vm?.ativo_id === normId || normalizarNomeAtivo(vm?.nome) === normNome)) {
+                bateuAtivo = true
+                break
+              }
+            }
+          }
+
+          // Verifica em confronto_escopo.comprovado
+          if (!bateuAtivo && (exec.confronto_escopo as any)?.comprovado) {
+            const comps = (exec.confronto_escopo as any).comprovado
+            if (Array.isArray(comps)) {
+              for (const comp of comps) {
+                if (
+                  comp?.ativo_id === normId ||
+                  normalizarNomeAtivo(comp?.ativo_nome) === normNome ||
+                  normalizarNomeAtivo(comp?.item_comprovante) === normNome
+                ) {
+                  bateuAtivo = true
+                  break
+                }
+              }
+            }
+          }
+
+          if (bateuAtivo && (modKey === 'local' || modKey === 'nuvem' || modKey === 'replicacao')) {
+            comprovacoesPorMod[modKey] = true
+          }
+        })
+
+      // 2. Confronto direto por ativo (se houver comprovação registrada no motor de confronto)
+      const confItem = confrontoData?.confronto?.find(
+        (c) => c.id === ativo.id || normalizarNomeAtivo(c.nome) === normNome,
+      )
+      if (confItem?.modalidades) {
+        if (confItem.modalidades.local?.ultima_comprovacao) comprovacoesPorMod.local = true
+        if (confItem.modalidades.nuvem?.ultima_comprovacao) comprovacoesPorMod.nuvem = true
+        if (confItem.modalidades.replicacao?.ultima_comprovacao)
+          comprovacoesPorMod.replicacao = true
+      }
+
+      const exigeLocal = Boolean(ativo.exige_backup_local)
+      const exigeNuvem = Boolean(ativo.exige_backup_nuvem)
+      const exigeReplicacao = Boolean(ativo.exige_backup_replicacao)
+
+      let exigidasCount = 0
+      let atendidasCount = 0
+
+      if (exigeLocal) {
+        exigidasCount++
+        if (comprovacoesPorMod.local) atendidasCount++
+      }
+      if (exigeNuvem) {
+        exigidasCount++
+        if (comprovacoesPorMod.nuvem) atendidasCount++
+      }
+      if (exigeReplicacao) {
+        exigidasCount++
+        if (comprovacoesPorMod.replicacao) atendidasCount++
+      }
+
+      if (exigidasCount === 0) {
+        exigidasCount = 3
+        if (comprovacoesPorMod.local) atendidasCount++
+        if (comprovacoesPorMod.nuvem) atendidasCount++
+        if (comprovacoesPorMod.replicacao) atendidasCount++
+      }
+
+      const completamenteProtegido = exigidasCount > 0 && atendidasCount === exigidasCount
+      const parcialmenteProtegido = atendidasCount > 0
+
+      return {
+        ativo,
+        exigidasCount,
+        atendidasCount,
+        completamenteProtegido,
+        parcialmenteProtegido,
+        comprovacoesPorMod,
+      }
+    })
+  }, [ativosExigemBackup, execucoes, rotinasMap, confrontoData])
+
   const totalExigidosConfronto = useMemo(() => {
+    if (ativosExigemBackup.length > 0) return ativosExigemBackup.length
     if (confrontoData?.totais?.total_ativos_exigidos !== undefined) {
       return confrontoData.totais.total_ativos_exigidos
     }
-    return ativosExigemBackup.length
-  }, [confrontoData, ativosExigemBackup])
+    return 0
+  }, [ativosExigemBackup, confrontoData])
 
   const totalAtivosProtegidosCompleto = useMemo(() => {
+    if (ativosProtecaoEfetiva.length > 0) {
+      return ativosProtecaoEfetiva.filter((a) => a.completamenteProtegido).length
+    }
     if (confrontoData?.totais?.total_protegidos_completo !== undefined) {
       return confrontoData.totais.total_protegidos_completo
     }
-    if (confrontoData?.confronto) {
-      return confrontoData.confronto.filter((a) => a.status_consolidado === 'PROTEGIDO').length
-    }
     return 0
-  }, [confrontoData])
+  }, [ativosProtecaoEfetiva, confrontoData])
 
   const totalAtivosComProtecao = useMemo(() => {
+    if (ativosProtecaoEfetiva.length > 0) {
+      return ativosProtecaoEfetiva.filter((a) => a.parcialmenteProtegido).length
+    }
     if (confrontoData?.totais?.total_parcialmente_protegidos !== undefined) {
       return confrontoData.totais.total_parcialmente_protegidos
     }
-    if (confrontoData?.confronto) {
-      return confrontoData.confronto.filter((a) => (a.total_atendidas || 0) > 0).length
-    }
-    return (
-      (confrontoData?.totais?.total_protegidos || 0) + (confrontoData?.totais?.total_parcial || 0)
-    )
-  }, [confrontoData])
+    return totalAtivosProtegidosCompleto
+  }, [ativosProtecaoEfetiva, confrontoData, totalAtivosProtegidosCompleto])
 
   const percentualProtegidoConfronto = useMemo(() => {
-    if (typeof confrontoData?.totais?.percentual_protegido_efetivo === 'number') {
-      return confrontoData.totais.percentual_protegido_efetivo
-    }
-    if (typeof confrontoData?.totais?.percentual_protegido === 'number') {
-      return confrontoData.totais.percentual_protegido
+    if (totalExigidosConfronto > 0) {
+      const somaPonderada = ativosProtecaoEfetiva.reduce((acc, curr) => {
+        return acc + (curr.exigidasCount > 0 ? curr.atendidasCount / curr.exigidasCount : 0)
+      }, 0)
+      return Math.round((somaPonderada / totalExigidosConfronto) * 100)
     }
     return 0
-  }, [confrontoData])
+  }, [ativosProtecaoEfetiva, totalExigidosConfronto])
 
   const totalExecucoes = execucoes.length
   const execucoesComSucesso = useMemo(
@@ -335,8 +459,6 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
       },
     ]
 
-    const confrontoItems = confrontoData?.confronto || []
-
     const resultados = categoriasBase
       .map((cat) => {
         const ativosDaCat = ativosExigemBackup.filter((a) => cat.tipos.includes(a.tipo))
@@ -348,11 +470,11 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
         let semProtecao = 0
 
         ativosDaCat.forEach((ativo) => {
-          const conf = confrontoItems.find((c) => c.id === ativo.id)
-          if (conf) {
-            if (conf.status_consolidado === 'PROTEGIDO') {
+          const infoEfetiva = ativosProtecaoEfetiva.find((ap) => ap.ativo.id === ativo.id)
+          if (infoEfetiva) {
+            if (infoEfetiva.completamenteProtegido) {
               protegidos++
-            } else if (conf.status_consolidado === 'PARCIAL') {
+            } else if (infoEfetiva.parcialmenteProtegido) {
               parciais++
             } else {
               semProtecao++
@@ -376,30 +498,19 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
       .filter((item): item is NonNullable<typeof item> => item !== null)
 
     return resultados
-  }, [ativosExigemBackup, confrontoData])
+  }, [ativosExigemBackup, ativosProtecaoEfetiva])
 
   const conformidadeRotinas = useMemo(() => {
-    const totalRotinas = rotinas.length
+    // Decisão expressa do usuário: Validação Externa (NOC) é exclusivamente análise extra,
+    // não fonte comprobatória. O donut e o percentual consideram EXCLUSIVAMENTE rotinas de backup reais.
     let conformes = 0
-    let validadasNoc = 0
     let pendentes = 0
     let naoConformes = 0
-
-    // Mapear se a organização possui atestado ou monitoramento do NOC
-    const temMonitoramentoNocValido =
-      monitoramentos.length > 0 &&
-      monitoramentos.some(
-        (m) => m.status_geral === 'ok' || m.status_geral === 'atencao' || !m.status_geral,
-      )
+    let totalRotinasBackup = 0
+    let totalRotinasNoc = 0
+    let rotinasNocAtivas = 0
 
     rotinas.forEach((r) => {
-      if (r.status === 'inativo') {
-        naoConformes++
-        return
-      }
-
-      // Verificar se a rotina é um atestado do NOC (ex.: ANALISE PREVENTIVA DIARIA DE BACKUP
-      // ou possui fonte com adaptador NOC_DIARIO/HUMANO/NOC, ou gera registros em monitoramento_externo)
       const nomeUpper = (r.nome || '').toUpperCase()
       const isRotinaNoc =
         nomeUpper.includes('ANALISE PREVENTIVA') ||
@@ -413,18 +524,17 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
         )
 
       if (isRotinaNoc) {
-        // Se há monitoramento externo cadastrado/recebido ou se a rotina do NOC está ativa
-        // e o último atestado do NOC é conforme (ou na ausência de erro explícito)
-        if (monitoramentos.length > 0) {
-          if (temMonitoramentoNocValido) {
-            validadasNoc++
-          } else {
-            naoConformes++
-          }
-        } else {
-          // Se não houver monitoramento recebido ainda, valida se ativo
-          validadasNoc++
+        totalRotinasNoc++
+        if (r.status !== 'inativo') {
+          rotinasNocAtivas++
         }
+        return // Excluída da base de cálculo comprobatória do donut
+      }
+
+      totalRotinasBackup++
+
+      if (r.status === 'inativo') {
+        naoConformes++
         return
       }
 
@@ -439,35 +549,29 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
       }
     })
 
-    // Conforme + Validada por NOC contam como conformes no percentual central
-    const totalConformesEfetivos = conformes + validadasNoc
-    const pctConformeEfetivo =
-      totalRotinas > 0 ? Math.round((totalConformesEfetivos / totalRotinas) * 100) : 0
-    const pctConforme = totalRotinas > 0 ? Math.round((conformes / totalRotinas) * 100) : 0
-    const pctValidadasNoc = totalRotinas > 0 ? Math.round((validadasNoc / totalRotinas) * 100) : 0
-    const pctPendente = totalRotinas > 0 ? Math.round((pendentes / totalRotinas) * 100) : 0
-    const pctNaoConforme = totalRotinas > 0 ? Math.round((naoConformes / totalRotinas) * 100) : 0
+    const pctConforme =
+      totalRotinasBackup > 0 ? Math.round((conformes / totalRotinasBackup) * 100) : 0
+    const pctPendente =
+      totalRotinasBackup > 0 ? Math.round((pendentes / totalRotinasBackup) * 100) : 0
+    const pctNaoConforme =
+      totalRotinasBackup > 0 ? Math.round((naoConformes / totalRotinasBackup) * 100) : 0
 
     return {
-      total: totalRotinas,
-      pctConforme: pctConformeEfetivo,
+      total: totalRotinasBackup,
+      totalGeralComNoc: rotinas.length,
+      totalRotinasNoc,
+      rotinasNocAtivas,
+      pctConforme,
       conformes,
-      validadasNoc,
       pendentes,
       naoConformes,
       segments: [
         { label: 'Conforme', value: conformes, color: '#10B981', percent: pctConforme },
-        {
-          label: 'Validada por NOC',
-          value: validadasNoc,
-          color: '#8B5CF6',
-          percent: pctValidadasNoc,
-        },
         { label: 'Pendente', value: pendentes, color: '#F59E0B', percent: pctPendente },
         { label: 'Não conforme', value: naoConformes, color: '#EF4444', percent: pctNaoConforme },
       ],
     }
-  }, [rotinas, execucoes, monitoramentos, fontes, regras])
+  }, [rotinas, execucoes, fontes, regras])
 
   // ---------------------------------------------------------------------------
   // 3. ENRIQUECIMENTO E FILTRAGEM DA TABELA DE EXECUÇÕES
@@ -1079,16 +1183,19 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
         {/* COLUNA ESQUERDA: KPIs + Gráficos Analíticos + Filtros + Tabela */}
         <div className="xl:col-span-9 space-y-5 min-w-0">
-          {/* 2. LINHA DE 4 KPIS */}
+          {/* 2. LINHA DE 4 KPIS UNIFORMIZADOS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* KPI 1: Total de Ativos Protegidos (Database verde) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-3.5 flex items-center gap-3">
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors min-h-[96px] flex flex-col justify-between">
+              <CardContent className="p-3.5 flex items-center gap-3 h-full">
                 <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
                   <Database className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                <div className="min-w-0 flex-1 flex flex-col justify-between">
+                  <span
+                    className="text-[11px] font-semibold text-slate-500 block truncate"
+                    title="Total de Ativos Protegidos"
+                  >
                     Total de Ativos Protegidos
                   </span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
@@ -1099,30 +1206,38 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                       / {totalExigidosConfronto} exigidos
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
-                    {percentualProtegidoConfronto}% de cobertura ({totalAtivosComProtecao} com
-                    proteção)
+                  <p
+                    className="text-[10px] text-slate-400 mt-1 font-medium whitespace-nowrap"
+                    title={`${percentualProtegidoConfronto}% de cobertura (${totalAtivosComProtecao} de ${totalExigidosConfronto} ativos com comprovação)`}
+                  >
+                    {percentualProtegidoConfronto}% de cobertura • {totalAtivosComProtecao} ativos
                   </p>
                 </div>
               </CardContent>
             </Card>
 
             {/* KPI 2: Execuções Realizadas (Check verde) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-3.5 flex items-center gap-3">
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors min-h-[96px] flex flex-col justify-between">
+              <CardContent className="p-3.5 flex items-center gap-3 h-full">
                 <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                <div className="min-w-0 flex-1 flex flex-col justify-between">
+                  <span
+                    className="text-[11px] font-semibold text-slate-500 block truncate"
+                    title="Execuções Realizadas"
+                  >
                     Execuções Realizadas
                   </span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
                       {totalExecucoes}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
+                  <p
+                    className="text-[10px] text-slate-400 mt-1 font-medium whitespace-nowrap"
+                    title="Execuções registradas no histórico operacional"
+                  >
                     registradas no histórico
                   </p>
                 </div>
@@ -1130,21 +1245,27 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
             </Card>
 
             {/* KPI 3: Execuções com Alertas (Alerta âmbar) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-3.5 flex items-center gap-3">
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors min-h-[96px] flex flex-col justify-between">
+              <CardContent className="p-3.5 flex items-center gap-3 h-full">
                 <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
                   <AlertTriangle className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                <div className="min-w-0 flex-1 flex flex-col justify-between">
+                  <span
+                    className="text-[11px] font-semibold text-slate-500 block truncate"
+                    title="Execuções com Alertas"
+                  >
                     Execuções com Alertas
                   </span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
                       {execucoesComAlertas}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
+                  <p
+                    className="text-[10px] text-slate-400 mt-1 font-medium whitespace-nowrap"
+                    title={`${pctAlertas}% do total de execuções`}
+                  >
                     {pctAlertas}% do total
                   </p>
                 </div>
@@ -1152,21 +1273,27 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
             </Card>
 
             {/* KPI 4: Execuções com Falha (X vermelho) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-3.5 flex items-center gap-3">
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors min-h-[96px] flex flex-col justify-between">
+              <CardContent className="p-3.5 flex items-center gap-3 h-full">
                 <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
                   <XCircle className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-[11px] font-semibold text-slate-500 block truncate">
+                <div className="min-w-0 flex-1 flex flex-col justify-between">
+                  <span
+                    className="text-[11px] font-semibold text-slate-500 block truncate"
+                    title="Execuções com Falha"
+                  >
                     Execuções com Falha
                   </span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
                       {execucoesComFalha}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
+                  <p
+                    className="text-[10px] text-slate-400 mt-1 font-medium whitespace-nowrap"
+                    title={`${pctFalhas}% do total de execuções`}
+                  >
                     {pctFalhas}% do total
                   </p>
                 </div>
@@ -1248,12 +1375,24 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
               </div>
             </Card>
 
-            {/* Painel C: Conformidade das Rotinas (Donut real) */}
+            {/* Painel C: Conformidade das Rotinas (Donut real considerando exclusivamente rotinas de backup) */}
             <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-4 sm:p-5 flex flex-col justify-between min-h-[250px]">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 mb-3 sm:mb-4">
-                  Conformidade das Rotinas
-                </h3>
+                <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
+                  <h3 className="text-sm font-bold text-slate-900 truncate">
+                    Conformidade das Rotinas
+                  </h3>
+                  {conformidadeRotinas.totalRotinasNoc > 0 && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 shrink-0"
+                      title="Validação Externa (NOC) mantida como análise extra, fora do cálculo comprobatório"
+                    >
+                      <UserCheck className="w-3 h-3 text-purple-600" />
+                      Análise extra — não comprobatória
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 py-0.5">
                   <div className="shrink-0 flex items-center justify-center">
                     <SvgDonutChart
@@ -1291,12 +1430,37 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                         </span>
                       </div>
                     ))}
+
+                    {/* Exibição visível mas separada da rotina do NOC como análise extra */}
+                    {conformidadeRotinas.totalRotinasNoc > 0 && (
+                      <div
+                        className="pt-1.5 mt-1 border-t border-dashed border-slate-200 flex items-center justify-between gap-2 text-slate-500"
+                        title="Validação Externa (NOC): análise preventiva diária do NOC (camada analítica adicional, não comprobatória)"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                          <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                          <span className="text-[11px] text-slate-600 truncate">
+                            Validação Externa (NOC)
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-purple-700 whitespace-nowrap pl-1 text-right">
+                          {conformidadeRotinas.rotinasNocAtivas} ativa (análise extra)
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-              <div className="pt-3 mt-2 border-t border-slate-100 text-center text-xs text-slate-500 font-medium">
-                Total de rotinas:{' '}
-                <strong className="text-slate-800">{conformidadeRotinas.total}</strong>
+              <div className="pt-3 mt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+                <span>
+                  Rotinas de backup:{' '}
+                  <strong className="text-slate-800">{conformidadeRotinas.total}</strong>
+                </span>
+                {conformidadeRotinas.totalRotinasNoc > 0 && (
+                  <span className="text-[11px] text-slate-400">
+                    + {conformidadeRotinas.totalRotinasNoc} análise NOC
+                  </span>
+                )}
               </div>
             </Card>
           </div>
