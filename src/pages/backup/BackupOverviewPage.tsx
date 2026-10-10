@@ -173,17 +173,15 @@ export const BackupOverviewPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* 1. Cabeçalho Claro Unificado com Breadcrumb, Serventia Real, Nova Execução e Menu */}
+      {/* 1. Cabeçalho Claro Unificado com Breadcrumb, Serventia Real, Status e Ações */}
       <BackupHeader
         currentTabLabel={currentTabLabel}
         serventiaNome={serventiaNome}
         serventiaAtiva={serventiaAtiva}
-        onNovaExecucao={() => setSearchParams({ tab: 'execucoes' })}
         onReload={loadAllData}
         loading={loading}
         lastUpdated={lastUpdated}
         canOperate={canOperate}
-        onNovoPlano={() => setSearchParams({ tab: 'planos', action: 'novo' })}
       />
 
       {/* 2. Barra de Abas Redesenhada: Container Branco, Bloco Azul na Ativa, Ícone + Nome + Sub-rótulo */}
