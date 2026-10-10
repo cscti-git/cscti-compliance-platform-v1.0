@@ -649,14 +649,14 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                 )}
               </section>
 
-              {/* ===== SEÇÃO 5 — ATESTADO HUMANO NOC ===== */}
+              {/* ===== SEÇÃO 5 — VALIDAÇÃO EXTERNA (NOC) ===== */}
               <section className="space-y-2.5">
                 <h2 className="text-sm font-bold text-[#0B2545] uppercase tracking-wide border-b border-slate-200 pb-1">
-                  5. Atestado Humano NOC (Dupla Camada)
+                  5. Validação Externa (NOC) — Dupla Camada
                 </h2>
                 {data.noc.length === 0 ? (
                   <p className="text-xs text-slate-500 italic">
-                    Nenhum atestado humano NOC registrado no período.
+                    Nenhum registro de Validação Externa (NOC) no período.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -668,7 +668,7 @@ export const BackupReportPage: React.FC<BackupReportPageProps> = ({ orgId: orgId
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1.5">
                             <UserCheck className="w-3.5 h-3.5 text-purple-700" />
-                            Atestado de {formatSpDateTime(n.data_email)} ·{' '}
+                            Validação Externa (NOC) de {formatSpDateTime(n.data_email)} ·{' '}
                             {n.origem === 'manual' ? 'Registro manual' : 'E-mail NOC'}
                           </span>
                           {n.convergencia === 'convergente' ? (

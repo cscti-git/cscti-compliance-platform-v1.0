@@ -23,7 +23,7 @@ interface NocAvaliacaoManualModalProps {
 }
 
 /**
- * Modal "Registrar Avaliação Manual" — Atestado Humano Diário (NOC).
+ * Modal "Registrar Avaliação Manual" — Validação Externa (NOC).
  * Usado quando a equipe (admin/suporte) conecta-se ao servidor e valida as
  * rotinas de backup manualmente, sem o e-mail do NOC (origem_tipo='manual').
  */
@@ -71,14 +71,14 @@ export const NocAvaliacaoManualModal: React.FC<NocAvaliacaoManualModalProps> = (
         data_avaliacao: dataAvaliacao || undefined,
         conteudo:
           conteudo.trim() ||
-          `Atestado humano diário registrado manualmente. Status geral: ${statusGeral}. Clientes avaliados: ${
+          `Validação Externa (NOC) registrada manualmente. Status geral: ${statusGeral}. Clientes avaliados: ${
             clientesPreview.map((c) => `${c.cliente}=${c.status}`).join('; ') || 'nenhum'
           }.${acoesRealizadas.trim() ? ' Ações: ' + acoesRealizadas.trim() : ''}${
             observacoes.trim() ? ' Observações: ' + observacoes.trim() : ''
           }`,
       })
       toast({
-        title: 'Atestado humano registrado',
+        title: 'Validação Externa (NOC) registrada',
         description:
           res.message ||
           'A avaliação manual do NOC foi arquivada no Monitoramento Externo com auditoria.',
@@ -110,13 +110,13 @@ export const NocAvaliacaoManualModal: React.FC<NocAvaliacaoManualModalProps> = (
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-purple-700" />
-              Registrar Avaliação Manual do NOC (Atestado Humano Diário)
+              Registrar Avaliação Manual do NOC (Validação Externa)
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Registre manualmente o resultado da conexão humana diária ao servidor e da verificação
-              das rotinas de backup. O registro sai em nome do seu perfil (admin/suporte), é
-              arquivado no Monitoramento Externo e gravado na auditoria append-only.
-            </DialogDescription>
+              Registre manualmente o resultado da conexão diária do NOC ao servidor e da verificação
+              das rotinas do Veeam/Acronis. Fica arquivado com seu login e carimbo de tempo
+              auditável.
+            </DialogDescription>{' '}
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
@@ -130,7 +130,7 @@ export const NocAvaliacaoManualModal: React.FC<NocAvaliacaoManualModalProps> = (
                   className="text-xs"
                 />
                 <span className="text-[10px] text-slate-500 block mt-1">
-                  Vazio = agora. Deve refletir o momento real da conexão/validação humana.
+                  Vazio = agora. Deve refletir o momento real da conexão/validação externa.
                 </span>
               </div>
               <div>
@@ -185,7 +185,7 @@ export const NocAvaliacaoManualModal: React.FC<NocAvaliacaoManualModalProps> = (
               <Input
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Contexto adicional desta validação humana (opcional)."
+                placeholder="Contexto adicional desta Validação Externa (NOC) (opcional)."
                 className="text-xs"
               />
             </div>

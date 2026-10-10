@@ -199,7 +199,7 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Monitoramentos Externos do NOC (Atestado Humano Diário)
+  // Monitoramentos Externos do NOC (Validação Externa)
   const [monitoramentos, setMonitoramentos] = useState<BackupMonitoramentoExternoItem[]>([])
   const [selectedMonit, setSelectedMonit] = useState<BackupMonitoramentoExternoItem | null>(null)
   const [monitModalOpen, setMonitModalOpen] = useState(false)
@@ -1249,8 +1249,8 @@ Lista de atividades (1 dia):
                   Relatórios de Avaliação do NOC (Monitoramento Externo)
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  E-mails diários enviados por colaboradores da empresa terceirizada com avaliação
-                  humana da integridade dos backups.
+                  E-mails diários enviados por técnicos da empresa terceirizada com Validação
+                  Externa (NOC) da integridade dos backups.
                 </CardDescription>
               </div>
               <Badge className="bg-purple-50 text-purple-800 border-purple-200 text-xs">
@@ -1264,12 +1264,12 @@ Lista de atividades (1 dia):
                   variant="outline"
                   onClick={() => setNocManualModalOpen(true)}
                   className="h-7 text-xs font-semibold text-purple-800 border-purple-300 bg-purple-50/60 hover:bg-purple-100 gap-1.5"
-                  title="Registrar manualmente o atestado humano diário (conexão e verificação das rotinas no servidor)"
+                  title="Registrar manualmente a Validação Externa (NOC) (conexão e verificação das rotinas no servidor)"
                 >
                   <UserCheck className="w-3.5 h-3.5" /> Registrar Avaliação Manual
                 </Button>
                 <span className="text-[10px] text-slate-500">
-                  Para os dias em que a validação humana é feita fora do e-mail do NOC. Fica
+                  Para os dias em que a Validação Externa (NOC) é feita fora do e-mail do NOC. Fica
                   arquivada com hash, autor e auditoria.
                 </span>
               </div>
@@ -1515,7 +1515,7 @@ Lista de atividades (1 dia):
                         : 'bg-white text-purple-800 border-purple-300 hover:bg-purple-50'
                     }`}
                   >
-                    3. NOC Diário (Humano)
+                    3. NOC Diário (Validação Externa)
                   </button>
                 </div>
               </div>

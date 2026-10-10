@@ -448,7 +448,7 @@ export const BackupRegrasTab: React.FC<BackupRegrasTabProps> = ({
                         ACRONIS_PDF (Anexo PDF &quot;Atividades diárias - SocNoc&quot;)
                       </SelectItem>
                       <SelectItem value="NOC_DIARIO">
-                        NOC_DIARIO (Análise Preventiva Diária por Humano/NOC)
+                        NOC_DIARIO (Análise Preventiva Diária / Validação Externa NOC)
                       </SelectItem>
                       <SelectItem value="EMAIL_HTML_GENERICO">
                         EMAIL_HTML_GENERICO (Texto / HTML Genérico)

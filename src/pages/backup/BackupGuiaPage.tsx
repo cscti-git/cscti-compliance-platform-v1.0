@@ -1169,8 +1169,8 @@ export const BackupGuiaPage: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-600 leading-snug">
-                      Processa e-mails humanos diários enviados pela equipe de suporte/NOC com
-                      resumo preventivo das rotinas executadas.
+                      Processa e-mails diários de Validação Externa enviados pela equipe de
+                      suporte/NOC com resumo preventivo das rotinas executadas.
                     </p>
                   </div>
 
@@ -1831,7 +1831,7 @@ export const BackupGuiaPage: React.FC = () => {
         </Card>
       </section>
 
-      {/* ETAPA 9 — VALIDAÇÃO HUMANA (ATESTADO NOC) */}
+      {/* ETAPA 9 — VALIDAÇÃO EXTERNA (NOC) */}
       <section id="etapa-9-noc" className="scroll-mt-6 space-y-3">
         <Card className="border-2 border-purple-200 shadow-sm">
           <CardHeader className="bg-gradient-to-r from-purple-50 to-white border-b border-purple-100 pb-3">
@@ -1843,7 +1843,7 @@ export const BackupGuiaPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-lg font-bold text-slate-900">
-                      Validação Externa NOC (Monitoramento Externo) e Dupla Camada
+                      Validação Externa (NOC) — Monitoramento Externo e Dupla Camada
                     </CardTitle>
                     <Badge
                       variant="outline"
@@ -1853,8 +1853,8 @@ export const BackupGuiaPage: React.FC = () => {
                     </Badge>
                   </div>
                   <CardDescription className="text-xs">
-                    Validação diária por agente humano externo, pipeline de ingestão resiliente e
-                    prova incontestável para auditorias.
+                    Validação diária externa da equipe NOC, pipeline de ingestão resiliente e prova
+                    incontestável para auditorias.
                   </CardDescription>
                 </div>
               </div>
@@ -1872,11 +1872,11 @@ export const BackupGuiaPage: React.FC = () => {
           <CardContent className="p-5 space-y-4 text-xs sm:text-sm text-slate-700">
             <div className="space-y-1">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Rotina Diária do Agente Humano do NOC
+                Rotina Diária de Validação Externa pelo NOC
               </h4>
               <p className="leading-relaxed">
-                Todo dia, um agente humano do NOC (Network Operations Center) conecta-se diretamente
-                no servidor de backup e valida as rotinas de backup do Veeam; caso encontre qualquer
+                Todo dia, um técnico do NOC (Network Operations Center) conecta-se diretamente no
+                servidor de backup e valida as rotinas de backup do Veeam; caso encontre qualquer
                 anomalia ou falha de replicação/cópia, ele reporta imediatamente as ações tomadas e
                 o status de cada máquina.
               </p>
@@ -1901,8 +1901,8 @@ export const BackupGuiaPage: React.FC = () => {
                 (– / -).
               </p>
               <p className="text-xs leading-relaxed">
-                Cada relatório processado é convertido em um{' '}
-                <strong>&quot;Atestado Humano Diário&quot;</strong>, contendo:
+                Cada relatório processado é convertido em um registro de{' '}
+                <strong>&quot;Validação Externa (NOC)&quot;</strong>, contendo:
               </p>
               <ul className="list-disc pl-5 text-[11px] space-y-1 text-purple-950 font-medium">
                 <li>
@@ -1953,8 +1953,8 @@ export const BackupGuiaPage: React.FC = () => {
                     &quot;NOC concorda com a análise do sistema&quot;
                   </span>
                   <p className="text-[11px] mt-1 text-emerald-900">
-                    O atestado humano converge integralmente com os laudos técnicos automáticos
-                    gerados a partir dos comprovantes.
+                    A Validação Externa (NOC) converge integralmente com os laudos técnicos
+                    automáticos gerados a partir dos comprovantes.
                   </p>
                 </div>
                 <div className="p-2.5 rounded bg-amber-50 border border-amber-200 text-amber-950">
@@ -1971,7 +1971,7 @@ export const BackupGuiaPage: React.FC = () => {
               </div>
               <p className="text-[11px] text-purple-900 pt-1 font-semibold">
                 Essa é a <strong>dupla camada de conformidade</strong> (prova automática via
-                evidência criptográfica + validação humana diária) que se apresenta ao juiz
+                evidência criptográfica + Validação Externa do NOC) que se apresenta ao juiz
                 corregedor e auditores.
               </p>
             </div>
