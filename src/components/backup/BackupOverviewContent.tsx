@@ -1304,14 +1304,14 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
           {/* 3. LINHA DE 3 PAINÉIS ANALÍTICOS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Painel A: Status das Execuções (Donut) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-4 sm:p-5 flex flex-col justify-between min-h-[250px]">
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px]">
               <div>
                 <div className="min-h-[38px] mb-2 sm:mb-3 flex items-start">
                   <h3 className="text-xs sm:text-[13px] 2xl:text-sm font-bold text-slate-900 leading-tight">
                     Status das Execuções
                   </h3>
                 </div>
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 py-0.5">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 py-0.5">
                   <div className="shrink-0 flex items-center justify-center">
                     <SvgDonutChart
                       data={statusExecucoesData.segments.map((s) => ({
@@ -1321,28 +1321,28 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                       }))}
                       totalLabel={String(statusExecucoesData.total)}
                       subLabel="Execuções"
-                      size={110}
-                      strokeWidth={16}
+                      size={98}
+                      strokeWidth={14}
                     />
                   </div>
 
-                  {/* Legenda com contagem e percentual real */}
-                  <div className="flex-1 w-full space-y-2 text-xs">
+                  {/* Legenda com contagem e percentual real sem estouro/corte */}
+                  <div className="flex-1 min-w-0 w-full space-y-1.5 text-xs">
                     {statusExecucoesData.segments.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between gap-2 text-slate-700 hover:text-slate-900 transition-colors"
+                        className="flex items-center justify-between gap-1.5 text-slate-700 hover:text-slate-900 transition-colors"
                       >
-                        <div className="flex items-center gap-2 min-w-0 pr-1">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: item.color }}
                           />
-                          <span className="text-xs text-slate-600 truncate" title={item.label}>
+                          <span className="text-[11px] text-slate-600 truncate" title={item.label}>
                             {item.label}
                           </span>
                         </div>
-                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1 text-right">
+                        <span className="font-bold text-slate-900 text-[11px] whitespace-nowrap shrink-0 text-right tabular-nums">
                           {item.value}{' '}
                           <span className="font-normal text-slate-500">({item.percent}%)</span>
                         </span>
@@ -1354,7 +1354,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
             </Card>
 
             {/* Painel B: Cobertura de Proteção por Tipo de Ativo (Barras horizontais reais) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-4 sm:p-5 flex flex-col justify-between min-h-[250px]">
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px]">
               <div>
                 <div className="min-h-[38px] mb-2 sm:mb-3 flex items-start">
                   <h3
@@ -1383,7 +1383,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
             </Card>
 
             {/* Painel C: Conformidade das Rotinas (Donut real considerando exclusivamente rotinas de backup) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-4 sm:p-5 flex flex-col justify-between min-h-[250px]">
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px]">
               <div>
                 <div className="min-h-[38px] mb-2 sm:mb-3 flex flex-col justify-start gap-1">
                   <h3
@@ -1405,7 +1405,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                   )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 py-0.5">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 py-0.5">
                   <div className="shrink-0 flex items-center justify-center">
                     <SvgDonutChart
                       data={conformidadeRotinas.segments.map((s) => ({
@@ -1415,49 +1415,54 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                       }))}
                       totalLabel={`${conformidadeRotinas.pctConforme}%`}
                       subLabel="Conforme"
-                      size={110}
-                      strokeWidth={16}
+                      size={98}
+                      strokeWidth={14}
                     />
                   </div>
 
-                  {/* Legenda com NOME, QUANTIDADE REAL e PERCENTUAL */}
-                  <div className="flex-1 w-full space-y-2 text-xs">
+                  {/* Legenda com NOME, QUANTIDADE REAL e PERCENTUAL com alinhamento consistente e wrap controlado */}
+                  <div className="flex-1 min-w-0 w-full space-y-1.5 text-xs">
                     {conformidadeRotinas.segments.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between gap-2 text-slate-700 hover:text-slate-900 transition-colors"
+                        className="flex items-center justify-between gap-1.5 text-slate-700 hover:text-slate-900 transition-colors"
                       >
-                        <div className="flex items-center gap-2 min-w-0 pr-1">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: item.color }}
                           />
-                          <span className="text-xs text-slate-600 truncate" title={item.label}>
+                          <span className="text-[11px] text-slate-600 truncate" title={item.label}>
                             {item.label}
                           </span>
                         </div>
-                        <span className="font-bold text-slate-900 text-xs whitespace-nowrap pl-1 text-right">
+                        <span className="font-bold text-slate-900 text-[11px] whitespace-nowrap shrink-0 text-right tabular-nums">
                           {item.percent}%{' '}
                           <span className="font-normal text-slate-500">({item.value})</span>
                         </span>
                       </div>
                     ))}
 
-                    {/* Exibição visível mas separada da rotina do NOC como análise extra */}
+                    {/* Exibição visível mas separada da rotina do NOC como análise extra com wrap controlado */}
                     {conformidadeRotinas.totalRotinasNoc > 0 && (
                       <div
-                        className="pt-1.5 mt-1 border-t border-dashed border-slate-200 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-slate-500"
+                        className="pt-1.5 mt-1 border-t border-dashed border-slate-200 text-slate-500"
                         title="Validação Externa (NOC): análise preventiva diária do NOC (camada analítica adicional, não comprobatória)"
                       >
-                        <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                          <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
-                          <span className="text-[11px] text-slate-600 font-medium">
-                            Validação Externa (NOC)
+                        <div className="flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                            <span
+                              className="text-[11px] text-slate-600 font-medium truncate"
+                              title="Validação Externa (NOC)"
+                            >
+                              Validação Externa (NOC)
+                            </span>
+                          </div>
+                          <span className="text-[10.5px] font-semibold text-purple-700 whitespace-nowrap shrink-0 text-right">
+                            {conformidadeRotinas.rotinasNocAtivas} ativa
                           </span>
                         </div>
-                        <span className="text-[11px] font-semibold text-purple-700 whitespace-nowrap">
-                          {conformidadeRotinas.rotinasNocAtivas} ativa
-                        </span>
                       </div>
                     )}
                   </div>

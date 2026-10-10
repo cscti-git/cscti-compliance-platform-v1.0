@@ -28,6 +28,16 @@ export const SvgDonutChart: React.FC<SvgDonutChartProps> = ({
 
   let accumulatedPercent = 0
 
+  // Escala dinâmica de tipografia central conforme o tamanho do donut
+  const titleClass =
+    size <= 100
+      ? 'text-lg font-extrabold text-slate-900 leading-none tracking-tight'
+      : 'text-xl font-extrabold text-slate-900 leading-none tracking-tight'
+  const subClass =
+    size <= 100
+      ? 'text-[10px] font-medium text-slate-500 mt-0.5 leading-none'
+      : 'text-[11px] font-medium text-slate-500 mt-1 leading-none'
+
   return (
     <div
       className="relative shrink-0 flex items-center justify-center"
@@ -67,15 +77,9 @@ export const SvgDonutChart: React.FC<SvgDonutChartProps> = ({
           })}
       </svg>
       {/* Texto Central */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <span className="text-xl font-extrabold text-slate-900 leading-none tracking-tight">
-          {totalLabel}
-        </span>
-        {subLabel && (
-          <span className="text-[11px] font-medium text-slate-500 mt-1 leading-none">
-            {subLabel}
-          </span>
-        )}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-1 text-center">
+        <span className={titleClass}>{totalLabel}</span>
+        {subLabel && <span className={subClass}>{subLabel}</span>}
       </div>
     </div>
   )
