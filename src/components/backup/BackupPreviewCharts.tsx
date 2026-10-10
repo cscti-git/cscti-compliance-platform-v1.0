@@ -112,20 +112,22 @@ export const HorizontalStackedBar: React.FC<HorizontalStackedBarProps> = ({ cate
         const pctSem = (cat.semProtecao / total) * 100
 
         return (
-          <div key={idx} className="flex items-center gap-3 text-xs">
+          <div key={idx} className="flex items-center gap-2 sm:gap-3 text-xs">
             {/* Nome da categoria */}
             <span
-              className="w-36 font-medium text-slate-700 truncate text-left shrink-0"
+              className="max-w-[130px] sm:max-w-[140px] font-medium text-slate-700 truncate text-left shrink-0"
               title={cat.categoria}
             >
               {cat.categoria}
             </span>
 
             {/* Quantidade de ativos */}
-            <span className="w-8 font-bold text-slate-800 text-right shrink-0">{cat.total}</span>
+            <span className="w-6 sm:w-8 font-bold text-slate-800 text-right shrink-0">
+              {cat.total}
+            </span>
 
             {/* Barra empilhada */}
-            <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+            <div className="flex-1 min-w-[60px] h-3.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
               {cat.protegidos > 0 && (
                 <div
                   className="bg-emerald-500 h-full transition-all duration-300"
