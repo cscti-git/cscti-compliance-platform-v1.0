@@ -540,21 +540,22 @@ export const BackupOverviewPreviewPage: React.FC = () => {
       const totalVms = vmsComprovadas.length
       const temMultiplasVms = totalVms > 1
 
+      // Prefixo gramatical da modalidade ("· Local", "· Cópia Nuvem", "· Replicação")
+      const modalidadeTexto =
+        ativoModalidadeLabel === 'Nuvem' ? '· Cópia Nuvem' : `· ${ativoModalidadeLabel}`
+
       if (totalVms > 0) {
         if (totalVms === 1) {
           ativoTitulo = vmsComprovadas[0].nome
-          const loc = vmsComprovadas[0].localizacao || 'Sala dos servidores'
-          ativoSubtitulo = `${loc} · Servidor Virtualizado · Destino ${ativoModalidadeLabel}`
+          ativoSubtitulo = `1 VM comprovada ${modalidadeTexto}`
         } else {
-          // Se comprovar 4 ativos: "SPCM-ORION +3" (ou primeira + contagem)
-          const primeiroNome = vmsComprovadas[0].nome
-          ativoTitulo = `${primeiroNome} +${totalVms - 1}`
-          ativoSubtitulo = `${totalVms} VMs comprovadas · Cópia ${ativoModalidadeLabel}`
+          ativoTitulo = vmsComprovadas.map((v) => v.nome).join(', ')
+          ativoSubtitulo = `${totalVms} VMs comprovadas ${modalidadeTexto}`
         }
       } else {
         // Fallback: usar nome da rotina
         ativoTitulo = rotinaNome
-        ativoSubtitulo = `Destino ${ativoModalidadeLabel}`
+        ativoSubtitulo = `Rotina de backup ${modalidadeTexto}`
       }
 
       // Nomes de todas as VMs formatados para tooltip/busca
@@ -1099,7 +1100,7 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                       {st.nocCount !== undefined && st.nocCount > 0 && (
                         <span
                           className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-0.5"
-                          title="Monitoramentos do NOC"
+                          title="Validação Externa (NOC) — Monitoramentos externos registrados"
                         >
                           <UserCheck className="w-2.5 h-2.5" />
                           {st.nocCount}
@@ -1537,29 +1538,53 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                             {exec.dataHoraFormatada}
                           </td>
 
-                          {/* Ativo: título com VMs comprovadas ou nome da rotina + subtítulo com modalidade */}
-                          <td className="py-3 px-3.5 min-w-[200px]" title={exec.vmsNomesFormatados}>
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200/80">
+                          {/* Ativo: lista vertical compacta de todas as VMs comprovadas ou nome individual */}
+                          <td className="py-3 px-3.5 min-w-[220px]" title={exec.vmsNomesFormatados}>
+                            <div className="flex items-start gap-2.5">
+                              <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200/80 mt-0.5">
                                 <Server className="w-3.5 h-3.5" />
                               </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-bold text-slate-900 block leading-tight truncate">
-                                    {exec.ativoTitulo}
-                                  </span>
-                                  {exec.temMultiplasVms && (
-                                    <span
-                                      className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0"
-                                      title={`VMs comprovadas nesta execução: ${exec.vmsNomesFormatados}`}
-                                    >
-                                      {exec.vmsComprovadas.length} VMs
+                              <div className="min-w-0 flex-1">
+                                {exec.vmsComprovadas.length > 0 ? (
+                                  exec.temMultiplasVms ? (
+                                    <div className="space-y-1">
+                                      <div className="flex flex-col gap-0.5">
+                                        {exec.vmsComprovadas.map((vm, vIdx) => (
+                                          <div
+                                            key={`${vm.nome}-${vIdx}`}
+                                            className="flex items-center gap-1.5 min-w-0"
+                                          >
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                                            <span className="font-mono text-xs font-semibold text-slate-900 truncate leading-tight">
+                                              {vm.nome}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <span className="text-[10px] font-medium text-slate-500 block truncate leading-tight">
+                                        {exec.ativoSubtitulo}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <span className="font-mono text-xs font-bold text-slate-900 block leading-tight truncate">
+                                        {exec.ativoTitulo}
+                                      </span>
+                                      <span className="text-[10px] font-medium text-slate-500 block truncate mt-0.5">
+                                        {exec.ativoSubtitulo}
+                                      </span>
+                                    </div>
+                                  )
+                                ) : (
+                                  <div>
+                                    <span className="font-semibold text-xs text-slate-900 block leading-tight truncate">
+                                      {exec.ativoTitulo}
                                     </span>
-                                  )}
-                                </div>
-                                <span className="text-[10px] text-slate-400 block truncate mt-0.5">
-                                  {exec.ativoSubtitulo}
-                                </span>
+                                    <span className="text-[10px] font-medium text-slate-500 block truncate mt-0.5">
+                                      {exec.ativoSubtitulo}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
