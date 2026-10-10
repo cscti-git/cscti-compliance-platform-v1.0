@@ -1,18 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  ShieldCheck,
-  Calendar,
-  FileCheck2,
-  AlertTriangle,
-  PlayCircle,
-  Layers,
-  CheckCircle2,
-  Sliders,
-  UserCheck,
-} from 'lucide-react'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import { BackupTabStrip } from '@/components/backup/BackupTabStrip'
 import {
   listBackupEscopos,
   listBackupPlanos,
@@ -134,91 +124,29 @@ export const BackupOverviewPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Tabs Principais de Navegação do Módulo */}
+      {/* Barra de Abas Redesenhada: Fundo Azul-Escuro (#0B2545), Pílulas e Mini-Badges */}
       <Tabs
         value={activeTab}
         onValueChange={(val) => setSearchParams({ tab: val })}
         className="w-full"
       >
-        <div className="border-b border-slate-200 pb-2 mb-4">
-          <TabsList className="bg-slate-100 p-1 border border-slate-200/80 flex-wrap h-auto gap-1">
-            <TabsTrigger
-              value="visao_geral"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> Visão Geral
-            </TabsTrigger>
-            <TabsTrigger
-              value="escopo"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <Layers className="w-3.5 h-3.5 mr-1.5" /> Escopo (
-              {ativosExigemBackupCount > 0 ? `${ativosExigemBackupCount} ativos` : escopos.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="planos"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <Sliders className="w-3.5 h-3.5 mr-1.5" /> Planos ({planos.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="rotinas"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <Calendar className="w-3.5 h-3.5 mr-1.5" /> Rotinas & Fontes ({rotinas.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="evidencias"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <FileCheck2 className="w-3.5 h-3.5 mr-1.5" /> Evidências ({evidencias.length})
-              {evidenciasPendentes > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-bold">
-                  {evidenciasPendentes}
-                </span>
-              )}
-              {monitoramentos.length > 0 && (
-                <span
-                  className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 text-[10px] font-bold"
-                  title="Atestados humanos do NOC registrados (Monitoramento Externo)"
-                >
-                  <UserCheck className="w-2.5 h-2.5 mr-0.5" />
-                  {monitoramentos.length}
-                </span>
-              )}
-            </TabsTrigger>
-
-            <TabsTrigger
-              value="execucoes"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <PlayCircle className="w-3.5 h-3.5 mr-1.5" /> Execuções ({execucoes.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="regras"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <Sliders className="w-3.5 h-3.5 mr-1.5" /> Regras & Adaptadores ({regras.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="ocorrencias"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Ocorrências ({ocorrencias.length})
-              {ocorrenciasAbertas > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px] font-bold">
-                  {ocorrenciasAbertas}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="testes"
-              className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-[#0B2545] data-[state=active]:shadow-2xs"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Testes de Recuperação ({testes.length}
-              )
-            </TabsTrigger>
-          </TabsList>
+        <div className="mb-5">
+          <BackupTabStrip
+            activeTab={activeTab}
+            onSelectTab={(val) => setSearchParams({ tab: val })}
+            ativosExigemBackupCount={ativosExigemBackupCount}
+            escoposCount={escopos.length}
+            planosCount={planos.length}
+            rotinasCount={rotinas.length}
+            evidenciasCount={evidencias.length}
+            evidenciasPendentesCount={evidenciasPendentes}
+            monitoramentosCount={monitoramentos.length}
+            execucoesCount={execucoes.length}
+            regrasCount={regras.length}
+            ocorrenciasCount={ocorrencias.length}
+            ocorrenciasAbertasCount={ocorrenciasAbertas}
+            testesCount={testes.length}
+          />
         </div>
 
         {/* 1. VISÃO GERAL (LAYOUT HOMOLOGADO COMPLETO) */}

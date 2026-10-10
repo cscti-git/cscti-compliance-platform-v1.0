@@ -287,4 +287,13 @@
   .animate-spotlight {
     animation: spotlight 2s ease forwards;
   }
+
+  /* Utilitários para rolagem suave sem barra visível */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
