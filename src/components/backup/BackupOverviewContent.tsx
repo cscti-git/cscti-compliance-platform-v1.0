@@ -389,7 +389,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
     const temMonitoramentoNocValido =
       monitoramentos.length > 0 &&
       monitoramentos.some(
-        (m) => m.status === 'conforme' || m.status === 'sucesso' || !m.status || m.status === 'ok',
+        (m) => m.status_geral === 'ok' || m.status_geral === 'atencao' || !m.status_geral,
       )
 
     rotinas.forEach((r) => {
@@ -408,8 +408,8 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
         fontes.some(
           (f) =>
             f.rotina === r.id &&
-            (f.adaptador === 'NOC_DIARIO' ||
-              (f.caminho_identificacao && f.caminho_identificacao.toUpperCase().includes('NOC'))),
+            ((f.caminho_identificacao && f.caminho_identificacao.toUpperCase().includes('NOC')) ||
+              regras.some((rg) => rg.fonte === f.id && rg.adaptador === 'NOC_DIARIO')),
         )
 
       if (isRotinaNoc) {
@@ -467,7 +467,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
         { label: 'Não conforme', value: naoConformes, color: '#EF4444', percent: pctNaoConforme },
       ],
     }
-  }, [rotinas, execucoes, monitoramentos, fontes])
+  }, [rotinas, execucoes, monitoramentos, fontes, regras])
 
   // ---------------------------------------------------------------------------
   // 3. ENRIQUECIMENTO E FILTRAGEM DA TABELA DE EXECUÇÕES
