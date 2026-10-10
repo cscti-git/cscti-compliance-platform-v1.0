@@ -32,7 +32,6 @@ import {
   AlertTriangle,
   XCircle,
   Search,
-  MoreVertical,
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
@@ -959,7 +958,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
           </div>
         </div>
 
-        {/* À direita: Pill com última atualização + Guia + Relatório Comprobatório + Botão + Novo Plano + Menu ⋮ */}
+        {/* À direita: Pill com última atualização + Guia + Relatório Comprobatório + Novo Plano */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Pill Última atualização */}
           <div
@@ -997,6 +996,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
               variant="outline"
               size="sm"
               className="text-xs font-semibold text-slate-700 hover:bg-slate-50 gap-1.5 h-9"
+              title="Abrir o Relatório Comprobatório em formato A4 para impressão ou conferência"
             >
               <Printer className="w-4 h-4 text-slate-600" /> Relatório Comprobatório
             </Button>
@@ -1011,36 +1011,6 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
               <Plus className="w-4 h-4" /> Novo Plano
             </Button>
           )}
-
-          {/* Botão menu ⋮ */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 border-slate-200 text-slate-600 hover:text-slate-900 shadow-2xs"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 text-xs">
-              <DropdownMenuItem
-                onClick={() => window.open('/backup/relatorio', '_blank')}
-                className="cursor-pointer gap-2"
-              >
-                <FileCheck2 className="w-4 h-4 text-slate-500" /> Relatório Comprobatório A4
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate('/backup/guia')}
-                className="cursor-pointer gap-2"
-              >
-                <ShieldCheck className="w-4 h-4 text-slate-500" /> Guia de Backup
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={loadAllData} className="cursor-pointer gap-2">
-                <RefreshCw className="w-4 h-4 text-slate-500" /> Atualizar dados
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </header>
 
