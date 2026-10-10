@@ -237,6 +237,62 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
   // 1. DADOS DOS 4 KPIS SUPERIORES
   // Comprovações efetivas registradas no histórico e confronto por ativo
   // ---------------------------------------------------------------------------
+  interface VmItemResumo {
+    nome: string
+    status: string
+    ativoId?: string
+    localizacao?: string
+    tipo?: string
+  }
+
+  type ModalidadeKey = 'local' | 'nuvem' | 'replicacao'
+
+  const inferirModalidadeInfo = (
+    obsStr: string,
+    rotinaNome: string,
+    destinoStr: string,
+  ): { key: ModalidadeKey; label: 'Local' | 'Nuvem' | 'Replicação' } => {
+    const obs = (obsStr || '').toLowerCase()
+    const rot = (rotinaNome || '').toLowerCase()
+    const dest = (destinoStr || '').toLowerCase()
+
+    if (
+      obs.includes('copy job:') ||
+      obs.includes('backup copy job:') ||
+      obs.includes('veeam backup_copy:')
+    ) {
+      return { key: 'nuvem', label: 'Nuvem' }
+    }
+    if (obs.includes('replication job:') || obs.includes('veeam replication:')) {
+      return { key: 'replicacao', label: 'Replicação' }
+    }
+    if (obs.includes('backup job:') || obs.includes('veeam backup:')) {
+      return { key: 'local', label: 'Local' }
+    }
+
+    if (/-\s*r[eé]plicas?$|\breplica[çc][aã]o$/i.test(rot)) {
+      return { key: 'replicacao', label: 'Replicação' }
+    }
+    if (/to cloud/i.test(rot) || /-\s*nuvens?$/i.test(rot) || /cloud/i.test(rot)) {
+      return { key: 'nuvem', label: 'Nuvem' }
+    }
+    if (/-\s*local$/i.test(rot)) {
+      return { key: 'local', label: 'Local' }
+    }
+
+    const temLocal = /\blocal\b/i.test(dest)
+    const temNuvem = /\b(?:nuvens?|cloud|s3)\b/i.test(dest)
+    const temReplica = /\b(?:r[eé]plicas?|replication)\b/i.test(dest)
+    const cnt = (temLocal ? 1 : 0) + (temNuvem ? 1 : 0) + (temReplica ? 1 : 0)
+    if (cnt === 1) {
+      if (temReplica) return { key: 'replicacao', label: 'Replicação' }
+      if (temNuvem) return { key: 'nuvem', label: 'Nuvem' }
+      if (temLocal) return { key: 'local', label: 'Local' }
+    }
+
+    return { key: 'local', label: 'Local' }
+  }
+
   const normalizarNomeAtivo = (txt?: string) => {
     if (!txt) return ''
     return txt
@@ -576,16 +632,6 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
   // ---------------------------------------------------------------------------
   // 3. ENRIQUECIMENTO E FILTRAGEM DA TABELA DE EXECUÇÕES
   // ---------------------------------------------------------------------------
-  interface VmItemResumo {
-    nome: string
-    status: string
-    ativoId?: string
-    localizacao?: string
-    tipo?: string
-  }
-
-  type ModalidadeKey = 'local' | 'nuvem' | 'replicacao'
-
   interface ExecucaoEnriquecida extends BackupExecucaoItem {
     ativoTitulo: string
     ativoModalidadeLabel: 'Local' | 'Nuvem' | 'Replicação'
@@ -604,52 +650,6 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
     tamanhoDisplay: string
     dataHoraFormatada: string
     dataEmailTime: number
-  }
-
-  const inferirModalidadeInfo = (
-    obsStr: string,
-    rotinaNome: string,
-    destinoStr: string,
-  ): { key: ModalidadeKey; label: 'Local' | 'Nuvem' | 'Replicação' } => {
-    const obs = (obsStr || '').toLowerCase()
-    const rot = (rotinaNome || '').toLowerCase()
-    const dest = (destinoStr || '').toLowerCase()
-
-    if (
-      obs.includes('copy job:') ||
-      obs.includes('backup copy job:') ||
-      obs.includes('veeam backup_copy:')
-    ) {
-      return { key: 'nuvem', label: 'Nuvem' }
-    }
-    if (obs.includes('replication job:') || obs.includes('veeam replication:')) {
-      return { key: 'replicacao', label: 'Replicação' }
-    }
-    if (obs.includes('backup job:') || obs.includes('veeam backup:')) {
-      return { key: 'local', label: 'Local' }
-    }
-
-    if (/-\s*r[eé]plicas?$|\breplica[çc][aã]o$/i.test(rot)) {
-      return { key: 'replicacao', label: 'Replicação' }
-    }
-    if (/to cloud/i.test(rot) || /-\s*nuvens?$/i.test(rot) || /cloud/i.test(rot)) {
-      return { key: 'nuvem', label: 'Nuvem' }
-    }
-    if (/-\s*local$/i.test(rot)) {
-      return { key: 'local', label: 'Local' }
-    }
-
-    const temLocal = /\blocal\b/i.test(dest)
-    const temNuvem = /\b(?:nuvens?|cloud|s3)\b/i.test(dest)
-    const temReplica = /\b(?:r[eé]plicas?|replication)\b/i.test(dest)
-    const cnt = (temLocal ? 1 : 0) + (temNuvem ? 1 : 0) + (temReplica ? 1 : 0)
-    if (cnt === 1) {
-      if (temReplica) return { key: 'replicacao', label: 'Replicação' }
-      if (temNuvem) return { key: 'nuvem', label: 'Nuvem' }
-      if (temLocal) return { key: 'local', label: 'Local' }
-    }
-
-    return { key: 'local', label: 'Local' }
   }
 
   const enrichedExecucoes = useMemo<ExecucaoEnriquecida[]>(() => {
