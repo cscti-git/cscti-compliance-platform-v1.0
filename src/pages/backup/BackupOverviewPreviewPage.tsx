@@ -416,42 +416,160 @@ export const BackupOverviewPreviewPage: React.FC = () => {
   // ---------------------------------------------------------------------------
   // 3. ENRIQUECIMENTO E FILTRAGEM DA TABELA DE EXECUÇÕES
   // ---------------------------------------------------------------------------
+  interface VmItemResumo {
+    nome: string
+    status: string
+    ativoId?: string
+    localizacao?: string
+    tipo?: string
+  }
+
   interface ExecucaoEnriquecida extends BackupExecucaoItem {
+    ativoTitulo: string
+    ativoModalidadeLabel: string
+    ativoSubtitulo: string
     ativoNome: string
     ativoCategoria: string
     ativoTipo: string
+    vmsComprovadas: VmItemResumo[]
+    vmsNomesFormatados: string
+    temMultiplasVms: boolean
     tipoBackupLabel: 'Completo' | 'Incremental' | 'Configuração'
     planoNome: string
     rotinaNome: string
     duracaoFormatada: string
     tamanhoDisplay: string
     dataHoraFormatada: string
+    dataEmailTime: number
+  }
+
+  // Função auxiliar para derivar a modalidade conforme a regra do motor de backup
+  const inferirModalidade = (obsStr: string, rotinaNome: string, destinoStr: string): string => {
+    const obs = (obsStr || '').toLowerCase()
+    const rot = (rotinaNome || '').toLowerCase()
+    const dest = (destinoStr || '').toLowerCase()
+
+    // 1. Prefixo da observação (prioridade máxima do motor)
+    if (
+      obs.includes('backup copy job:') ||
+      obs.includes('copy job:') ||
+      obs.includes('veeam backup_copy:')
+    ) {
+      return 'Nuvem'
+    }
+    if (obs.includes('replication job:') || obs.includes('veeam replication:')) {
+      return 'Replicação'
+    }
+    if (obs.includes('backup job:') || obs.includes('veeam backup:')) {
+      return 'Local'
+    }
+
+    // 2. Sufixo ou padrão do nome da rotina (fallback)
+    if (/-\s*r[eé]plicas?$|\breplica[çc][aã]o$/i.test(rot)) {
+      return 'Replicação'
+    }
+    if (/to cloud/i.test(rot) || /-\s*nuvens?$/i.test(rot)) {
+      return 'Nuvem'
+    }
+    if (/-\s*local$/i.test(rot)) {
+      return 'Local'
+    }
+
+    // 3. Destino inequívoco
+    const temLocal = /\blocal\b/i.test(dest)
+    const temNuvem = /\b(?:nuvens?|cloud|s3)\b/i.test(dest)
+    const temReplica = /\b(?:r[eé]plicas?|replication)\b/i.test(dest)
+    const cnt = (temLocal ? 1 : 0) + (temNuvem ? 1 : 0) + (temReplica ? 1 : 0)
+    if (cnt === 1) {
+      if (temReplica) return 'Replicação'
+      if (temNuvem) return 'Nuvem'
+      if (temLocal) return 'Local'
+    }
+
+    return 'Local'
   }
 
   const enrichedExecucoes = useMemo<ExecucaoEnriquecida[]>(() => {
-    return execucoes.map((exec) => {
+    // 1. Mapeamento enriquecido
+    const list = execucoes.map((exec) => {
       const rotina = rotinasMap.get(exec.rotina)
       const plano = rotina ? planosMap.get(rotina.plano) : undefined
+      const rotinaNome = rotina?.nome || 'Rotina Geral'
+      const planoNome = plano?.nome || 'Plano Principal'
 
-      // Descobrir ativo vinculado (via detalhes_vms, ou confronto_escopo, ou fonte)
-      let ativoNome = 'Ativo Geral'
-      let ativoCategoria = 'Servidor'
-      let ativoTipo = 'servidor_virtualizado'
-
+      // Extrair todas as VMs / ativos comprovados
+      const vmsComprovadas: VmItemResumo[] = []
       if (exec.detalhes_vms && Array.isArray(exec.detalhes_vms) && exec.detalhes_vms.length > 0) {
-        const firstVm = exec.detalhes_vms[0]
-        ativoNome = firstVm.nome || ativoNome
-        if (firstVm.ativo_id && assetsMap.has(firstVm.ativo_id)) {
-          const a = assetsMap.get(firstVm.ativo_id)!
-          ativoCategoria = a.localizacao || 'Servidor virtualizado'
-          ativoTipo = a.tipo
-        }
-      } else if (exec.confronto_escopo && (exec.confronto_escopo as any).comprovado?.length > 0) {
-        const comp = (exec.confronto_escopo as any).comprovado[0]
-        ativoNome = comp.ativo_nome || ativoNome
-        ativoTipo = comp.ativo_tipo || ativoTipo
-        ativoCategoria = 'Servidor virtualizado'
+        exec.detalhes_vms.forEach((vm: any) => {
+          const asset = vm.ativo_id ? assetsMap.get(vm.ativo_id) : undefined
+          vmsComprovadas.push({
+            nome: vm.nome || 'VM',
+            status: vm.status || 'success',
+            ativoId: vm.ativo_id,
+            localizacao: asset?.localizacao,
+            tipo: asset?.tipo || 'servidor_virtualizado',
+          })
+        })
+      } else if (
+        exec.confronto_escopo &&
+        Array.isArray((exec.confronto_escopo as any).comprovado) &&
+        (exec.confronto_escopo as any).comprovado.length > 0
+      ) {
+        ;(exec.confronto_escopo as any).comprovado.forEach((comp: any) => {
+          const asset = comp.ativo_id ? assetsMap.get(comp.ativo_id) : undefined
+          vmsComprovadas.push({
+            nome: comp.ativo_nome || comp.item_comprovante || 'Ativo',
+            status: 'success',
+            ativoId: comp.ativo_id,
+            localizacao: asset?.localizacao,
+            tipo: comp.ativo_tipo || asset?.tipo || 'servidor_virtualizado',
+          })
+        })
       }
+
+      // Modalidade inferida (Local / Nuvem / Replicação)
+      const ativoModalidadeLabel = inferirModalidade(
+        exec.observacao || '',
+        rotinaNome,
+        exec.destino || '',
+      )
+
+      // Montagem do título e subtítulo fiéis para a coluna ATIVO
+      let ativoTitulo = ''
+      let ativoSubtitulo = ''
+      const totalVms = vmsComprovadas.length
+      const temMultiplasVms = totalVms > 1
+
+      if (totalVms > 0) {
+        if (totalVms === 1) {
+          ativoTitulo = vmsComprovadas[0].nome
+          const loc = vmsComprovadas[0].localizacao || 'Sala dos servidores'
+          ativoSubtitulo = `${loc} · Servidor Virtualizado · Destino ${ativoModalidadeLabel}`
+        } else {
+          // Se comprovar 4 ativos: "SPCM-ORION +3" (ou primeira + contagem)
+          const primeiroNome = vmsComprovadas[0].nome
+          ativoTitulo = `${primeiroNome} +${totalVms - 1}`
+          ativoSubtitulo = `${totalVms} VMs comprovadas · Cópia ${ativoModalidadeLabel}`
+        }
+      } else {
+        // Fallback: usar nome da rotina
+        ativoTitulo = rotinaNome
+        ativoSubtitulo = `Destino ${ativoModalidadeLabel}`
+      }
+
+      // Nomes de todas as VMs formatados para tooltip/busca
+      const vmsNomesFormatados =
+        vmsComprovadas.length > 0 ? vmsComprovadas.map((v) => v.nome).join(', ') : ativoTitulo
+
+      const ativoNome = vmsComprovadas.length > 0 ? vmsComprovadas[0].nome : 'Ativo Geral'
+      const ativoCategoria =
+        vmsComprovadas.length > 0 && vmsComprovadas[0].localizacao
+          ? vmsComprovadas[0].localizacao
+          : 'Servidor virtualizado'
+      const ativoTipo =
+        vmsComprovadas.length > 0 && vmsComprovadas[0].tipo
+          ? vmsComprovadas[0].tipo
+          : 'servidor_virtualizado'
 
       // Tipo de Backup visual Pastel: Completo, Incremental ou Configuração
       let tipoBackupLabel: 'Completo' | 'Incremental' | 'Configuração' = 'Incremental'
@@ -490,12 +608,16 @@ export const BackupOverviewPreviewPage: React.FC = () => {
         exec.tamanho_formatado ||
         (exec.tamanho_bytes ? `${Math.round(exec.tamanho_bytes / (1024 * 1024))} MB` : '—')
 
-      // Data/Hora
+      // Data/Hora baseada estritamente em data_email (data do comprovante — verdade operacional)
+      // com fallbacks seguros para data_inicio ou created se data_email não existir
       const dataIso = exec.data_email || exec.data_inicio || exec.created
       let dataHoraFormatada = '—'
+      let dataEmailTime = 0
       if (dataIso) {
         try {
           dataHoraFormatada = formatDateTime(dataIso, { includeSeconds: false })
+          const parsed = new Date(dataIso.replace(' ', 'T')).getTime()
+          dataEmailTime = isNaN(parsed) ? 0 : parsed
         } catch (_) {
           dataHoraFormatada = dataIso
         }
@@ -503,17 +625,29 @@ export const BackupOverviewPreviewPage: React.FC = () => {
 
       return {
         ...exec,
+        ativoTitulo,
+        ativoModalidadeLabel,
+        ativoSubtitulo,
         ativoNome,
         ativoCategoria,
         ativoTipo,
+        vmsComprovadas,
+        vmsNomesFormatados,
+        temMultiplasVms,
         tipoBackupLabel,
-        planoNome: plano?.nome || 'Plano Principal',
-        rotinaNome: rotina?.nome || 'Rotina Geral',
+        planoNome,
+        rotinaNome,
         duracaoFormatada,
         tamanhoDisplay,
         dataHoraFormatada,
+        dataEmailTime,
       }
     })
+
+    // 2. Ordenação estrita por data_email descendente (verdade operacional do projeto)
+    list.sort((a, b) => b.dataEmailTime - a.dataEmailTime)
+
+    return list
   }, [execucoes, rotinasMap, planosMap, assetsMap])
 
   // Execuções do período e com filtros gerais aplicados (exceto o filtro específico de status)
@@ -521,35 +655,49 @@ export const BackupOverviewPreviewPage: React.FC = () => {
   // base filtrada no mesmo período e contexto operacional.
   const execucoesContextoFiltro = useMemo(() => {
     return enrichedExecucoes.filter((exec) => {
-      // Busca textual
+      // Busca textual abrangendo nome das VMs, rotina, plano, status, etc.
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim()
         const match =
+          exec.ativoTitulo.toLowerCase().includes(q) ||
+          exec.vmsNomesFormatados.toLowerCase().includes(q) ||
           exec.ativoNome.toLowerCase().includes(q) ||
           exec.rotinaNome.toLowerCase().includes(q) ||
           exec.planoNome.toLowerCase().includes(q) ||
           exec.status.toLowerCase().includes(q) ||
-          exec.tipoBackupLabel.toLowerCase().includes(q)
+          exec.tipoBackupLabel.toLowerCase().includes(q) ||
+          exec.ativoModalidadeLabel.toLowerCase().includes(q)
         if (!match) return false
       }
 
       // Tipo de Ativo
       if (filterTipoAtivo !== 'todos') {
-        if (filterTipoAtivo === 'servidor' && !exec.ativoTipo.includes('servidor')) return false
-        if (filterTipoAtivo === 'estacao' && exec.ativoTipo !== 'estacao') return false
-        if (filterTipoAtivo === 'rede' && exec.ativoTipo !== 'equipamento_rede') return false
-        if (filterTipoAtivo === 'banco' && exec.ativoTipo !== 'banco_dados') return false
+        const matchTipo = exec.vmsComprovadas.some((vm) => {
+          if (!vm.tipo) return false
+          if (filterTipoAtivo === 'servidor' && vm.tipo.includes('servidor')) return true
+          if (filterTipoAtivo === 'estacao' && vm.tipo === 'estacao') return true
+          if (filterTipoAtivo === 'rede' && vm.tipo === 'equipamento_rede') return true
+          if (filterTipoAtivo === 'banco' && vm.tipo === 'banco_dados') return true
+          return false
+        })
+        if (!matchTipo) {
+          if (filterTipoAtivo === 'servidor' && !exec.ativoTipo.includes('servidor')) return false
+          if (filterTipoAtivo === 'estacao' && exec.ativoTipo !== 'estacao') return false
+          if (filterTipoAtivo === 'rede' && exec.ativoTipo !== 'equipamento_rede') return false
+          if (filterTipoAtivo === 'banco' && exec.ativoTipo !== 'banco_dados') return false
+        }
       }
 
-      // Período (com base em data_email operacional, data_inicio ou created)
+      // Período (com base em data_email operacional)
       if (filterPeriodo !== 'todos') {
-        const rawDate = exec.data_email || exec.data_inicio || exec.created
-        const execDate = rawDate ? new Date(rawDate.replace(' ', 'T')).getTime() : NaN
-        if (!isNaN(execDate)) {
+        if (exec.dataEmailTime > 0) {
           const now = Date.now()
-          if (filterPeriodo === '24h' && now - execDate > 24 * 60 * 60 * 1000) return false
-          if (filterPeriodo === '7dias' && now - execDate > 7 * 24 * 60 * 60 * 1000) return false
-          if (filterPeriodo === '30dias' && now - execDate > 30 * 24 * 60 * 60 * 1000) return false
+          if (filterPeriodo === '24h' && now - exec.dataEmailTime > 24 * 60 * 60 * 1000)
+            return false
+          if (filterPeriodo === '7dias' && now - exec.dataEmailTime > 7 * 24 * 60 * 60 * 1000)
+            return false
+          if (filterPeriodo === '30dias' && now - exec.dataEmailTime > 30 * 24 * 60 * 60 * 1000)
+            return false
         }
       }
 
@@ -1389,18 +1537,28 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                             {exec.dataHoraFormatada}
                           </td>
 
-                          {/* Ativo: ícone por tipo + nome em negrito + subtítulo categoria */}
-                          <td className="py-3 px-3.5 min-w-[170px]">
+                          {/* Ativo: título com VMs comprovadas ou nome da rotina + subtítulo com modalidade */}
+                          <td className="py-3 px-3.5 min-w-[200px]" title={exec.vmsNomesFormatados}>
                             <div className="flex items-center gap-2.5">
                               <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200/80">
                                 <Server className="w-3.5 h-3.5" />
                               </div>
                               <div className="min-w-0">
-                                <span className="font-bold text-slate-900 block leading-tight truncate">
-                                  {exec.ativoNome}
-                                </span>
-                                <span className="text-[10px] text-slate-400 block truncate">
-                                  {exec.ativoCategoria}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-slate-900 block leading-tight truncate">
+                                    {exec.ativoTitulo}
+                                  </span>
+                                  {exec.temMultiplasVms && (
+                                    <span
+                                      className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0"
+                                      title={`VMs comprovadas nesta execução: ${exec.vmsNomesFormatados}`}
+                                    >
+                                      {exec.vmsComprovadas.length} VMs
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 block truncate mt-0.5">
+                                  {exec.ativoSubtitulo}
                                 </span>
                               </div>
                             </div>
@@ -1802,32 +1960,57 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                 </div>
               )}
 
-              {execDetail.detalhes_vms &&
+              {((execDetail.detalhes_vms &&
                 Array.isArray(execDetail.detalhes_vms) &&
-                execDetail.detalhes_vms.length > 0 && (
-                  <div className="p-3 bg-white rounded-lg border border-slate-200">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1.5">
-                      Máquinas / Ativos Inspecionados ({execDetail.detalhes_vms.length})
-                    </span>
-                    <div className="space-y-1">
-                      {execDetail.detalhes_vms.map((vm: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between p-1.5 rounded bg-slate-50 text-[11px]"
-                        >
-                          <span className="font-bold text-slate-800">{vm.nome}</span>
-                          <span
-                            className={`font-semibold ${
-                              vm.status === 'success' ? 'text-emerald-700' : 'text-rose-700'
-                            }`}
+                execDetail.detalhes_vms.length > 0) ||
+                (execDetail.confronto_escopo &&
+                  Array.isArray((execDetail.confronto_escopo as any).comprovado) &&
+                  (execDetail.confronto_escopo as any).comprovado.length > 0)) && (
+                <div className="p-3 bg-white rounded-lg border border-slate-200">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1.5">
+                    Máquinas / Ativos Comprovados nesta Execução (
+                    {execDetail.detalhes_vms && execDetail.detalhes_vms.length > 0
+                      ? execDetail.detalhes_vms.length
+                      : (execDetail.confronto_escopo as any).comprovado.length}
+                    )
+                  </span>
+                  <div className="space-y-1">
+                    {execDetail.detalhes_vms && execDetail.detalhes_vms.length > 0
+                      ? execDetail.detalhes_vms.map((vm: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between p-1.5 rounded bg-slate-50 text-[11px]"
                           >
-                            {vm.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                            <span className="font-bold text-slate-800">{vm.nome}</span>
+                            <span
+                              className={`font-semibold ${
+                                String(vm.status || '')
+                                  .toLowerCase()
+                                  .includes('success')
+                                  ? 'text-emerald-700'
+                                  : 'text-rose-700'
+                              }`}
+                            >
+                              {vm.status || 'success'}
+                            </span>
+                          </div>
+                        ))
+                      : (execDetail.confronto_escopo as any).comprovado.map(
+                          (comp: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-1.5 rounded bg-slate-50 text-[11px]"
+                            >
+                              <span className="font-bold text-slate-800">
+                                {comp.ativo_nome || comp.item_comprovante}
+                              </span>
+                              <span className="font-semibold text-emerald-700">comprovado</span>
+                            </div>
+                          ),
+                        )}
                   </div>
-                )}
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
