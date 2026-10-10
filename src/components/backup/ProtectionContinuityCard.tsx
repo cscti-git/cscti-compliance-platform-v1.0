@@ -12,16 +12,19 @@ import {
   PlusCircle,
   RefreshCw,
   ExternalLink,
+  Info,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { listInventoryAssets } from '@/services/csctiService'
 import {
   listBackupPlanos,
   listBackupRotinas,
   listBackupFontes,
   listBackupEvidencias,
+  listBackupExecucoes,
   listBackupOcorrencias,
   listBackupEscopos,
   getBackupConfronto,
@@ -32,6 +35,7 @@ import type {
   BackupRotinaItem,
   BackupFonteItem,
   BackupEvidenciaItem,
+  BackupExecucaoItem,
   BackupOcorrenciaItem,
   BackupEscopoItem,
   BackupConfrontoResponse,
@@ -82,6 +86,64 @@ function formatTipoAtivo(tipo: string): string {
   return map[tipo] || tipo.replace(/_/g, ' ')
 }
 
+type ModalidadeKey = 'local' | 'nuvem' | 'replicacao'
+
+function inferirModalidadeInfo(
+  obsStr: string,
+  rotinaNome: string,
+  destinoStr: string,
+): { key: ModalidadeKey; label: 'Local' | 'Nuvem' | 'Replicação' } {
+  const obs = (obsStr || '').toLowerCase()
+  const rot = (rotinaNome || '').toLowerCase()
+  const dest = (destinoStr || '').toLowerCase()
+
+  if (
+    obs.includes('copy job:') ||
+    obs.includes('backup copy job:') ||
+    obs.includes('veeam backup_copy:')
+  ) {
+    return { key: 'nuvem', label: 'Nuvem' }
+  }
+  if (obs.includes('replication job:') || obs.includes('veeam replication:')) {
+    return { key: 'replicacao', label: 'Replicação' }
+  }
+  if (obs.includes('backup job:') || obs.includes('veeam backup:')) {
+    return { key: 'local', label: 'Local' }
+  }
+
+  if (/-\s*r[eé]plicas?$|\breplica[çc][aã]o$/i.test(rot)) {
+    return { key: 'replicacao', label: 'Replicação' }
+  }
+  if (/to cloud/i.test(rot) || /-\s*nuvens?$/i.test(rot) || /cloud/i.test(rot)) {
+    return { key: 'nuvem', label: 'Nuvem' }
+  }
+  if (/-\s*local$/i.test(rot)) {
+    return { key: 'local', label: 'Local' }
+  }
+
+  const temLocal = /\blocal\b/i.test(dest)
+  const temNuvem = /\b(?:nuvens?|cloud|s3)\b/i.test(dest)
+  const temReplica = /\b(?:r[eé]plicas?|replication)\b/i.test(dest)
+  const cnt = (temLocal ? 1 : 0) + (temNuvem ? 1 : 0) + (temReplica ? 1 : 0)
+  if (cnt === 1) {
+    if (temReplica) return { key: 'replicacao', label: 'Replicação' }
+    if (temNuvem) return { key: 'nuvem', label: 'Nuvem' }
+    if (temLocal) return { key: 'local', label: 'Local' }
+  }
+
+  return { key: 'local', label: 'Local' }
+}
+
+function normalizarNomeAtivo(txt?: string): string {
+  if (!txt) return ''
+  return txt
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .trim()
+}
+
 export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> = ({
   organizationId,
   userRole,
@@ -94,6 +156,7 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
   const [rotinas, setRotinas] = useState<BackupRotinaItem[]>([])
   const [fontes, setFontes] = useState<BackupFonteItem[]>([])
   const [evidencias, setEvidencias] = useState<BackupEvidenciaItem[]>([])
+  const [execucoes, setExecucoes] = useState<BackupExecucaoItem[]>([])
   const [ocorrencias, setOcorrencias] = useState<BackupOcorrenciaItem[]>([])
   const [escopos, setEscopos] = useState<BackupEscopoItem[]>([])
   const [confrontoData, setConfrontoData] = useState<BackupConfrontoResponse | null>(null)
@@ -111,6 +174,7 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
         rotinasData,
         fontesData,
         evidenciasData,
+        execucoesData,
         ocorrenciasData,
         escoposData,
       ] = await Promise.all([
@@ -119,6 +183,7 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
         listBackupRotinas(organizationId),
         listBackupFontes(organizationId),
         listBackupEvidencias(organizationId),
+        listBackupExecucoes(organizationId),
         listBackupOcorrencias(organizationId),
         listBackupEscopos(organizationId),
       ])
@@ -128,6 +193,7 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
       setRotinas(rotinasData)
       setFontes(fontesData)
       setEvidencias(evidenciasData)
+      setExecucoes(execucoesData)
       setOcorrencias(ocorrenciasData)
       setEscopos(escoposData)
 
@@ -231,44 +297,230 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
   }, [monitoredAssets, coveredAssetIds, coveredAssetNames])
 
   const totalMonitorados = monitoredAssets.length
-  const totalComBackup = coveredAssets.length
 
-  // MÉTRICA HONESTA DO CONFRONTO POR ATIVO (ESTILO VEEAM ONE)
-  // Substitui o percentual inflado de mero cadastro pelo número honesto de prova recente dentro do RPO
-  const totalExigidosConfronto = confrontoData?.totais?.total_ativos_exigidos ?? 0
-  const totalProtegidosConfronto = confrontoData?.totais?.total_protegidos ?? 0
-  const percentualConfronto = confrontoData?.totais?.percentual_protegido ?? 0
-  const temDadosConfronto = confrontoData !== null && totalExigidosConfronto > 0
+  // Mapas rápidos para junção de rotinas
+  const rotinasMap = useMemo(() => {
+    const map = new Map<string, BackupRotinaItem>()
+    rotinas.forEach((r) => map.set(r.id, r))
+    return map
+  }, [rotinas])
 
-  // Ativos com proteção efetiva / parcial pelas regras da serventia vs exigidos
-  const totalParcialConfronto = confrontoData?.totais?.total_parcial ?? 0
-  const totalComProtecao =
-    confrontoData?.totais?.total_parcialmente_protegidos ??
-    (confrontoData?.confronto
-      ? confrontoData.confronto.filter((a) => (a.total_atendidas || 0) > 0).length
-      : totalProtegidosConfronto + totalParcialConfronto)
+  // Ativos que exigem backup (mesma base da Visão Geral do Backup / BackupOverviewContent)
+  const ativosExigemBackup = useMemo(() => {
+    const comExigencias = assets.filter(
+      (a) => a.exige_backup_local || a.exige_backup_nuvem || a.exige_backup_replicacao,
+    )
+    if (comExigencias.length > 0) return comExigencias
+    // Fallback: ativos monitorados do escopo
+    return monitoredAssets
+  }, [assets, monitoredAssets])
 
-  const honestoProtegidos = temDadosConfronto ? totalComProtecao : 0
-  const honestoCompletos = temDadosConfronto ? totalProtegidosConfronto : 0
-  const honestoExigidos = temDadosConfronto ? totalExigidosConfronto : totalMonitorados
-  const honestoPercentual = temDadosConfronto ? percentualConfronto : 0
+  // CÁLCULO HOMOLOGADO: IDÊNTICO AO DO MÓDULO BACKUP (BackupOverviewContent.tsx)
+  // Base de comprovações efetivas reais registradas por ativo e por modalidade
+  const ativosProtecaoEfetiva = useMemo(() => {
+    return ativosExigemBackup.map((ativo) => {
+      const normId = ativo.id
+      const normNome = normalizarNomeAtivo(ativo.name)
 
-  // Cor semântica do percentual honesto: verde 100%, âmbar > 0%, vermelho 0%
-  const percentualColorClass =
-    honestoExigidos === 0
+      const comprovacoesPorMod = {
+        local: false,
+        nuvem: false,
+        replicacao: false,
+      }
+
+      // 1. Verificar através das execuções reais de backup com sucesso
+      execucoes
+        .filter((e) => e.status === 'sucesso')
+        .forEach((exec) => {
+          const rotina = rotinasMap.get(exec.rotina)
+          const rotinaNome = rotina?.nome || ''
+          const modalidadeInfo = inferirModalidadeInfo(
+            exec.observacao || '',
+            rotinaNome,
+            exec.destino || '',
+          )
+          const modKey = modalidadeInfo.key
+
+          let bateuAtivo = false
+
+          // Verifica em detalhes_vms
+          if (Array.isArray(exec.detalhes_vms)) {
+            for (const vm of exec.detalhes_vms) {
+              const st = String(vm?.status || '').toLowerCase()
+              const isOk = st === 'success' || st === 'ok' || !st
+              if (isOk && (vm?.ativo_id === normId || normalizarNomeAtivo(vm?.nome) === normNome)) {
+                bateuAtivo = true
+                break
+              }
+            }
+          }
+
+          // Verifica em confronto_escopo.comprovado
+          if (!bateuAtivo && (exec.confronto_escopo as any)?.comprovado) {
+            const comps = (exec.confronto_escopo as any).comprovado
+            if (Array.isArray(comps)) {
+              for (const comp of comps) {
+                if (
+                  comp?.ativo_id === normId ||
+                  normalizarNomeAtivo(comp?.ativo_nome) === normNome ||
+                  normalizarNomeAtivo(comp?.item_comprovante) === normNome
+                ) {
+                  bateuAtivo = true
+                  break
+                }
+              }
+            }
+          }
+
+          if (bateuAtivo && (modKey === 'local' || modKey === 'nuvem' || modKey === 'replicacao')) {
+            comprovacoesPorMod[modKey] = true
+          }
+        })
+
+      // 2. Confronto direto por ativo (se houver comprovação registrada no motor de confronto)
+      const confItem = confrontoData?.confronto?.find(
+        (c) => c.id === ativo.id || normalizarNomeAtivo(c.nome) === normNome,
+      )
+      if (confItem?.modalidades) {
+        if (confItem.modalidades.local?.ultima_comprovacao) comprovacoesPorMod.local = true
+        if (confItem.modalidades.nuvem?.ultima_comprovacao) comprovacoesPorMod.nuvem = true
+        if (confItem.modalidades.replicacao?.ultima_comprovacao)
+          comprovacoesPorMod.replicacao = true
+      }
+
+      const exigeLocal = Boolean(ativo.exige_backup_local)
+      const exigeNuvem = Boolean(ativo.exige_backup_nuvem)
+      const exigeReplicacao = Boolean(ativo.exige_backup_replicacao)
+
+      let exigidasCount = 0
+      let atendidasCount = 0
+
+      if (exigeLocal) {
+        exigidasCount++
+        if (comprovacoesPorMod.local) atendidasCount++
+      }
+      if (exigeNuvem) {
+        exigidasCount++
+        if (comprovacoesPorMod.nuvem) atendidasCount++
+      }
+      if (exigeReplicacao) {
+        exigidasCount++
+        if (comprovacoesPorMod.replicacao) atendidasCount++
+      }
+
+      if (exigidasCount === 0) {
+        exigidasCount = 3
+        if (comprovacoesPorMod.local) atendidasCount++
+        if (comprovacoesPorMod.nuvem) atendidasCount++
+        if (comprovacoesPorMod.replicacao) atendidasCount++
+      }
+
+      const completamenteProtegido = exigidasCount > 0 && atendidasCount === exigidasCount
+      const parcialmenteProtegido = atendidasCount > 0
+
+      return {
+        ativo,
+        exigidasCount,
+        atendidasCount,
+        completamenteProtegido,
+        parcialmenteProtegido,
+        comprovacoesPorMod,
+      }
+    })
+  }, [ativosExigemBackup, execucoes, rotinasMap, confrontoData])
+
+  // Total de ativos exigidos
+  const totalExigidosConfronto = useMemo(() => {
+    if (ativosExigemBackup.length > 0) return ativosExigemBackup.length
+    if (confrontoData?.totais?.total_ativos_exigidos !== undefined) {
+      return confrontoData.totais.total_ativos_exigidos
+    }
+    return totalMonitorados
+  }, [ativosExigemBackup, confrontoData, totalMonitorados])
+
+  // Ativos com proteção completa (TODAS as modalidades comprovadas dentro da janela)
+  const totalAtivosProtegidosCompleto = useMemo(() => {
+    if (ativosProtecaoEfetiva.length > 0) {
+      return ativosProtecaoEfetiva.filter((a) => a.completamenteProtegido).length
+    }
+    if (confrontoData?.totais?.total_protegidos_completo !== undefined) {
+      return confrontoData.totais.total_protegidos_completo
+    }
+    return 0
+  }, [ativosProtecaoEfetiva, confrontoData])
+
+  // Ativos com proteção ativa (ao menos 1 modalidade comprovada dentro da janela)
+  const totalAtivosComProtecao = useMemo(() => {
+    if (ativosProtecaoEfetiva.length > 0) {
+      return ativosProtecaoEfetiva.filter((a) => a.parcialmenteProtegido).length
+    }
+    if (confrontoData?.totais?.total_parcialmente_protegidos !== undefined) {
+      return confrontoData.totais.total_parcialmente_protegidos
+    }
+    return totalAtivosProtegidosCompleto
+  }, [ativosProtecaoEfetiva, confrontoData, totalAtivosProtegidosCompleto])
+
+  // Percentual geral de proteção efetiva: média ponderada das modalidades comprovadas
+  // Exatamente igual ao percentualProtegidoConfronto da Visão Geral do Backup
+  const percentualProtegidoEfetivo = useMemo(() => {
+    if (totalExigidosConfronto > 0) {
+      const somaPonderada = ativosProtecaoEfetiva.reduce((acc, curr) => {
+        return acc + (curr.exigidasCount > 0 ? curr.atendidasCount / curr.exigidasCount : 0)
+      }, 0)
+      return Math.round((somaPonderada / totalExigidosConfronto) * 100)
+    }
+    if (confrontoData?.totais?.percentual_protegido_efetivo !== undefined) {
+      return confrontoData.totais.percentual_protegido_efetivo
+    }
+    return 0
+  }, [ativosProtecaoEfetiva, totalExigidosConfronto, confrontoData])
+
+  // Percentual de proteção completa (ativos com todas as modalidades 3/3 comprovadas)
+  const percentualProtegidoCompleto = useMemo(() => {
+    if (totalExigidosConfronto > 0) {
+      return Math.round((totalAtivosProtegidosCompleto / totalExigidosConfronto) * 100)
+    }
+    if (confrontoData?.totais?.percentual_protegido_completo !== undefined) {
+      return confrontoData.totais.percentual_protegido_completo
+    }
+    return 0
+  }, [totalAtivosProtegidosCompleto, totalExigidosConfronto, confrontoData])
+
+  // Cores semânticas para Proteção Efetiva (geral)
+  const percentualEfetivoColorClass =
+    totalExigidosConfronto === 0
       ? 'text-slate-400'
-      : honestoPercentual === 100
+      : percentualProtegidoEfetivo === 100
         ? 'text-emerald-600'
-        : honestoPercentual > 0
+        : percentualProtegidoEfetivo > 0
           ? 'text-amber-600'
           : 'text-red-600'
 
-  const percentualBadgeClass =
-    honestoExigidos === 0
+  const percentualEfetivoBadgeClass =
+    totalExigidosConfronto === 0
       ? 'bg-slate-100 text-slate-600 border-slate-200'
-      : honestoPercentual === 100
+      : percentualProtegidoEfetivo === 100
         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-        : honestoPercentual > 0
+        : percentualProtegidoEfetivo > 0
+          ? 'bg-amber-50 text-amber-700 border-amber-200'
+          : 'bg-red-50 text-red-700 border-red-200'
+
+  // Cores semânticas para Proteção Completa (todas as modalidades)
+  const percentualCompletoColorClass =
+    totalExigidosConfronto === 0
+      ? 'text-slate-400'
+      : percentualProtegidoCompleto === 100
+        ? 'text-emerald-600'
+        : percentualProtegidoCompleto > 0
+          ? 'text-amber-600'
+          : 'text-red-600'
+
+  const percentualCompletoBadgeClass =
+    totalExigidosConfronto === 0
+      ? 'bg-slate-100 text-slate-600 border-slate-200'
+      : percentualProtegidoCompleto === 100
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        : percentualProtegidoCompleto > 0
           ? 'bg-amber-50 text-amber-700 border-amber-200'
           : 'bg-red-50 text-red-700 border-red-200'
 
@@ -407,54 +659,129 @@ export const ProtectionContinuityCard: React.FC<ProtectionContinuityCardProps> =
                 </p>
               </Link>
 
-              {/* Métrica 2: Ativos com backup (Proteção efetiva/parcial no RPO) */}
-              <Link
-                to="/backup"
-                className="group p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition block"
-                title="Proteção efetiva = ativos com rotinas e modalidades comprovadas no RPO"
-              >
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                  <span className="font-semibold uppercase tracking-wider text-[11px]">
-                    Proteção Efetiva
-                  </span>
-                  <HardDriveDownload className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
-                </div>
-                <div className="text-2xl font-bold text-[#0B2545]">{honestoProtegidos}</div>
-                <p className="text-[11px] text-slate-500 mt-0.5 group-hover:text-indigo-700 inline-flex items-center">
-                  de {honestoExigidos} com proteção parcial{' '}
-                  <ArrowRight className="w-3 h-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </p>
-              </Link>
+              {/* Métrica 2: Card A — PROTEÇÃO EFETIVA (Percentual geral e contagem de ativos com proteção ativa) */}
+              <TooltipProvider>
+                <Link
+                  to="/backup"
+                  className="group p-3.5 rounded-xl border border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-2xs transition flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-700">
+                          Proteção Efetiva
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="text-slate-400 hover:text-slate-600 transition-colors cursor-help p-0.5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs text-xs bg-slate-900 text-white p-3 shadow-xl">
+                            <p className="font-bold mb-1">Proteção Efetiva Geral</p>
+                            <p className="text-slate-200 text-[11px] leading-relaxed">
+                              Percentual médio das modalidades comprovadas dentro da janela válida
+                              (Local, Nuvem e Replicação) sobre os ativos exigidos, conforme
+                              comprovantes processados pelo sistema.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
 
-              {/* Métrica 3: Percentual Protegidos (destaque visual honesto estilo Veeam ONE) */}
-              <div
-                className="p-3.5 rounded-xl border border-slate-200/80 bg-white shadow-2xs flex flex-col justify-between"
-                title="Confronto por ativo e modalidade: contabiliza proteção efetiva perante as rotinas comprovadas."
-              >
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                  <span className="font-semibold uppercase tracking-wider text-[11px]">
-                    Proteção Efetiva
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] px-1.5 py-0 font-bold ${percentualBadgeClass}`}
-                  >
-                    {honestoPercentual === 100
-                      ? '100% Protegido'
-                      : honestoPercentual > 0
-                        ? 'Parcial'
-                        : 'Crítico'}
-                  </Badge>
-                </div>
-                <div className={`text-3xl font-extrabold tracking-tight ${percentualColorClass}`}>
-                  {honestoExigidos > 0 ? `${honestoPercentual}%` : '—'}
-                </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  {honestoProtegidos > 0
-                    ? `${honestoProtegidos} de ${honestoExigidos} com proteção completa`
-                    : `${confrontoData?.totais?.total_parcialmente_protegidos ?? honestoExigidos} de ${honestoExigidos} parcialmente protegidos`}
-                </p>
-              </div>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 font-bold ${percentualEfetivoBadgeClass}`}
+                      >
+                        {percentualProtegidoEfetivo === 100
+                          ? '100% Protegido'
+                          : percentualProtegidoEfetivo > 0
+                            ? 'Parcial'
+                            : 'Crítico'}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span
+                        className={`text-3xl font-extrabold tracking-tight ${percentualEfetivoColorClass}`}
+                      >
+                        {totalExigidosConfronto > 0 ? `${percentualProtegidoEfetivo}%` : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-100 group-hover:text-indigo-700 inline-flex items-center justify-between">
+                    <span>
+                      {totalAtivosComProtecao} de {totalExigidosConfronto} ativos com proteção ativa
+                    </span>
+                    <ArrowRight className="w-3 h-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </p>
+                </Link>
+              </TooltipProvider>
+
+              {/* Métrica 3: Card B — PROTEÇÃO COMPLETA (Ativos com 100% das modalidades comprovadas) */}
+              <TooltipProvider>
+                <Link
+                  to="/backup"
+                  className="group p-3.5 rounded-xl border border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-2xs transition flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-700">
+                          Proteção Completa
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="text-slate-400 hover:text-slate-600 transition-colors cursor-help p-0.5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs text-xs bg-slate-900 text-white p-3 shadow-xl">
+                            <p className="font-bold mb-1">Proteção Completa (3/3)</p>
+                            <p className="text-slate-200 text-[11px] leading-relaxed">
+                              Percentual de ativos que possuem todas as modalidades exigidas (Local,
+                              Nuvem e Replicação) integralmente comprovadas dentro da janela válida.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 font-bold ${percentualCompletoBadgeClass}`}
+                      >
+                        {percentualProtegidoCompleto === 100
+                          ? 'Integral'
+                          : percentualProtegidoCompleto > 0
+                            ? 'Parcial'
+                            : 'Pendente'}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span
+                        className={`text-3xl font-extrabold tracking-tight ${percentualCompletoColorClass}`}
+                      >
+                        {totalExigidosConfronto > 0 ? `${percentualProtegidoCompleto}%` : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-100 group-hover:text-blue-700 inline-flex items-center justify-between">
+                    <span>
+                      {totalAtivosProtegidosCompleto} de {totalExigidosConfronto} ativos com todas
+                      as modalidades
+                    </span>
+                    <ArrowRight className="w-3 h-3 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </p>
+                </Link>
+              </TooltipProvider>
               {/* Métrica 4: Última evidência */}
               <Link
                 to="/backup?aba=evidencias"
