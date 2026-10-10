@@ -381,14 +381,53 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
   const conformidadeRotinas = useMemo(() => {
     const totalRotinas = rotinas.length
     let conformes = 0
+    let validadasNoc = 0
     let pendentes = 0
     let naoConformes = 0
+
+    // Mapear se a organização possui atestado ou monitoramento do NOC
+    const temMonitoramentoNocValido =
+      monitoramentos.length > 0 &&
+      monitoramentos.some(
+        (m) => m.status === 'conforme' || m.status === 'sucesso' || !m.status || m.status === 'ok',
+      )
 
     rotinas.forEach((r) => {
       if (r.status === 'inativo') {
         naoConformes++
         return
       }
+
+      // Verificar se a rotina é um atestado do NOC (ex.: ANALISE PREVENTIVA DIARIA DE BACKUP
+      // ou possui fonte com adaptador NOC_DIARIO/HUMANO/NOC, ou gera registros em monitoramento_externo)
+      const nomeUpper = (r.nome || '').toUpperCase()
+      const isRotinaNoc =
+        nomeUpper.includes('ANALISE PREVENTIVA') ||
+        nomeUpper.includes('PREVENTIVA DIARIA') ||
+        nomeUpper.includes('NOC') ||
+        fontes.some(
+          (f) =>
+            f.rotina === r.id &&
+            (f.adaptador === 'NOC_DIARIO' ||
+              (f.caminho_identificacao && f.caminho_identificacao.toUpperCase().includes('NOC'))),
+        )
+
+      if (isRotinaNoc) {
+        // Se há monitoramento externo cadastrado/recebido ou se a rotina do NOC está ativa
+        // e o último atestado do NOC é conforme (ou na ausência de erro explícito)
+        if (monitoramentos.length > 0) {
+          if (temMonitoramentoNocValido) {
+            validadasNoc++
+          } else {
+            naoConformes++
+          }
+        } else {
+          // Se não houver monitoramento recebido ainda, valida se ativo
+          validadasNoc++
+        }
+        return
+      }
+
       const execsDaRotina = execucoes.filter((e) => e.rotina === r.id)
       if (execsDaRotina.length === 0) {
         pendentes++
@@ -400,20 +439,35 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
       }
     })
 
+    // Conforme + Validada por NOC contam como conformes no percentual central
+    const totalConformesEfetivos = conformes + validadasNoc
+    const pctConformeEfetivo =
+      totalRotinas > 0 ? Math.round((totalConformesEfetivos / totalRotinas) * 100) : 0
     const pctConforme = totalRotinas > 0 ? Math.round((conformes / totalRotinas) * 100) : 0
+    const pctValidadasNoc = totalRotinas > 0 ? Math.round((validadasNoc / totalRotinas) * 100) : 0
     const pctPendente = totalRotinas > 0 ? Math.round((pendentes / totalRotinas) * 100) : 0
     const pctNaoConforme = totalRotinas > 0 ? Math.round((naoConformes / totalRotinas) * 100) : 0
 
     return {
       total: totalRotinas,
-      pctConforme,
+      pctConforme: pctConformeEfetivo,
+      conformes,
+      validadasNoc,
+      pendentes,
+      naoConformes,
       segments: [
         { label: 'Conforme', value: conformes, color: '#10B981', percent: pctConforme },
+        {
+          label: 'Validada por NOC',
+          value: validadasNoc,
+          color: '#8B5CF6',
+          percent: pctValidadasNoc,
+        },
         { label: 'Pendente', value: pendentes, color: '#F59E0B', percent: pctPendente },
         { label: 'Não conforme', value: naoConformes, color: '#EF4444', percent: pctNaoConforme },
       ],
     }
-  }, [rotinas, execucoes])
+  }, [rotinas, execucoes, monitoramentos, fontes])
 
   // ---------------------------------------------------------------------------
   // 3. ENRIQUECIMENTO E FILTRAGEM DA TABELA DE EXECUÇÕES

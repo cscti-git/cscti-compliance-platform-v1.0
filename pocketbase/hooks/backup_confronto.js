@@ -454,6 +454,9 @@ routerAdd(
       rotinasMap[rot.id] = {
         id: rot.id,
         nome: rot.getString('nome') || 'Rotina de Backup',
+        periodicidade: rot.getString('periodicidade') || '',
+        horario: rot.getString('horario') || '',
+        intervalo_minutos: rot.getInt('intervalo_minutos') || 0,
         plano_id: pId || null,
         plano_nome: plInfo ? plInfo.nome : null,
         rpo_horas: plInfo ? plInfo.rpo_horas : rpoHorasDefault,
@@ -696,6 +699,13 @@ routerAdd(
           }
         }
 
+        const rotinaEfetivaObj =
+          (fonteCorrespondente &&
+            fonteCorrespondente.rotina_id &&
+            rotinasMap[fonteCorrespondente.rotina_id]) ||
+          rotinaCobrindoMod ||
+          null
+
         const rpoHorasConfigurado = fonteCorrespondente
           ? fonteCorrespondente.rpo_horas
           : rotinaCobrindoMod
@@ -705,6 +715,7 @@ routerAdd(
         let statusDaMaisRecente = null
         let dataMaisRecente = null
         let execucaoMaisRecenteId = null
+        let rotinaIdMaisRecente = null
         let rotinaNomeMaisRecente = null
         let jobNomeMaisRecente = null
         let vmsFalhasMaisRecente = []
@@ -726,6 +737,7 @@ routerAdd(
             // Prioridade total: data_email (data/hora do e-mail comprovante), fallback data_inicio
             dataMaisRecente = execItem.data_efetiva
             execucaoMaisRecenteId = execItem.id
+            rotinaIdMaisRecente = execItem.rotina_id || null
             rotinaNomeMaisRecente =
               execItem.rotina_nome || (fonteCorrespondente ? fonteCorrespondente.rotina_nome : null)
             jobNomeMaisRecente = resultadoAtivo.job_nome || execItem.rotina_nome
@@ -751,7 +763,67 @@ routerAdd(
                 0,
                 Math.round(((now.getTime() - dtCompMs) / (1000 * 60 * 60)) * 10) / 10,
               )
-              dentroDoRpo = horasDesdeUltima <= rpoHorasConfigurado
+
+              // DECISÃO DO USUÁRIO LEANDRO: "o certo é até o próximo email validar que dá as 23 do outro dia"
+              // A validade de uma execução se estende até a PRÓXIMA EXECUÇÃO AGENDADA daquela modalidade/rotina.
+              // Se houver RPO configurado no plano, usar o mais permissivo entre (próxima ocorrência agendada)
+              // e (data_email + RPO).
+              const rotinaParaVigencia =
+                (rotinaIdMaisRecente && rotinasMap[rotinaIdMaisRecente]) || rotinaEfetivaObj || null
+
+              let proximaOcorrenciaMs = NaN
+
+              if (rotinaParaVigencia) {
+                const per = String(rotinaParaVigencia.periodicidade || '').toLowerCase()
+                const intMin = Number(rotinaParaVigencia.intervalo_minutos) || 0
+                const horStr = String(rotinaParaVigencia.horario || '').trim()
+
+                if (per === 'intervalo_minutos' && intMin > 0) {
+                  // Próxima ocorrência é a cada N minutos após a comprovação
+                  proximaOcorrenciaMs = dtCompMs + intMin * 60 * 1000
+                } else if (horStr) {
+                  // Rotina com horário fixo (ex: 23:00)
+                  const partesHor = horStr.split(':')
+                  const targetH = parseInt(partesHor[0], 10) || 0
+                  const targetM = parseInt(partesHor[1] || '0', 10) || 0
+
+                  // Decompor data do comprovante considerando fuso America/Sao_Paulo (UTC-3)
+                  // No fuso SP: UTC = Local + 3h => Local = UTC - 3h
+                  const dSpComp = new Date(dtCompMs - 3 * 3600 * 1000)
+                  const cAno = dSpComp.getUTCFullYear()
+                  const cMes = dSpComp.getUTCMonth()
+                  const cDia = dSpComp.getUTCDate()
+
+                  // Ocorrência agendada no mesmo dia civil da execução: targetH:targetM em SP => (targetH + 3):targetM em UTC
+                  const targetOcorrUtc = Date.UTC(cAno, cMes, cDia, targetH + 3, targetM, 0, 0)
+                  // Se o e-mail de comprovação foi recebido dentro de uma janela razoável daquele dia (ex: até 6h antes ou a qualquer momento depois),
+                  // a execução atende àquela rodada diária e a PRÓXIMA rodada esperada é no dia seguinte às HH:MM!
+                  // Ex.: Comprovante de 08/10 23:04 atende a rodada de 08/10 23:00, e a próxima rodada é 09/10 23:00.
+                  if (dtCompMs >= targetOcorrUtc - 6 * 3600 * 1000) {
+                    proximaOcorrenciaMs = Date.UTC(cAno, cMes, cDia + 1, targetH + 3, targetM, 0, 0)
+                  } else {
+                    proximaOcorrenciaMs = targetOcorrUtc
+                  }
+                } else if (per === 'diaria') {
+                  // Diária sem horário fixo especificado: 24h a partir da execução
+                  proximaOcorrenciaMs = dtCompMs + 24 * 60 * 60 * 1000
+                }
+              }
+
+              // Se não identificou horário específico na rotina, mas a modalidade é replicação ou nuvem diária,
+              // o ciclo padrão de backup é diário (24h)
+              if (isNaN(proximaOcorrenciaMs)) {
+                proximaOcorrenciaMs = dtCompMs + 24 * 60 * 60 * 1000
+              }
+
+              // Janela clássica por RPO do plano (horas)
+              const janelaRpoFixaMs = dtCompMs + rpoHorasConfigurado * 60 * 60 * 1000
+
+              // Janela de validade: a maior/mais permissiva entre a próxima agendada e o RPO fixo
+              let janelaValidadeLimiteMs = Math.max(janelaRpoFixaMs, proximaOcorrenciaMs)
+
+              // Válido enquanto a data/hora atual não ultrapassar o limite da janela de validade
+              dentroDoRpo = now.getTime() <= janelaValidadeLimiteMs
             } else {
               dentroDoRpo = true
               horasDesdeUltima = 0
@@ -1383,6 +1455,9 @@ routerAdd(
       rotinasMap[rot.id] = {
         id: rot.id,
         nome: rot.getString('nome') || 'Rotina de Backup',
+        periodicidade: rot.getString('periodicidade') || '',
+        horario: rot.getString('horario') || '',
+        intervalo_minutos: rot.getInt('intervalo_minutos') || 0,
         plano_id: pId || null,
         plano_nome: plInfo ? plInfo.nome : null,
         rpo_horas: plInfo ? plInfo.rpo_horas : rpoHorasDefault,
@@ -1622,6 +1697,13 @@ routerAdd(
           }
         }
 
+        const rotinaEfetivaObj =
+          (fonteCorrespondente &&
+            fonteCorrespondente.rotina_id &&
+            rotinasMap[fonteCorrespondente.rotina_id]) ||
+          rotinaCobrindoMod ||
+          null
+
         const rpoHorasConfigurado = fonteCorrespondente
           ? fonteCorrespondente.rpo_horas
           : rotinaCobrindoMod
@@ -1631,6 +1713,7 @@ routerAdd(
         let statusDaMaisRecente = null
         let dataMaisRecente = null
         let execucaoMaisRecenteId = null
+        let rotinaIdMaisRecente = null
         let rotinaNomeMaisRecente = null
         let jobNomeMaisRecente = null
         let vmsFalhasMaisRecente = []
@@ -1652,6 +1735,7 @@ routerAdd(
             // Prioridade total: data_email (data/hora do e-mail comprovante), fallback data_inicio
             dataMaisRecente = execItem.data_efetiva
             execucaoMaisRecenteId = execItem.id
+            rotinaIdMaisRecente = execItem.rotina_id || null
             rotinaNomeMaisRecente =
               execItem.rotina_nome || (fonteCorrespondente ? fonteCorrespondente.rotina_nome : null)
             jobNomeMaisRecente = resultadoAtivo.job_nome || execItem.rotina_nome
@@ -1677,7 +1761,63 @@ routerAdd(
                 0,
                 Math.round(((now.getTime() - dtCompMs) / (1000 * 60 * 60)) * 10) / 10,
               )
-              dentroDoRpo = horasDesdeUltima <= rpoHorasConfigurado
+
+              // DECISÃO DO USUÁRIO LEANDRO: A validade de uma execução se estende até
+              // a PRÓXIMA OCORRÊNCIA AGENDADA da rotina correspondente (intervalo_minutos,
+              // diária às HH:MM, etc.). Se houver RPO configurado no plano, usar o mais
+              // permissivo entre (próxima ocorrência agendada) e (data_email + RPO).
+              const rotinaParaVigencia =
+                (rotinaIdMaisRecente && rotinasMap[rotinaIdMaisRecente]) || rotinaEfetivaObj || null
+
+              let proximaOcorrenciaMs = NaN
+
+              if (rotinaParaVigencia) {
+                const per = String(rotinaParaVigencia.periodicidade || '').toLowerCase()
+                const intMin = Number(rotinaParaVigencia.intervalo_minutos) || 0
+                const horStr = String(rotinaParaVigencia.horario || '').trim()
+
+                if (per === 'intervalo_minutos' && intMin > 0) {
+                  // Próxima ocorrência é a cada N minutos após a comprovação
+                  proximaOcorrenciaMs = dtCompMs + intMin * 60 * 1000
+                } else if (horStr) {
+                  // Rotina diária com horário fixo (ex: 23:00)
+                  const partesHor = horStr.split(':')
+                  const targetH = parseInt(partesHor[0], 10) || 0
+                  const targetM = parseInt(partesHor[1] || '0', 10) || 0
+
+                  // Converter data do comprovante para os componentes de data no fuso America/Sao_Paulo (UTC-3)
+                  const spOffsetMs = 3 * 60 * 60 * 1000
+                  const dSpComp = new Date(dtCompMs - spOffsetMs)
+                  const cAno = dSpComp.getUTCFullYear()
+                  const cMes = dSpComp.getUTCMonth()
+                  const cDia = dSpComp.getUTCDate()
+
+                  // Ocorrência agendada no mesmo dia civil SP
+                  let targetOcorrUtc = Date.UTC(cAno, cMes, cDia, targetH + 3, targetM, 0, 0)
+                  // Se a execução foi feita às ou após as HH:MM agendadas do dia (ou muito próximo, ex.: job das 23h que executou às 23:04),
+                  // a PRÓXIMA execução esperada é no dia civil seguinte às HH:MM!
+                  // Margem de 10 minutos para jobs agendados que rodam logo após o horário
+                  if (dtCompMs >= targetOcorrUtc - 10 * 60 * 1000) {
+                    targetOcorrUtc = Date.UTC(cAno, cMes, cDia + 1, targetH + 3, targetM, 0, 0)
+                  }
+                  proximaOcorrenciaMs = targetOcorrUtc
+                } else if (per === 'diaria') {
+                  // Diária sem horário fixo especificado: 24h a partir da execução
+                  proximaOcorrenciaMs = dtCompMs + 24 * 60 * 60 * 1000
+                }
+              }
+
+              // Janela clássica por RPO do plano (horas)
+              const janelaRpoFixaMs = dtCompMs + rpoHorasConfigurado * 60 * 60 * 1000
+
+              // Janela de validade: a maior/mais permissiva entre a próxima agendada e o RPO fixo
+              let janelaValidadeLimiteMs = janelaRpoFixaMs
+              if (!isNaN(proximaOcorrenciaMs)) {
+                janelaValidadeLimiteMs = Math.max(janelaValidadeLimiteMs, proximaOcorrenciaMs)
+              }
+
+              // Válido enquanto a data/hora atual não ultrapassar o limite da janela de validade
+              dentroDoRpo = now.getTime() <= janelaValidadeLimiteMs
             } else {
               dentroDoRpo = true
               horasDesdeUltima = 0
