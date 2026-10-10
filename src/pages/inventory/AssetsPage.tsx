@@ -73,7 +73,11 @@ import {
   Server,
   CheckCircle2,
   Clock,
+  ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react'
+import { ModuleHeader } from '@/components/common/ModuleHeader'
+import { KpiCard } from '@/components/common/KpiCard'
 
 // Categorias padronizadas da visualização
 const CATEGORY_GROUPS = [
@@ -744,97 +748,55 @@ export const AssetsPage: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* 3. LINHA DE 4 CARDS DE ESTATÍSTICAS */}
+          {/* 3. LINHA DE 4 CARDS DE ESTATÍSTICAS (KpiCard padronizado do produto) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Total de Ativos */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                  <Boxes className="w-6 h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-slate-500 block">
-                    Total de Ativos
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
-                      {totalAssetsCount}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-                    Ativos cadastrados na serventia
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Card 1: Total de Ativos (Ícone Server exatamente igual ao Dashboard) */}
+            <KpiCard
+              label="Total de Ativos"
+              value={totalAssetsCount}
+              supportText="Ativos cadastrados na serventia"
+              icon={Server}
+              iconBgColor="bg-blue-100"
+              iconColor="text-blue-600"
+            />
 
-            {/* Card 2: Ativos Críticos */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-slate-500 block">
-                    Ativos Críticos
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
-                      {criticalAssetsCount}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-                    {criticalPercent}% do total
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Card 2: Ativos Críticos (Ícone AlertTriangle igual ao Dashboard) */}
+            <KpiCard
+              label="Ativos Críticos"
+              value={criticalAssetsCount}
+              supportText={`${criticalPercent}% do total`}
+              icon={AlertTriangle}
+              iconBgColor="bg-red-100"
+              iconColor="text-red-600"
+            />
 
-            {/* Card 3: Inventário Validado */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-slate-500 block">
-                    Inventário Validado
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
-                      {validatedAssetsCount}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-                    {totalAssetsCount > 0 && validatedAssetsCount === totalAssetsCount
-                      ? 'Dados validados e completos'
-                      : `${validatedPercent}% dos ativos validados`}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Card 3: Inventário Validado (Ícone ShieldCheck igual à Conformidade Geral) */}
+            <KpiCard
+              label="Inventário Validado"
+              value={validatedAssetsCount}
+              supportText={
+                totalAssetsCount > 0 && validatedAssetsCount === totalAssetsCount
+                  ? 'Dados validados e completos'
+                  : `${validatedPercent}% dos ativos validados`
+              }
+              icon={ShieldCheck}
+              iconBgColor="bg-emerald-100"
+              iconColor="text-emerald-600"
+            />
 
-            {/* Card 4: Com Pendências */}
-            <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                  <Clock className="w-6 h-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-slate-500 block">Com Pendências</span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">
-                      {pendingAssetsCount}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
-                    {pendingAssetsCount === 0
-                      ? 'Nenhuma pendência identificada'
-                      : `${pendingPercent}% requerem atenção`}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Card 4: Com Pendências (Ícone ShieldAlert igual a Pendências da Dashboard e Backup) */}
+            <KpiCard
+              label="Com Pendências"
+              value={pendingAssetsCount}
+              supportText={
+                pendingAssetsCount === 0
+                  ? 'Nenhuma pendência identificada'
+                  : `${pendingPercent}% requerem atenção`
+              }
+              icon={ShieldAlert}
+              iconBgColor="bg-amber-100"
+              iconColor="text-amber-600"
+            />
           </div>
 
           {/* 4. LINHA ANALÍTICA (3 painéis fixos em grid de 3 colunas, NUNCA sofrem reflow) */}

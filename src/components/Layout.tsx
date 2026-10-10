@@ -67,7 +67,7 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Inventário de Ativos', href: '/ativos', icon: Server },
       { title: 'Sincronização GLPI', href: '/ativos?tab=glpi', icon: RefreshCw },
-      { title: 'Infraestrutura', href: '/infraestrutura', icon: Building2 },
+      { title: 'Infraestrutura', href: '/infraestrutura', icon: Server },
     ],
   },
   {
@@ -255,7 +255,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                               className={`w-4 h-4 shrink-0 ${active ? 'text-[#D4AF37]' : 'text-slate-400 group-hover:text-slate-200'}`}
                             />
                             <span className="truncate">{item.title}</span>
-                          </div>
+                          </div>{' '}
                           {item.badge && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#F3C969] font-semibold border border-[#D4AF37]/30">
                               {item.badge}

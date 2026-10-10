@@ -24,8 +24,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { ProtectionContinuityCard } from '@/components/backup/ProtectionContinuityCard'
-import { MainDashboardHeader } from '@/components/dashboard/MainDashboardHeader'
-import { MainKpiCard } from '@/components/dashboard/MainKpiCard'
+import { ModuleHeader } from '@/components/common/ModuleHeader'
+import { KpiCard } from '@/components/common/KpiCard'
 import { DashboardCard } from '@/components/dashboard/DashboardCard'
 import { DonutWithLegend } from '@/components/dashboard/DonutWithLegend'
 import {
@@ -1009,8 +1009,13 @@ export const Index: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* 1. CABEÇALHO NOVO NO PADRÃO HOMOLOGADO DO BACKUP */}
-      <MainDashboardHeader
+      {/* 1. CABEÇALHO PADRÃO DO PRODUTO (ModuleHeader) */}
+      <ModuleHeader
+        breadcrumbs={[{ label: 'CSCTI - Compliance', href: '/' }, { label: 'Dashboard Principal' }]}
+        icon={LayoutDashboard}
+        title="Dashboard"
+        badgeText="Compliance & Governança"
+        subtitle="Visão geral da conformidade, riscos e proteção dos ativos"
         serventiaNome={organization?.name || 'Cliente CSCTI'}
         serventiaAtiva={organization?.status === 'ativa'}
         lastUpdated={lastUpdated}
@@ -1051,10 +1056,10 @@ export const Index: React.FC = () => {
         </Card>
       )}
 
-      {/* 2. TOPO: 5 KPIS EM CARDS HORIZONTAIS COM ÍCONE EM CÍRCULO COLORIDO */}
+      {/* 2. TOPO: 5 KPIS EM CARDS HORIZONTAIS COM ÍCONE EM CÍRCULO COLORIDO E SEM TRUNCAMENTO */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
-        {/* KPI 1: Total de Ativos (Ícone Server exatamente igual ao menu Inventário e cabeçalho /ativos) */}
-        <MainKpiCard
+        {/* KPI 1: Total de Ativos (Ícone Server exatamente igual ao menu Inventário e /ativos) */}
+        <KpiCard
           label="Total de Ativos"
           value={assets.length}
           supportText={
@@ -1068,8 +1073,8 @@ export const Index: React.FC = () => {
           href="/ativos"
         />
 
-        {/* KPI 2: Cobertura de Backup (% de proteção efetiva homologada - Ícone HardDriveDownload igual ao menu Backup e Recuperação) */}
-        <MainKpiCard
+        {/* KPI 2: Cobertura de Backup (% de proteção efetiva homologada - Ícone HardDriveDownload) */}
+        <KpiCard
           label="Cobertura de Backup"
           value={percentualProtegidoEfetivo}
           unit="%"
@@ -1081,21 +1086,21 @@ export const Index: React.FC = () => {
           infoTooltip="Percentual médio ponderado das modalidades exigidas (Local, Nuvem, Replicação) comprovadas dentro da janela válida."
         />
 
-        {/* KPI 3: Pendências (Ocorrências em aberto - Ícone ShieldAlert igual ao menu Gestão de Riscos / Pendências) */}
-        <MainKpiCard
+        {/* KPI 3: Pendências (Ocorrências em aberto - Ícone ShieldAlert igual a Riscos/Pendências) */}
+        <KpiCard
           label="Pendências"
           value={ocorrenciasAbertas.length}
           supportText={
             ocorrenciasAbertas.length > 0 ? 'Necessitam de atenção' : 'Nenhuma pendência ativa'
           }
-          icon={ocorrenciasAbertas.length > 0 ? ShieldAlert : CheckCircle2}
-          iconBgColor={ocorrenciasAbertas.length > 0 ? 'bg-red-100' : 'bg-slate-100'}
-          iconColor={ocorrenciasAbertas.length > 0 ? 'text-red-600' : 'text-slate-600'}
+          icon={ShieldAlert}
+          iconBgColor={ocorrenciasAbertas.length > 0 ? 'bg-amber-100' : 'bg-slate-100'}
+          iconColor={ocorrenciasAbertas.length > 0 ? 'text-amber-600' : 'text-slate-600'}
           href="/backup?tab=ocorrencias"
         />
 
-        {/* KPI 4: Conformidade Geral (Ícone ShieldCheck exatamente igual ao menu Conformidade) */}
-        <MainKpiCard
+        {/* KPI 4: Conformidade Geral (Ícone ShieldCheck) */}
+        <KpiCard
           label="Conformidade Geral"
           value={conformidadeGeral}
           unit="%"
@@ -1106,15 +1111,15 @@ export const Index: React.FC = () => {
           href="/conformidade"
         />
 
-        {/* KPI 5: Sistemas Críticos (Ícone Building2 / Boxes exatamente do padrão de infraestrutura de ativos) */}
+        {/* KPI 5: Sistemas Críticos (Ícone AlertTriangle igual ao Ativos Críticos / Riscos Críticos) */}
         <div className="col-span-2 md:col-span-1">
-          <MainKpiCard
+          <KpiCard
             label="Sistemas Críticos"
             value={ativosCriticos.length}
             supportText={`${pctCriticos}% do total de ativos`}
-            icon={Building2}
-            iconBgColor="bg-slate-100"
-            iconColor="text-slate-600"
+            icon={AlertTriangle}
+            iconBgColor={ativosCriticos.length > 0 ? 'bg-red-100' : 'bg-slate-100'}
+            iconColor={ativosCriticos.length > 0 ? 'text-red-600' : 'text-slate-600'}
             href="/ativos"
           />
         </div>
@@ -1227,7 +1232,7 @@ export const Index: React.FC = () => {
         <DashboardCard
           title="Pendências e Tarefas"
           subtitle="Ações necessárias para conformidade"
-          icon={CheckCircle2}
+          icon={ShieldAlert}
           iconColor="text-amber-600"
           iconBgColor="bg-amber-100"
           viewAllLink={{ href: '/backup?tab=ocorrencias', label: 'Ver todas' }}
@@ -1241,11 +1246,11 @@ export const Index: React.FC = () => {
         {/* Painel 1: Cobertura de Proteção por Categoria */}
         <DashboardCard
           title="Cobertura de Proteção por Categoria"
-          subtitle="Percentual de ativos com backup por tipo"
-          icon={Building2}
+          subtitle="Percentual de ativos com backup por categoria"
+          icon={HardDriveDownload}
           iconColor="text-blue-600"
           iconBgColor="bg-blue-100"
-          viewAllLink={{ href: '/ativos', label: 'Ver inventário' }}
+          viewAllLink={{ href: '/backup', label: 'Ver módulo de Backup' }}
         >
           <CategoryProtectionBars categories={categoryProtectionBars} />
         </DashboardCard>
