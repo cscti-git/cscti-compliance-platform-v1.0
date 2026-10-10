@@ -79,6 +79,8 @@ import type {
 } from '@/types/cscti'
 import { SvgDonutChart, HorizontalStackedBar } from '@/components/backup/BackupPreviewCharts'
 import { BackupNocValidacaoCard } from '@/components/backup/BackupNocValidacaoCard'
+import { KpiCard } from '@/components/common/KpiCard'
+import { PanelHeader } from '@/components/common/PanelHeader'
 
 export interface BackupOverviewContentProps {
   showPreviewBanner?: boolean
@@ -1183,122 +1185,52 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
         {/* COLUNA ESQUERDA: KPIs + Gráficos Analíticos + Filtros + Tabela */}
         <div className="xl:col-span-9 space-y-5 min-w-0">
-          {/* 2. LINHA DE 4 KPIS UNIFORMIZADOS */}
+          {/* 2. LINHA DE 4 KPIS UNIFORMIZADOS (KpiCard padronizado do produto sem truncamento) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* KPI 1: Total de Ativos Protegidos (Database verde) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors min-h-[96px] flex flex-col justify-between">
-              <CardContent className="p-3.5 flex items-center gap-3 h-full">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Database className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
-                </div>
-                <div className="min-w-0 flex-1 flex flex-col justify-between">
-                  <span
-                    className="text-[11px] font-semibold text-slate-500 block truncate"
-                    title="Total de Ativos Protegidos"
-                  >
-                    Total de Ativos Protegidos
-                  </span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5 flex-wrap">
-                    <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
-                      {totalAtivosProtegidosCompleto}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-500 truncate">
-                      / {totalExigidosConfronto} exigidos
-                    </span>
-                  </div>
-                  <p
-                    className="text-[10px] text-slate-400 mt-1 font-medium truncate"
-                    title={`${percentualProtegidoConfronto}% de cobertura • ${totalAtivosComProtecao} de ${totalExigidosConfronto} ativos com comprovação`}
-                  >
-                    {percentualProtegidoConfronto}% de cobertura • {totalAtivosComProtecao} ativos
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <KpiCard
+              label="Total de Ativos Protegidos"
+              value={totalAtivosProtegidosCompleto}
+              secondaryValue={`/ ${totalExigidosConfronto} exigidos`}
+              supportText={`${percentualProtegidoConfronto}% de cobertura • ${totalAtivosComProtecao} ativos`}
+              icon={Database}
+              iconBgColor="bg-emerald-100"
+              iconColor="text-emerald-600"
+              href="/backup?tab=escopo"
+            />
 
-            {/* KPI 2: Execuções Realizadas (Check verde) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors min-h-[96px] flex flex-col justify-between">
-              <CardContent className="p-3.5 flex items-center gap-3 h-full">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
-                </div>
-                <div className="min-w-0 flex-1 flex flex-col justify-between">
-                  <span
-                    className="text-[11px] font-semibold text-slate-500 block truncate"
-                    title="Execuções Realizadas"
-                  >
-                    Execuções Realizadas
-                  </span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
-                      {totalExecucoes}
-                    </span>
-                  </div>
-                  <p
-                    className="text-[10px] text-slate-400 mt-1 font-medium truncate"
-                    title="Execuções registradas no histórico operacional"
-                  >
-                    registradas no histórico
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* KPI 2: Execuções Realizadas (CheckCircle2 verde) */}
+            <KpiCard
+              label="Execuções Realizadas"
+              value={totalExecucoes}
+              supportText="registradas no histórico"
+              icon={CheckCircle2}
+              iconBgColor="bg-emerald-100"
+              iconColor="text-emerald-600"
+              href="/backup?tab=execucoes"
+            />
 
-            {/* KPI 3: Execuções com Alertas (Alerta âmbar) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors min-h-[96px] flex flex-col justify-between">
-              <CardContent className="p-3.5 flex items-center gap-3 h-full">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
-                </div>
-                <div className="min-w-0 flex-1 flex flex-col justify-between">
-                  <span
-                    className="text-[11px] font-semibold text-slate-500 block truncate"
-                    title="Execuções com Alertas"
-                  >
-                    Execuções com Alertas
-                  </span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
-                      {execucoesComAlertas}
-                    </span>
-                  </div>
-                  <p
-                    className="text-[10px] text-slate-400 mt-1 font-medium truncate"
-                    title={`${pctAlertas}% do total de execuções`}
-                  >
-                    {pctAlertas}% do total
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* KPI 3: Execuções com Alertas (AlertTriangle âmbar) */}
+            <KpiCard
+              label="Execuções com Alertas"
+              value={execucoesComAlertas}
+              supportText={`${pctAlertas}% do total`}
+              icon={AlertTriangle}
+              iconBgColor={execucoesComAlertas > 0 ? 'bg-amber-100' : 'bg-slate-100'}
+              iconColor={execucoesComAlertas > 0 ? 'text-amber-600' : 'text-slate-600'}
+              href="/backup?tab=execucoes"
+            />
 
-            {/* KPI 4: Execuções com Falha (X vermelho) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden hover:border-slate-300 transition-colors min-h-[96px] flex flex-col justify-between">
-              <CardContent className="p-3.5 flex items-center gap-3 h-full">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                  <XCircle className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
-                </div>
-                <div className="min-w-0 flex-1 flex flex-col justify-between">
-                  <span
-                    className="text-[11px] font-semibold text-slate-500 block truncate"
-                    title="Execuções com Falha"
-                  >
-                    Execuções com Falha
-                  </span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
-                      {execucoesComFalha}
-                    </span>
-                  </div>
-                  <p
-                    className="text-[10px] text-slate-400 mt-1 font-medium truncate"
-                    title={`${pctFalhas}% do total de execuções`}
-                  >
-                    {pctFalhas}% do total
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* KPI 4: Execuções com Falha (XCircle vermelho) */}
+            <KpiCard
+              label="Execuções com Falha"
+              value={execucoesComFalha}
+              supportText={`${pctFalhas}% do total`}
+              icon={XCircle}
+              iconBgColor={execucoesComFalha > 0 ? 'bg-rose-100' : 'bg-slate-100'}
+              iconColor={execucoesComFalha > 0 ? 'text-rose-600' : 'text-slate-600'}
+              href="/backup?tab=execucoes"
+            />
           </div>
 
           {/* 3. LINHA DE 3 PAINÉIS ANALÍTICOS */}
@@ -1562,15 +1494,20 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
 
           {/* TABELA "ÚLTIMAS EXECUÇÕES DE BACKUP" */}
           <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden">
-            <div className="p-3.5 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-900">Últimas Execuções de Backup</h2>
-              <Button
-                onClick={() => handleNavigateTab('execucoes')}
-                className="bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-8 px-3 gap-1 shadow-2xs"
-              >
-                Ver histórico completo
-              </Button>
-            </div>
+            <PanelHeader
+              title="Últimas Execuções de Backup"
+              icon={CheckCircle2}
+              iconBgColor="bg-emerald-100"
+              iconColor="text-emerald-600"
+              action={
+                <Button
+                  onClick={() => handleNavigateTab('execucoes')}
+                  className="bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-8 px-3 gap-1 shadow-2xs rounded-lg"
+                >
+                  Ver histórico completo
+                </Button>
+              }
+            />
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
@@ -1865,16 +1802,21 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
         <div className="xl:col-span-3 space-y-4">
           {/* Card 1: Próximas Execuções */}
           <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden">
-            <div className="p-3.5 border-b border-slate-100 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900">Próximas Execuções</span>
-              <button
-                type="button"
-                onClick={() => handleNavigateTab('rotinas')}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
-              >
-                Ver todas
-              </button>
-            </div>
+            <PanelHeader
+              title="Próximas Execuções"
+              icon={Calendar}
+              iconBgColor="bg-blue-100"
+              iconColor="text-blue-600"
+              action={
+                <button
+                  type="button"
+                  onClick={() => handleNavigateTab('rotinas')}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
+                >
+                  Ver todas
+                </button>
+              }
+            />
             <div className="p-3 space-y-3">
               {proximasExecucoesCalculadas.length === 0 ? (
                 <div className="py-4 text-center text-xs text-slate-400 italic">
@@ -1916,16 +1858,21 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
 
           {/* Card 2: Últimas Ocorrências */}
           <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden">
-            <div className="p-3.5 border-b border-slate-100 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900">Últimas Ocorrências</span>
-              <button
-                type="button"
-                onClick={() => handleNavigateTab('ocorrencias')}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
-              >
-                Ver todas
-              </button>
-            </div>
+            <PanelHeader
+              title="Últimas Ocorrências"
+              icon={AlertTriangle}
+              iconBgColor="bg-amber-100"
+              iconColor="text-amber-600"
+              action={
+                <button
+                  type="button"
+                  onClick={() => handleNavigateTab('ocorrencias')}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
+                >
+                  Ver todas
+                </button>
+              }
+            />
             <div className="p-3 space-y-3">
               {ultimasOcorrencias.length === 0 ? (
                 <div className="py-4 text-center text-xs text-slate-400 italic">
@@ -1983,9 +1930,12 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
 
           {/* Card 3: Ações Rápidas */}
           <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden">
-            <div className="p-3.5 border-b border-slate-100">
-              <span className="text-xs font-bold text-slate-900">Ações Rápidas</span>
-            </div>
+            <PanelHeader
+              title="Ações Rápidas"
+              icon={Sliders}
+              iconBgColor="bg-slate-100"
+              iconColor="text-slate-700"
+            />
             <div className="p-3 space-y-2">
               {canOperate ? (
                 <>

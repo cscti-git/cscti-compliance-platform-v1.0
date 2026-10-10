@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   RefreshCw,
+  Network,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -67,7 +68,7 @@ const navSections: NavSection[] = [
     items: [
       { title: 'Inventário de Ativos', href: '/ativos', icon: Server },
       { title: 'Sincronização GLPI', href: '/ativos?tab=glpi', icon: RefreshCw },
-      { title: 'Infraestrutura', href: '/infraestrutura', icon: Server },
+      { title: 'Infraestrutura', href: '/infraestrutura', icon: Network },
     ],
   },
   {

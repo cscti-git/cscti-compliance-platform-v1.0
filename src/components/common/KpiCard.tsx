@@ -9,8 +9,10 @@ export interface KpiCardProps {
   label: string
   /** Valor numérico ou string destacado */
   value: string | number
-  /** Sufixo de unidade (ex.: "%", "ativos", etc.) */
+  /** Sufixo ou complemento de valor secundário (ex.: "%", "ativos", "/ 4 exigidos") */
   unit?: string
+  /** Complemento ou subvalor exibido ao lado do valor principal (ex.: "/ 4 exigidos") */
+  secondaryValue?: string
   /** Indicador de tendência opcional */
   trend?: {
     value: string
@@ -42,6 +44,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   label,
   value,
   unit,
+  secondaryValue,
   trend,
   supportText,
   icon: Icon,
@@ -86,6 +89,11 @@ export const KpiCard: React.FC<KpiCardProps> = ({
               {value}
               {unit && <span className="text-xl sm:text-2xl ml-0.5 font-bold">{unit}</span>}
             </span>
+            {secondaryValue && (
+              <span className="text-xs sm:text-sm font-semibold text-slate-500 whitespace-nowrap">
+                {secondaryValue}
+              </span>
+            )}
 
             {trend && (
               <span
