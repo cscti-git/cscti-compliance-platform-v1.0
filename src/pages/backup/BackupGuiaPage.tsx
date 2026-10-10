@@ -151,7 +151,7 @@ export const BackupGuiaPage: React.FC = () => {
     {
       id: 'etapa-9-noc',
       num: '9',
-      title: 'Validação Humana (NOC)',
+      title: 'Validação Externa (NOC)',
       subtitle: 'Atestado Diário & Convergência',
       icon: UserCheck,
       tab: 'evidencias',
@@ -1843,7 +1843,7 @@ export const BackupGuiaPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-lg font-bold text-slate-900">
-                      Validação Humana NOC (Monitoramento Externo) e Dupla Camada
+                      Validação Externa NOC (Monitoramento Externo) e Dupla Camada
                     </CardTitle>
                     <Badge
                       variant="outline"
@@ -1938,12 +1938,12 @@ export const BackupGuiaPage: React.FC = () => {
               <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wide text-purple-900">
                 <ShieldCheck className="w-4 h-4 text-purple-700 shrink-0" />
                 <span>
-                  Card &quot;Validação Humana (NOC)&quot; na Visão Geral e Selo de Convergência
+                  Card &quot;Validação Externa (NOC)&quot; na Visão Geral e Selo de Convergência
                 </span>
               </div>
               <p className="text-xs leading-relaxed">
                 Na tela inicial da Visão Geral, ao lado da tabela &quot;Proteção por Ativo&quot;, o
-                card <strong>&quot;Validação Humana (NOC)&quot;</strong> apresenta o selo de
+                card <strong>&quot;Validação Externa (NOC)&quot;</strong> apresenta o selo de
                 convergência do dia:
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">

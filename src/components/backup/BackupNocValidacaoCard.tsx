@@ -18,10 +18,10 @@ import type {
 } from '@/types/cscti'
 
 /**
- * Card "Validação Humana (NOC)" da Visão Geral do Backup.
+ * Card "Validação Externa (NOC)" da Visão Geral do Backup.
  *
  * Mostra a segunda camada da conformidade (o motor de confronto é a primeira):
- * a data do último atestado humano diário do NOC, o status geral, as VMs
+ * a data do último atestado externo diário do NOC, o status geral, as VMs
  * avaliadas com status individual e o indicador de convergência
  * NOC × análise do sistema. Somente leitura — os dados vêm da coleção
  * `backup_monitoramentos_externos` (mesma fonte da sub-aba
@@ -155,18 +155,18 @@ export const BackupNocValidacaoCard: React.FC<BackupNocValidacaoCardProps> = ({
       role="button"
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      aria-label="Validação Humana (NOC) — abrir Monitoramento Externo"
+      aria-label="Validação Externa (NOC) — abrir Monitoramento Externo"
     >
       <CardHeader className="pb-3 border-b border-slate-100">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="min-w-0">
             <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-purple-700 shrink-0" />
-              <span className="truncate">Validação Humana (NOC)</span>
+              <span className="truncate">Validação Externa (NOC)</span>
             </CardTitle>
             <CardDescription className="text-xs">
-              Dupla camada de conformidade: prova automática do motor de confronto + atestado humano
-              diário do NOC.
+              Dupla camada de conformidade: prova automática do motor de confronto + atestado
+              externo diário do NOC.
             </CardDescription>
           </div>
           <Button
@@ -196,10 +196,10 @@ export const BackupNocValidacaoCard: React.FC<BackupNocValidacaoCardProps> = ({
               <UserCheck className="w-5 h-5" />
             </div>
             <p className="text-xs font-semibold text-slate-700">
-              Nenhum atestado humano registrado ainda
+              Nenhum atestado externo registrado ainda
             </p>
             <p className="text-[11px] text-slate-500 max-w-md leading-relaxed">
-              Nenhum atestado humano registrado ainda — os relatórios do NOC aparecem aqui
+              Nenhum atestado externo registrado ainda — os relatórios do NOC aparecem aqui
               automaticamente ao serem processados.
             </p>
             <Button

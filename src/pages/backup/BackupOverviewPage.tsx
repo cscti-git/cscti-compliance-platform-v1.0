@@ -851,7 +851,7 @@ export const BackupOverviewPage: React.FC = () => {
             }}
           />
 
-          {/* DUPLA CAMADA DE CONFORMIDADE: atestado humano diário do NOC (2ª camada) */}
+          {/* DUPLA CAMADA DE CONFORMIDADE: atestado externo diário do NOC (2ª camada) */}
           <BackupNocValidacaoCard
             monitoramentos={monitoramentos}
             loading={loading}

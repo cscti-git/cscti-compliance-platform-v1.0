@@ -91,7 +91,7 @@ interface BackupEvidenciasTabProps {
   canOperate: boolean
   orgId: string
   onReload: () => void
-  /** Sub-aba solicitada de fora (ex.: deep-link do card "Validação Humana (NOC)" da Visão Geral). */
+  /** Sub-aba solicitada de fora (ex.: deep-link do card "Validação Externa (NOC)" da Visão Geral). */
   subAbaInicial?: 'evidencias' | 'monitoramento_externo'
   /** Consome o deep-link (limpa o parâmetro de URL) após a primeira renderização. */
   onConsumirSubAbaInicial?: () => void
@@ -185,7 +185,7 @@ export const BackupEvidenciasTab: React.FC<BackupEvidenciasTabProps> = ({
 
   // Sub-abas dentro de Evidências: "evidencias" | "monitoramento_externo"
   const [activeSubTab, setActiveSubTab] = useState<'evidencias' | 'monitoramento_externo'>(
-    // Deep-link do card "Validação Humana (NOC)" da Visão Geral (?tab=evidencias&sub=monitoramento_externo)
+    // Deep-link do card "Validação Externa (NOC)" da Visão Geral (?tab=evidencias&sub=monitoramento_externo)
     subAbaInicial === 'monitoramento_externo' ? 'monitoramento_externo' : 'evidencias',
   )
 

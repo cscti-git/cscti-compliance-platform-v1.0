@@ -83,6 +83,7 @@ import type {
   OrganizationItem,
 } from '@/types/cscti'
 import { SvgDonutChart, HorizontalStackedBar } from '@/components/backup/BackupPreviewCharts'
+import { BackupNocValidacaoCard } from '@/components/backup/BackupNocValidacaoCard'
 
 export const BackupOverviewPreviewPage: React.FC = () => {
   const { organization, role } = useAuth()
@@ -426,7 +427,8 @@ export const BackupOverviewPreviewPage: React.FC = () => {
 
   interface ExecucaoEnriquecida extends BackupExecucaoItem {
     ativoTitulo: string
-    ativoModalidadeLabel: string
+    ativoModalidadeLabel: 'Local' | 'Nuvem' | 'Replicação'
+    ativoModalidadeKey: ModalidadeKey
     ativoSubtitulo: string
     ativoNome: string
     ativoCategoria: string
@@ -443,36 +445,46 @@ export const BackupOverviewPreviewPage: React.FC = () => {
     dataEmailTime: number
   }
 
-  // Função auxiliar para derivar a modalidade conforme a regra do motor de backup
-  const inferirModalidade = (obsStr: string, rotinaNome: string, destinoStr: string): string => {
+  // Tipo para a modalidade comprovada pela execução
+  type ModalidadeKey = 'local' | 'nuvem' | 'replicacao'
+
+  // Função auxiliar para derivar a modalidade conforme a REGRA DE OURO DO PROJETO:
+  // "Backup job:" → Local
+  // "Copy job:" → Nuvem
+  // "Replication job:" → Replicação
+  const inferirModalidadeInfo = (
+    obsStr: string,
+    rotinaNome: string,
+    destinoStr: string,
+  ): { key: ModalidadeKey; label: 'Local' | 'Nuvem' | 'Replicação' } => {
     const obs = (obsStr || '').toLowerCase()
     const rot = (rotinaNome || '').toLowerCase()
     const dest = (destinoStr || '').toLowerCase()
 
-    // 1. Prefixo da observação (prioridade máxima do motor)
+    // 1. Regra de ouro do motor: prefixos de job na observação
     if (
-      obs.includes('backup copy job:') ||
       obs.includes('copy job:') ||
+      obs.includes('backup copy job:') ||
       obs.includes('veeam backup_copy:')
     ) {
-      return 'Nuvem'
+      return { key: 'nuvem', label: 'Nuvem' }
     }
     if (obs.includes('replication job:') || obs.includes('veeam replication:')) {
-      return 'Replicação'
+      return { key: 'replicacao', label: 'Replicação' }
     }
     if (obs.includes('backup job:') || obs.includes('veeam backup:')) {
-      return 'Local'
+      return { key: 'local', label: 'Local' }
     }
 
-    // 2. Sufixo ou padrão do nome da rotina (fallback)
+    // 2. Sufixo ou padrão do nome da rotina (fallback de motor)
     if (/-\s*r[eé]plicas?$|\breplica[çc][aã]o$/i.test(rot)) {
-      return 'Replicação'
+      return { key: 'replicacao', label: 'Replicação' }
     }
-    if (/to cloud/i.test(rot) || /-\s*nuvens?$/i.test(rot)) {
-      return 'Nuvem'
+    if (/to cloud/i.test(rot) || /-\s*nuvens?$/i.test(rot) || /cloud/i.test(rot)) {
+      return { key: 'nuvem', label: 'Nuvem' }
     }
     if (/-\s*local$/i.test(rot)) {
-      return 'Local'
+      return { key: 'local', label: 'Local' }
     }
 
     // 3. Destino inequívoco
@@ -481,12 +493,12 @@ export const BackupOverviewPreviewPage: React.FC = () => {
     const temReplica = /\b(?:r[eé]plicas?|replication)\b/i.test(dest)
     const cnt = (temLocal ? 1 : 0) + (temNuvem ? 1 : 0) + (temReplica ? 1 : 0)
     if (cnt === 1) {
-      if (temReplica) return 'Replicação'
-      if (temNuvem) return 'Nuvem'
-      if (temLocal) return 'Local'
+      if (temReplica) return { key: 'replicacao', label: 'Replicação' }
+      if (temNuvem) return { key: 'nuvem', label: 'Nuvem' }
+      if (temLocal) return { key: 'local', label: 'Local' }
     }
 
-    return 'Local'
+    return { key: 'local', label: 'Local' }
   }
 
   const enrichedExecucoes = useMemo<ExecucaoEnriquecida[]>(() => {
@@ -527,12 +539,14 @@ export const BackupOverviewPreviewPage: React.FC = () => {
         })
       }
 
-      // Modalidade inferida (Local / Nuvem / Replicação)
-      const ativoModalidadeLabel = inferirModalidade(
+      // Modalidade inferida (Local / Nuvem / Replicação) conforme Regra de Ouro do motor
+      const modalidadeInfo = inferirModalidadeInfo(
         exec.observacao || '',
         rotinaNome,
         exec.destino || '',
       )
+      const ativoModalidadeLabel = modalidadeInfo.label
+      const ativoModalidadeKey = modalidadeInfo.key
 
       // Montagem do título e subtítulo fiéis para a coluna ATIVO
       let ativoTitulo = ''
@@ -540,22 +554,20 @@ export const BackupOverviewPreviewPage: React.FC = () => {
       const totalVms = vmsComprovadas.length
       const temMultiplasVms = totalVms > 1
 
-      // Prefixo gramatical da modalidade ("· Local", "· Cópia Nuvem", "· Replicação")
-      const modalidadeTexto =
-        ativoModalidadeLabel === 'Nuvem' ? '· Cópia Nuvem' : `· ${ativoModalidadeLabel}`
-
       if (totalVms > 0) {
         if (totalVms === 1) {
           ativoTitulo = vmsComprovadas[0].nome
-          ativoSubtitulo = `1 VM comprovada ${modalidadeTexto}`
+          ativoSubtitulo = '1 VM comprovada'
         } else {
+          // Quando comprovar múltiplas VMs, exibe o nome de forma discreta:
+          // ativoTitulo com o resumo dos nomes ou primeiro nome, e subtítulo discreto "X VMs comprovadas"
           ativoTitulo = vmsComprovadas.map((v) => v.nome).join(', ')
-          ativoSubtitulo = `${totalVms} VMs comprovadas ${modalidadeTexto}`
+          ativoSubtitulo = `${totalVms} VMs comprovadas`
         }
       } else {
         // Fallback: usar nome da rotina
         ativoTitulo = rotinaNome
-        ativoSubtitulo = `Rotina de backup ${modalidadeTexto}`
+        ativoSubtitulo = 'Rotina de backup'
       }
 
       // Nomes de todas as VMs formatados para tooltip/busca
@@ -628,6 +640,7 @@ export const BackupOverviewPreviewPage: React.FC = () => {
         ...exec,
         ativoTitulo,
         ativoModalidadeLabel,
+        ativoModalidadeKey,
         ativoSubtitulo,
         ativoNome,
         ativoCategoria,
@@ -1462,16 +1475,13 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                       />
                     </th>
                     <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Data/Hora
-                    </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
                       Ativo
                     </th>
                     <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Tipo
+                      Tipo / Rotina
                     </th>
                     <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Rotina / Plano
+                      Comprovação da Modalidade
                     </th>
                     <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
                       Resultado
@@ -1490,14 +1500,14 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-600 mb-2" />
                         Carregando execuções de backup...
                       </td>
                     </tr>
                   ) : paginatedExecucoes.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         <Server className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                         <span className="font-semibold text-slate-700 block text-xs">
                           Nenhuma execução encontrada
@@ -1517,30 +1527,19 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                           className="hover:bg-slate-50/70 transition-colors cursor-pointer"
                           onClick={() => setExecDetail(exec)}
                         >
-                          {/* Checkbox */}
-                          <td
-                            className="py-3 px-3.5 text-center"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleSelectRow(exec.id)
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {}}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
-                            />
-                          </td>
-
-                          {/* Data/Hora */}
-                          <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-700 text-[11px]">
-                            {exec.dataHoraFormatada}
-                          </td>
-
-                          {/* Ativo: lista vertical compacta de todas as VMs comprovadas ou nome individual */}
-                          <td className="py-3 px-3.5 min-w-[220px]" title={exec.vmsNomesFormatados}>
+                          {/* Checkbox + Ativo */}
+                          <td className="py-3 px-3.5 min-w-[240px]">
                             <div className="flex items-start gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleSelectRow(exec.id)
+                                }}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5 mt-1 shrink-0"
+                              />
                               <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200/80 mt-0.5">
                                 <Server className="w-3.5 h-3.5" />
                               </div>
@@ -1548,21 +1547,14 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                                 {exec.vmsComprovadas.length > 0 ? (
                                   exec.temMultiplasVms ? (
                                     <div className="space-y-1">
-                                      <div className="flex flex-col gap-0.5">
-                                        {exec.vmsComprovadas.map((vm, vIdx) => (
-                                          <div
-                                            key={`${vm.nome}-${vIdx}`}
-                                            className="flex items-center gap-1.5 min-w-0"
-                                          >
-                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                                            <span className="font-mono text-xs font-semibold text-slate-900 truncate leading-tight">
-                                              {vm.nome}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                      <span className="text-[10px] font-medium text-slate-500 block truncate leading-tight">
-                                        {exec.ativoSubtitulo}
+                                      <span
+                                        className="font-mono text-xs font-bold text-slate-900 block leading-tight truncate"
+                                        title={exec.vmsNomesFormatados}
+                                      >
+                                        {exec.vmsComprovadas.map((v) => v.nome).join(', ')}
+                                      </span>
+                                      <span className="text-[11px] font-medium text-slate-500 block truncate leading-tight">
+                                        {exec.vmsComprovadas.length} VMs comprovadas
                                       </span>
                                     </div>
                                   ) : (
@@ -1570,8 +1562,8 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                                       <span className="font-mono text-xs font-bold text-slate-900 block leading-tight truncate">
                                         {exec.ativoTitulo}
                                       </span>
-                                      <span className="text-[10px] font-medium text-slate-500 block truncate mt-0.5">
-                                        {exec.ativoSubtitulo}
+                                      <span className="text-[11px] font-medium text-slate-500 block truncate mt-0.5">
+                                        1 VM comprovada
                                       </span>
                                     </div>
                                   )
@@ -1580,8 +1572,8 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                                     <span className="font-semibold text-xs text-slate-900 block leading-tight truncate">
                                       {exec.ativoTitulo}
                                     </span>
-                                    <span className="text-[10px] font-medium text-slate-500 block truncate mt-0.5">
-                                      {exec.ativoSubtitulo}
+                                    <span className="text-[11px] font-medium text-slate-500 block truncate mt-0.5">
+                                      {exec.rotinaNome}
                                     </span>
                                   </div>
                                 )}
@@ -1589,30 +1581,41 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                             </div>
                           </td>
 
-                          {/* Tipo: Badges pastel distintas (Completo, Incremental, Configuração) */}
-                          <td className="py-3 px-3.5 whitespace-nowrap">
-                            {exec.tipoBackupLabel === 'Completo' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
-                                Completo
-                              </span>
-                            ) : exec.tipoBackupLabel === 'Incremental' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-100 text-sky-700 border border-sky-200">
-                                Incremental
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-                                Configuração
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Rotina / Plano: plano em negrito + rotina em cinza */}
-                          <td className="py-3 px-3.5 min-w-[160px]">
-                            <span className="font-bold text-slate-900 block leading-tight truncate">
+                          {/* Tipo / Rotina */}
+                          <td className="py-3 px-3.5 min-w-[150px]">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {exec.tipoBackupLabel === 'Completo' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                                  Completo
+                                </span>
+                              ) : exec.tipoBackupLabel === 'Incremental' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-sky-100 text-sky-700 border border-sky-200">
+                                  Incremental
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                                  Configuração
+                                </span>
+                              )}
+                            </div>
+                            <span
+                              className="text-[11px] text-slate-500 block truncate mt-1"
+                              title={`${exec.planoNome} • ${exec.rotinaNome}`}
+                            >
                               {exec.planoNome}
                             </span>
-                            <span className="text-[11px] text-slate-500 block truncate">
-                              {exec.rotinaNome}
+                          </td>
+
+                          {/* Comprovação da Modalidade (padrão visual fiel de chip verde da tela oficial: "Local: 09/10/2026, 08:35") */}
+                          <td className="py-3 px-3.5 whitespace-nowrap min-w-[200px]">
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 shadow-2xs"
+                              title={`Modalidade ${exec.ativoModalidadeLabel} comprovada via e-mail em ${exec.dataHoraFormatada}`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>
+                                {exec.ativoModalidadeLabel}: {exec.dataHoraFormatada}
+                              </span>
                             </span>
                           </td>
 
@@ -1912,6 +1915,13 @@ export const BackupOverviewPreviewPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* CARD: VALIDAÇÃO EXTERNA (NOC) — Dupla Camada de Conformidade */}
+      <BackupNocValidacaoCard
+        monitoramentos={monitoramentos}
+        loading={loading}
+        onOpenNoc={() => navigate('/backup?tab=evidencias&sub=monitoramento_externo')}
+      />
 
       {/* DIALOG DE DETALHES DA EXECUÇÃO SELECIONADA */}
       <Dialog open={Boolean(execDetail)} onOpenChange={(open) => !open && setExecDetail(null)}>
