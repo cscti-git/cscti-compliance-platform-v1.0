@@ -697,21 +697,65 @@ routerAdd(
       const nocConteudoNorm = normalizarNoc(rawConteudo) + ' ' + normalizarNoc(pdfExtraidoTexto)
       const nocRemetenteNorm = normalizarNoc(remetente)
 
+      // Prioridade Veeam: prefixos de job Veeam ou regra casada VEEAM_HTML têm precedência
+      // absoluta sobre qualquer fallback de NOC (remetentes do Veeam como newsletter@proitcs.com.br
+      // NUNCA podem ser desviados para o atestado NOC).
+      const temPrefixosJobVeeam =
+        lowerConteudo.includes('backup job:') ||
+        lowerConteudo.includes('backup copy job:') ||
+        lowerConteudo.includes('replication job:') ||
+        lowerConteudo.includes('veeam backup') ||
+        lowerConteudo.includes('veem backup') ||
+        lowerAssunto.includes('backup job:') ||
+        lowerAssunto.includes('copy job:') ||
+        lowerAssunto.includes('replication job:') ||
+        lowerAssunto.includes('backup copy job:') ||
+        lowerAssunto.includes('[cri][success]') ||
+        lowerAssunto.includes('backup vms') ||
+        (lowerConteudo.includes('vms processed') && lowerConteudo.includes('details')) ||
+        (lowerConteudo.includes('start time') &&
+          lowerConteudo.includes('data read') &&
+          lowerConteudo.includes('transferred')) ||
+        lowerConteudo.includes('spch-regwin') ||
+        lowerConteudo.includes('spcm-tdepj') ||
+        lowerConteudo.includes('spcm-regwin')
+
+      const isRegraVeeam = Boolean(
+        regraCasada && regraCasada.getString('adaptador') === 'VEEAM_HTML',
+      )
+      const isRegraNoc = Boolean(regraCasada && regraCasada.getString('adaptador') === 'NOC_DIARIO')
+
+      // Remetente de NOC: NÃO casar com remetentes automáticos de comprovantes Veeam
+      // (ex.: newsletter@proitcs.com.br). Exigir remetente do NOC real (ex.: rafael.nascimento@proitcs.com.br,
+      // noc@proitcs.com.br) e NUNCA considerar newsletter@ como NOC.
+      const isNewsletterVeeam =
+        nocRemetenteNorm.includes('newsletter@') || lowerRemetente.includes('newsletter@')
+
       const temRemetenteNoc =
-        nocRemetenteNorm.includes('@proitcs.com.br') ||
-        nocRemetenteNorm.includes('proitcs.com.br') ||
-        nocRemetenteNorm.includes('noc')
+        !isNewsletterVeeam &&
+        (nocRemetenteNorm.includes('noc@') ||
+          nocRemetenteNorm.includes('rafael.nascimento@proitcs.com.br') ||
+          ((nocRemetenteNorm.includes('@proitcs.com.br') ||
+            nocRemetenteNorm.includes('proitcs.com.br')) &&
+            !temPrefixosJobVeeam &&
+            !isRegraVeeam))
+
       const temConteudoNoc =
         nocConteudoNorm.includes('informacoes do ambiente') &&
         (nocConteudoNorm.includes('acoes a realizadas pelo noc') ||
           nocConteudoNorm.includes('acoes realizadas pelo noc'))
+
+      const temAssuntoAtestadoNoc =
+        nocAssuntoNorm.includes('analise preventiva') &&
+        (nocAssuntoNorm.includes('backup') || nocAssuntoNorm.includes('noc'))
+
       const isNocDetected =
-        (regraCasada && regraCasada.getString('adaptador') === 'NOC_DIARIO') ||
-        (nocAssuntoNorm.includes('noc') &&
-          nocAssuntoNorm.includes('analise preventiva') &&
-          nocAssuntoNorm.includes('backup')) ||
-        temRemetenteNoc ||
-        temConteudoNoc
+        !isAcronisDetected &&
+        !isRegraVeeam &&
+        (isRegraNoc ||
+          (temAssuntoAtestadoNoc && (temRemetenteNoc || temConteudoNoc)) ||
+          temConteudoNoc ||
+          (temRemetenteNoc && !temPrefixosJobVeeam))
 
       // Fail-closed do atestado: se o único indício de NOC é o assunto (sem
       // remetente do NOC e sem o corpo padrão do relatório), o e-mail NÃO é
@@ -719,22 +763,7 @@ routerAdd(
       const nocNaoReconhecida = isNocDetected && !temRemetenteNoc && !temConteudoNoc
 
       const isVeeamDetected =
-        !isAcronisDetected &&
-        !isNocDetected &&
-        ((regraCasada && regraCasada.getString('adaptador') === 'VEEAM_HTML') ||
-          lowerConteudo.includes('backup job:') ||
-          lowerConteudo.includes('backup copy job:') ||
-          lowerConteudo.includes('replication job:') ||
-          lowerConteudo.includes('veeam backup') ||
-          lowerConteudo.includes('veem backup') ||
-          lowerAssunto.includes('backup vms') ||
-          (lowerConteudo.includes('vms processed') && lowerConteudo.includes('details')) ||
-          (lowerConteudo.includes('start time') &&
-            lowerConteudo.includes('data read') &&
-            lowerConteudo.includes('transferred')) ||
-          lowerConteudo.includes('spch-regwin') ||
-          lowerConteudo.includes('spcm-tdepj') ||
-          lowerConteudo.includes('spcm-regwin'))
+        !isAcronisDetected && !isNocDetected && (isRegraVeeam || temPrefixosJobVeeam)
       const isGenericBackup =
         !nocNaoReconhecida &&
         (isAcronisDetected ||
@@ -4275,6 +4304,15 @@ routerAdd(
         )
       }
 
+      // Resiliência: no catch do processamento, marcar a evidência com status_processamento = 'erro'
+      // (nunca deixar 'processada' sem execução gerada), permitindo reprocessamento pelo botão da tela.
+      try {
+        if (typeof evidenciaRec !== 'undefined' && evidenciaRec && evidenciaRec.id) {
+          evidenciaRec.set('status_processamento', 'erro')
+          $app.save(evidenciaRec)
+        }
+      } catch (_) {}
+
       // Registrar ocorrência para auditoria e visibilidade
       try {
         const bodyObj = (e.requestInfo && e.requestInfo().body) || {}
@@ -4299,6 +4337,9 @@ routerAdd(
               ? `Ocorreu um erro interno de execução no servidor (ReferenceError/TypeError): ${sanitizedErr}.`
               : `Ocorreu uma exceção não tratada durante o processamento da evidência: ${sanitizedErr}.`,
           )
+          if (typeof evidenciaRec !== 'undefined' && evidenciaRec && evidenciaRec.id) {
+            oc.set('evidencia', evidenciaRec.id)
+          }
           $app.save(oc)
         }
       } catch (_) {}
