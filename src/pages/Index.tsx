@@ -19,6 +19,7 @@ import {
   Activity,
   BarChart3,
   Cpu,
+  LayoutDashboard,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
