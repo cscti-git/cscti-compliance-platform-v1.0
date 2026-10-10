@@ -119,8 +119,14 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
   const [monitoramentos, setMonitoramentos] = useState<BackupMonitoramentoExternoItem[]>([])
   const [confrontoData, setConfrontoData] = useState<BackupConfrontoResponse | null>(null)
 
-  // Data/hora da última atividade real
-  const [lastUpdated, setLastUpdated] = useState<string>('')
+  // Momento da última recarga efetiva dos dados
+  const [lastUpdated, setLastUpdated] = useState<string>(() => {
+    const d = new Date()
+    return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`
+  })
 
   // Filtros da tabela
   const [searchTerm, setSearchTerm] = useState('')
@@ -182,18 +188,14 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
       setMonitoramentos(nocData)
       setConfrontoData(confData)
 
-      // Determinar data/hora da última atividade real (ou agora)
-      let ultimaData = new Date()
-      if (exeData.length > 0 && exeData[0].created) {
-        ultimaData = new Date(exeData[0].created)
-      } else if (eviData.length > 0 && eviData[0].created) {
-        ultimaData = new Date(eviData[0].created)
-      }
-      const dd = String(ultimaData.getDate()).padStart(2, '0')
-      const mm = String(ultimaData.getMonth() + 1).padStart(2, '0')
-      const hh = String(ultimaData.getHours()).padStart(2, '0')
-      const min = String(ultimaData.getMinutes()).padStart(2, '0')
-      setLastUpdated(`${dd}/${mm} ${hh}:${min}`)
+      // Atualizar para o momento exato da recarga efetiva dos dados (mesmo padrão de AssetsPage)
+      const d = new Date()
+      setLastUpdated(
+        `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}`,
+      )
     } catch (err) {
       console.error('Erro ao carregar dados do preview de backup:', err)
     } finally {
@@ -964,8 +966,8 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
           <div
             onClick={loadAllData}
             role="button"
-            className="flex items-center gap-2 text-right cursor-pointer hover:bg-slate-50 transition bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs"
-            title="Recarregar dados reais"
+            className="flex items-center gap-2 text-right cursor-pointer hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-lg border border-slate-200/80 shadow-2xs"
+            title="Clique para recarregar os dados"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 text-blue-600 shrink-0 ${loading ? 'animate-spin' : ''}`}
@@ -975,7 +977,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                 Última atualização
               </span>
               <span className="text-[11px] font-semibold text-slate-700 font-mono block">
-                {lastUpdated || 'Carregando...'}
+                {lastUpdated}
               </span>
             </div>
           </div>
