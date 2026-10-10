@@ -220,16 +220,44 @@ export const BackupOverviewPreviewPage: React.FC = () => {
   }, [assets])
 
   // ---------------------------------------------------------------------------
-  // 1. DADOS DOS 4 KPIS SUPERIORES (reais)
+  // 1. DADOS DOS 4 KPIS SUPERIORES (alinhados com BackupOverviewPage e motor de confronto)
   // ---------------------------------------------------------------------------
-  const totalAtivosInventariados = assets.length
-  const totalAtivosProtegidos = useMemo(() => {
-    if (confrontoData?.totais?.total_protegidos !== undefined) {
-      return confrontoData.totais.total_protegidos
+  // Ativos com exigências de backup (regra idêntica à tela oficial BackupOverviewPage)
+  const totalExigidosConfronto = useMemo(() => {
+    if (confrontoData?.totais?.total_ativos_exigidos !== undefined) {
+      return confrontoData.totais.total_ativos_exigidos
     }
-    // Fallback: se houver confronto, contar PROTEGIDO
+    return ativosExigemBackup.length
+  }, [confrontoData, ativosExigemBackup])
+
+  const totalAtivosProtegidosCompleto = useMemo(() => {
+    if (confrontoData?.totais?.total_protegidos_completo !== undefined) {
+      return confrontoData.totais.total_protegidos_completo
+    }
     if (confrontoData?.confronto) {
       return confrontoData.confronto.filter((a) => a.status_consolidado === 'PROTEGIDO').length
+    }
+    return 0
+  }, [confrontoData])
+
+  const totalAtivosComProtecao = useMemo(() => {
+    if (confrontoData?.totais?.total_parcialmente_protegidos !== undefined) {
+      return confrontoData.totais.total_parcialmente_protegidos
+    }
+    if (confrontoData?.confronto) {
+      return confrontoData.confronto.filter((a) => (a.total_atendidas || 0) > 0).length
+    }
+    return (
+      (confrontoData?.totais?.total_protegidos || 0) + (confrontoData?.totais?.total_parcial || 0)
+    )
+  }, [confrontoData])
+
+  const percentualProtegidoConfronto = useMemo(() => {
+    if (typeof confrontoData?.totais?.percentual_protegido_efetivo === 'number') {
+      return confrontoData.totais.percentual_protegido_efetivo
+    }
+    if (typeof confrontoData?.totais?.percentual_protegido === 'number') {
+      return confrontoData.totais.percentual_protegido
     }
     return 0
   }, [confrontoData])
@@ -261,49 +289,16 @@ export const BackupOverviewPreviewPage: React.FC = () => {
   // 2. DADOS DOS 3 PAINÉIS ANALÍTICOS (estilo InventoryCharts do Leandro)
   // ---------------------------------------------------------------------------
   // Painel A: Status das Execuções (Donut)
-  const statusExecucoesData = useMemo(() => {
-    const total = totalExecucoes || 1
-    return [
-      {
-        label: 'Sucesso',
-        value: execucoesComSucesso,
-        percent: totalExecucoes > 0 ? Math.round((execucoesComSucesso / total) * 100) : 0,
-        color: '#10B981', // emerald-500
-      },
-      {
-        label: 'Com alertas',
-        value: execucoesComAlertas,
-        percent: totalExecucoes > 0 ? Math.round((execucoesComAlertas / total) * 100) : 0,
-        color: '#F59E0B', // amber-500
-      },
-      {
-        label: 'Falhas',
-        value: execucoesComFalha,
-        percent: totalExecucoes > 0 ? Math.round((execucoesComFalha / total) * 100) : 0,
-        color: '#EF4444', // red-500
-      },
-      {
-        label: 'Não executadas',
-        value: execucoesNaoExecutadas,
-        percent: totalExecucoes > 0 ? Math.round((execucoesNaoExecutadas / total) * 100) : 0,
-        color: '#94A3B8', // slate-400
-      },
-    ]
-  }, [
-    totalExecucoes,
-    execucoesComSucesso,
-    execucoesComAlertas,
-    execucoesComFalha,
-    execucoesNaoExecutadas,
-  ])
-
+  // Alinhado dinamicamente: reflete as execuções de acordo com os filtros ativos da tela
+  // (período/tipo/busca/status), garantindo coerência visual absoluta entre o Donut e a Tabela.
   // Painel B: Cobertura de Proteção por Tipo de Ativo (Barras horizontais reais)
   const coberturaPorTipoAtivo = useMemo(() => {
-    // Categorias reais do inventário
+    // Categorias reais do inventário alinhadas com o padrão do Inventário de Ativos (AssetsPage.tsx):
+    // "Servidores virtualizados" para categoria servidor_virtualizado/servidor_aplicacao
     const categoriasBase = [
       {
         key: 'servidor',
-        label: 'Servidores',
+        label: 'Servidores virtualizados',
         tipos: ['servidor_virtualizado', 'servidor_aplicacao'],
       },
       {
@@ -521,8 +516,10 @@ export const BackupOverviewPreviewPage: React.FC = () => {
     })
   }, [execucoes, rotinasMap, planosMap, assetsMap])
 
-  // Filtragem da tabela
-  const filteredExecucoes = useMemo(() => {
+  // Execuções do período e com filtros gerais aplicados (exceto o filtro específico de status)
+  // Usado para garantir que o Donut "Status das Execuções" e a tabela usem EXATAMENTE a mesma
+  // base filtrada no mesmo período e contexto operacional.
+  const execucoesContextoFiltro = useMemo(() => {
     return enrichedExecucoes.filter((exec) => {
       // Busca textual
       if (searchTerm.trim()) {
@@ -544,23 +541,69 @@ export const BackupOverviewPreviewPage: React.FC = () => {
         if (filterTipoAtivo === 'banco' && exec.ativoTipo !== 'banco_dados') return false
       }
 
-      // Status da Execução
-      if (filterStatusExecucao !== 'todos') {
-        if (exec.status !== filterStatusExecucao) return false
-      }
-
-      // Período (com base em data_inicio/created)
+      // Período (com base em data_email operacional, data_inicio ou created)
       if (filterPeriodo !== 'todos') {
-        const execDate = new Date(exec.data_email || exec.data_inicio || exec.created).getTime()
-        const now = Date.now()
-        if (filterPeriodo === '24h' && now - execDate > 24 * 60 * 60 * 1000) return false
-        if (filterPeriodo === '7dias' && now - execDate > 7 * 24 * 60 * 60 * 1000) return false
-        if (filterPeriodo === '30dias' && now - execDate > 30 * 24 * 60 * 60 * 1000) return false
+        const rawDate = exec.data_email || exec.data_inicio || exec.created
+        const execDate = rawDate ? new Date(rawDate.replace(' ', 'T')).getTime() : NaN
+        if (!isNaN(execDate)) {
+          const now = Date.now()
+          if (filterPeriodo === '24h' && now - execDate > 24 * 60 * 60 * 1000) return false
+          if (filterPeriodo === '7dias' && now - execDate > 7 * 24 * 60 * 60 * 1000) return false
+          if (filterPeriodo === '30dias' && now - execDate > 30 * 24 * 60 * 60 * 1000) return false
+        }
       }
 
       return true
     })
-  }, [enrichedExecucoes, searchTerm, filterTipoAtivo, filterStatusExecucao, filterPeriodo])
+  }, [enrichedExecucoes, searchTerm, filterTipoAtivo, filterPeriodo])
+
+  // Filtragem final da tabela (incluindo o filtro opcional de status da execução)
+  const filteredExecucoes = useMemo(() => {
+    if (filterStatusExecucao === 'todos') {
+      return execucoesContextoFiltro
+    }
+    return execucoesContextoFiltro.filter((exec) => exec.status === filterStatusExecucao)
+  }, [execucoesContextoFiltro, filterStatusExecucao])
+
+  // Status das Execuções (Donut): derivado de execucoesContextoFiltro
+  // Isso assegura 100% de consistência entre a contagem do donut e a contagem da tabela!
+  const statusExecucoesData = useMemo(() => {
+    const total = execucoesContextoFiltro.length
+    const sucessoCount = execucoesContextoFiltro.filter((e) => e.status === 'sucesso').length
+    const alertaCount = execucoesContextoFiltro.filter((e) => e.status === 'parcial').length
+    const falhaCount = execucoesContextoFiltro.filter((e) => e.status === 'erro').length
+    const naoExecCount = execucoesContextoFiltro.filter((e) => e.status === 'nao_executada').length
+
+    return {
+      total,
+      segments: [
+        {
+          label: 'Sucesso',
+          value: sucessoCount,
+          percent: total > 0 ? Math.round((sucessoCount / total) * 100) : 0,
+          color: '#10B981', // emerald-500
+        },
+        {
+          label: 'Com alertas',
+          value: alertaCount,
+          percent: total > 0 ? Math.round((alertaCount / total) * 100) : 0,
+          color: '#F59E0B', // amber-500
+        },
+        {
+          label: 'Falhas',
+          value: falhaCount,
+          percent: total > 0 ? Math.round((falhaCount / total) * 100) : 0,
+          color: '#EF4444', // red-500
+        },
+        {
+          label: 'Não executadas',
+          value: naoExecCount,
+          percent: total > 0 ? Math.round((naoExecCount / total) * 100) : 0,
+          color: '#94A3B8', // slate-400
+        },
+      ],
+    }
+  }, [execucoesContextoFiltro])
 
   // Paginação
   const totalPages = Math.max(1, Math.ceil(filteredExecucoes.length / pageSize))
@@ -599,12 +642,13 @@ export const BackupOverviewPreviewPage: React.FC = () => {
   // ---------------------------------------------------------------------------
   // 4. COLUNA LATERAL DIREITA: PRÓXIMAS EXECUÇÕES, ÚLTIMAS OCORRÊNCIAS, AÇÕES
   // ---------------------------------------------------------------------------
-  // Cálculo honesto das próximas 4 execuções agendadas reais com base na periodicidade
+  // Cálculo real das próximas execuções agendadas reais com base nas rotinas cadastradas no banco
   interface ProximaExecucaoItem {
     ativoNome: string
     tipoBackup: string
     rotinaNome: string
     proximoHorarioLabel: string
+    ordemPrioridade: number
   }
 
   const proximasExecucoesCalculadas = useMemo<ProximaExecucaoItem[]>(() => {
@@ -627,12 +671,18 @@ export const BackupOverviewPreviewPage: React.FC = () => {
           : [rot.nome]
 
       let horarioLabel = ''
+      let ordemPrioridade = 999
+
       if (rot.periodicidade === 'intervalo_minutos') {
         horarioLabel = `A cada ${rot.intervalo_minutos || 30} min`
+        ordemPrioridade = rot.intervalo_minutos || 30
       } else if (rot.horario) {
         horarioLabel = `Hoje às ${rot.horario}`
+        const [hh, mm] = rot.horario.split(':').map(Number)
+        ordemPrioridade = 1000 + (hh || 0) * 60 + (mm || 0)
       } else {
         horarioLabel = 'Agendamento diário'
+        ordemPrioridade = 3000
       }
 
       nomesAtivos.forEach((nome) => {
@@ -646,9 +696,13 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                 : 'Backup de rotina',
           rotinaNome: rot.nome,
           proximoHorarioLabel: horarioLabel,
+          ordemPrioridade,
         })
       })
     })
+
+    // Ordenar de forma que intervalos frequentes venham primeiro ou horários cronológicos
+    list.sort((a, b) => a.ordemPrioridade - b.ordemPrioridade)
 
     return list.slice(0, 4)
   }, [rotinas, fontes, assetsMap])
@@ -945,13 +999,17 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                   <span className="text-[11px] font-semibold text-slate-500 block truncate">
                     Total de Ativos Protegidos
                   </span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-2xl sm:text-[26px] font-extrabold text-slate-900 leading-none">
-                      {totalAtivosProtegidos}
+                      {totalAtivosProtegidosCompleto}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500">
+                      / {totalExigidosConfronto} exigidos
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1 font-medium truncate">
-                    de {totalAtivosInventariados} ativos inventariados
+                    {percentualProtegidoConfronto}% de cobertura ({totalAtivosComProtecao} com
+                    proteção)
                   </p>
                 </div>
               </CardContent>
@@ -1035,12 +1093,12 @@ export const BackupOverviewPreviewPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 py-0.5">
                   <div className="shrink-0 flex items-center justify-center">
                     <SvgDonutChart
-                      data={statusExecucoesData.map((s) => ({
+                      data={statusExecucoesData.segments.map((s) => ({
                         label: s.label,
                         value: s.value,
                         color: s.color,
                       }))}
-                      totalLabel={String(totalExecucoes)}
+                      totalLabel={String(statusExecucoesData.total)}
                       subLabel="Execuções"
                       size={110}
                       strokeWidth={16}
@@ -1049,7 +1107,7 @@ export const BackupOverviewPreviewPage: React.FC = () => {
 
                   {/* Legenda com contagem e percentual real */}
                   <div className="flex-1 w-full space-y-2 text-xs">
-                    {statusExecucoesData.map((item, idx) => (
+                    {statusExecucoesData.segments.map((item, idx) => (
                       <div
                         key={idx}
                         className="flex items-center justify-between gap-2 text-slate-700 hover:text-slate-900 transition-colors"
@@ -1169,19 +1227,18 @@ export const BackupOverviewPreviewPage: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2">
                 {/* Tipo de Ativo */}
                 <Select value={filterTipoAtivo} onValueChange={setFilterTipoAtivo}>
-                  <SelectTrigger className="h-9 text-xs w-[140px] bg-white border-slate-200">
+                  <SelectTrigger className="h-9 text-xs w-[190px] bg-white border-slate-200">
                     <span className="text-slate-500 mr-1">Tipo:</span>
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="servidor">Servidores</SelectItem>
-                    <SelectItem value="estacao">Estações</SelectItem>
+                    <SelectItem value="servidor">Servidores virtualizados</SelectItem>
+                    <SelectItem value="estacao">Estações de trabalho</SelectItem>
                     <SelectItem value="banco">Bancos de dados</SelectItem>
-                    <SelectItem value="rede">Rede</SelectItem>
+                    <SelectItem value="rede">Rede e segurança</SelectItem>
                   </SelectContent>
                 </Select>
-
                 {/* Status da Execução */}
                 <Select value={filterStatusExecucao} onValueChange={setFilterStatusExecucao}>
                   <SelectTrigger className="h-9 text-xs w-[150px] bg-white border-slate-200">
