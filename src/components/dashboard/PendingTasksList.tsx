@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, AlertCircle, Info, Clock } from 'lucide-react'
+import { ShieldAlert, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 
 export interface PendingTaskItem {
   id: string
@@ -19,21 +19,21 @@ export interface PendingTasksListProps {
 const getPriorityIcon = (prioridade: PendingTaskItem['prioridade'], isVencido?: boolean) => {
   if (isVencido || prioridade === 'alta') {
     return (
-      <div className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-        <AlertTriangle className="w-3.5 h-3.5" />
+      <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 border border-rose-200/80 flex items-center justify-center shrink-0 shadow-2xs">
+        <ShieldAlert className="w-3.5 h-3.5" />
       </div>
     )
   }
   if (prioridade === 'media') {
     return (
-      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-        <AlertCircle className="w-3.5 h-3.5" />
+      <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0 shadow-2xs">
+        <AlertTriangle className="w-3.5 h-3.5" />
       </div>
     )
   }
   return (
-    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-      <Info className="w-3.5 h-3.5" />
+    <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 border border-blue-200/80 flex items-center justify-center shrink-0 shadow-2xs">
+      <CheckCircle2 className="w-3.5 h-3.5" />
     </div>
   )
 }

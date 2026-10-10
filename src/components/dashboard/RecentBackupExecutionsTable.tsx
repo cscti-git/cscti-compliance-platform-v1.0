@@ -15,43 +15,31 @@ const getResultBadge = (resultado: RecentBackupExecutionRow['resultado'], label:
   switch (resultado) {
     case 'sucesso':
       return (
-        <Badge
-          variant="outline"
-          className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
           {label}
-        </Badge>
+        </span>
       )
     case 'parcial':
       return (
-        <Badge
-          variant="outline"
-          className="bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-        >
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           {label}
-        </Badge>
+        </span>
       )
     case 'erro':
       return (
-        <Badge
-          variant="outline"
-          className="bg-rose-50 text-rose-800 border-rose-200 text-[10px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
           {label}
-        </Badge>
+        </span>
       )
     default:
       return (
-        <Badge
-          variant="outline"
-          className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-        >
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
           <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
           {label}
-        </Badge>
+        </span>
       )
   }
 }

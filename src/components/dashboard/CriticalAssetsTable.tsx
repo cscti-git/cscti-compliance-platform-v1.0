@@ -51,7 +51,7 @@ const getAssetIcon = (tipo: string): LucideIcon => {
     case 'servico_nuvem':
       return Cloud
     default:
-      return Cpu
+      return Server
   }
 }
 
@@ -59,39 +59,27 @@ const getSituacaoBadge = (situacao: CriticalAssetRow['situacao'], label: string)
   switch (situacao) {
     case 'conforme':
       return (
-        <Badge
-          variant="outline"
-          className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0"
-        >
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
           {label}
-        </Badge>
+        </span>
       )
     case 'pendente':
       return (
-        <Badge
-          variant="outline"
-          className="bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0"
-        >
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
           {label}
-        </Badge>
+        </span>
       )
     case 'nao_conforme':
       return (
-        <Badge
-          variant="outline"
-          className="bg-rose-50 text-rose-800 border-rose-200 text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0"
-        >
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 shrink-0">
           {label}
-        </Badge>
+        </span>
       )
     default:
       return (
-        <Badge
-          variant="outline"
-          className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0"
-        >
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
           {label}
-        </Badge>
+        </span>
       )
   }
 }

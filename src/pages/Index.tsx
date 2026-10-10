@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import {
   Server,
   ShieldCheck,
+  ShieldAlert,
   AlertTriangle,
   CheckCircle2,
   HardDriveDownload,
@@ -11,6 +12,13 @@ import {
   Layers,
   ArrowRight,
   Sparkles,
+  Building2,
+  FolderGit2,
+  FileText,
+  Clock,
+  Activity,
+  BarChart3,
+  Cpu,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1045,7 +1053,7 @@ export const Index: React.FC = () => {
 
       {/* 2. TOPO: 5 KPIS EM CARDS HORIZONTAIS COM ÍCONE EM CÍRCULO COLORIDO */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
-        {/* KPI 1: Total de Ativos */}
+        {/* KPI 1: Total de Ativos (Ícone Server exatamente igual ao menu Inventário e cabeçalho /ativos) */}
         <MainKpiCard
           label="Total de Ativos"
           value={assets.length}
@@ -1056,11 +1064,11 @@ export const Index: React.FC = () => {
           }
           icon={Server}
           iconBgColor="bg-blue-100"
-          iconColor="text-blue-700"
+          iconColor="text-blue-600"
           href="/ativos"
         />
 
-        {/* KPI 2: Cobertura de Backup (% de proteção efetiva homologada) */}
+        {/* KPI 2: Cobertura de Backup (% de proteção efetiva homologada - Ícone HardDriveDownload igual ao menu Backup e Recuperação) */}
         <MainKpiCard
           label="Cobertura de Backup"
           value={percentualProtegidoEfetivo}
@@ -1068,25 +1076,25 @@ export const Index: React.FC = () => {
           supportText={`${totalAtivosComProtecao} de ${totalExigidosConfronto} ativos protegidos`}
           icon={HardDriveDownload}
           iconBgColor="bg-emerald-100"
-          iconColor="text-emerald-700"
+          iconColor="text-emerald-600"
           href="/backup"
           infoTooltip="Percentual médio ponderado das modalidades exigidas (Local, Nuvem, Replicação) comprovadas dentro da janela válida."
         />
 
-        {/* KPI 3: Pendências (Ocorrências em aberto) */}
+        {/* KPI 3: Pendências (Ocorrências em aberto - Ícone ShieldAlert igual ao menu Gestão de Riscos / Pendências) */}
         <MainKpiCard
           label="Pendências"
           value={ocorrenciasAbertas.length}
           supportText={
             ocorrenciasAbertas.length > 0 ? 'Necessitam de atenção' : 'Nenhuma pendência ativa'
           }
-          icon={AlertTriangle}
-          iconBgColor={ocorrenciasAbertas.length > 0 ? 'bg-rose-100' : 'bg-slate-100'}
-          iconColor={ocorrenciasAbertas.length > 0 ? 'text-rose-700' : 'text-slate-600'}
+          icon={ocorrenciasAbertas.length > 0 ? ShieldAlert : CheckCircle2}
+          iconBgColor={ocorrenciasAbertas.length > 0 ? 'bg-red-100' : 'bg-slate-100'}
+          iconColor={ocorrenciasAbertas.length > 0 ? 'text-red-600' : 'text-slate-600'}
           href="/backup?tab=ocorrencias"
         />
 
-        {/* KPI 4: Conformidade Geral */}
+        {/* KPI 4: Conformidade Geral (Ícone ShieldCheck exatamente igual ao menu Conformidade) */}
         <MainKpiCard
           label="Conformidade Geral"
           value={conformidadeGeral}
@@ -1094,19 +1102,19 @@ export const Index: React.FC = () => {
           supportText="Consolidado dos módulos"
           icon={ShieldCheck}
           iconBgColor="bg-emerald-100"
-          iconColor="text-emerald-700"
+          iconColor="text-emerald-600"
           href="/conformidade"
         />
 
-        {/* KPI 5: Sistemas Críticos */}
+        {/* KPI 5: Sistemas Críticos (Ícone Building2 / Boxes exatamente do padrão de infraestrutura de ativos) */}
         <div className="col-span-2 md:col-span-1">
           <MainKpiCard
             label="Sistemas Críticos"
             value={ativosCriticos.length}
             supportText={`${pctCriticos}% do total de ativos`}
-            icon={Layers}
+            icon={Building2}
             iconBgColor="bg-slate-100"
-            iconColor="text-slate-700"
+            iconColor="text-slate-600"
             href="/ativos"
           />
         </div>
@@ -1118,14 +1126,23 @@ export const Index: React.FC = () => {
       {/* 4. LINHA 2 (4 PAINÉIS): Conformidade por Módulo / Situação dos Ativos / Status Backups / Principais Riscos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Painel 1: Conformidade por Módulo */}
-        <DashboardCard title="Conformidade por Módulo" subtitle="Aderência calculada por controle">
+        <DashboardCard
+          title="Conformidade por Módulo"
+          subtitle="Aderência calculada por controle"
+          icon={ShieldCheck}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
+        >
           <ModuleComplianceList items={complianceModules} />
         </DashboardCard>
 
-        {/* Painel 2: Situação dos Ativos (Donut centralizado com legenda à direita) */}
+        {/* Painel 2: Situação dos Ativos */}
         <DashboardCard
           title="Situação dos Ativos"
           subtitle="Comprovação e conformidade do parque"
+          icon={Server}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
           viewAllLink={{ href: '/ativos', label: 'Ver ativos' }}
         >
           {assets.length === 0 ? (
@@ -1146,7 +1163,10 @@ export const Index: React.FC = () => {
         {/* Painel 3: Status dos Backups (Últimos 30 dias) */}
         <DashboardCard
           title="Status dos Backups"
-          subtitle="Janela dos últimos 30 dias"
+          subtitle="Últimos 30 dias"
+          icon={HardDriveDownload}
+          iconColor="text-emerald-600"
+          iconBgColor="bg-emerald-100"
           viewAllLink={{ href: '/backup', label: 'Ver histórico' }}
         >
           {statusBackups30DiasDonut.total === 0 ? (
@@ -1168,6 +1188,9 @@ export const Index: React.FC = () => {
         <DashboardCard
           title="Principais Riscos em Aberto"
           subtitle="Ocorrências e lapsos não resolvidos"
+          icon={ShieldAlert}
+          iconColor="text-red-600"
+          iconBgColor="bg-red-100"
           viewAllLink={{ href: '/backup?tab=ocorrencias', label: 'Gerenciar' }}
         >
           <OpenRisksList items={openRisks} />
@@ -1180,15 +1203,21 @@ export const Index: React.FC = () => {
         <DashboardCard
           title="Ativos Críticos em Atenção"
           subtitle="Máquinas e servidores de alta relevância"
+          icon={Server}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
           viewAllLink={{ href: '/ativos', label: 'Ver todos' }}
         >
           <CriticalAssetsTable assets={criticalAssetsRows} />
         </DashboardCard>
 
-        {/* Painel 2: Execuções de Backup Recentes (data_email como verdade) */}
+        {/* Painel 2: Execuções de Backup Recentes */}
         <DashboardCard
           title="Execuções de Backup Recentes"
           subtitle="Comprovantes recebidos e processados"
+          icon={HardDriveDownload}
+          iconColor="text-emerald-600"
+          iconBgColor="bg-emerald-100"
           viewAllLink={{ href: '/backup', label: 'Ver todas' }}
         >
           <RecentBackupExecutionsTable executions={recentBackupExecutions} />
@@ -1198,6 +1227,9 @@ export const Index: React.FC = () => {
         <DashboardCard
           title="Pendências e Tarefas"
           subtitle="Ações necessárias para conformidade"
+          icon={CheckCircle2}
+          iconColor="text-amber-600"
+          iconBgColor="bg-amber-100"
           viewAllLink={{ href: '/backup?tab=ocorrencias', label: 'Ver todas' }}
         >
           <PendingTasksList tasks={pendingTasks} />
@@ -1208,22 +1240,34 @@ export const Index: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Painel 1: Cobertura de Proteção por Categoria */}
         <DashboardCard
-          title="Cobertura por Categoria"
+          title="Cobertura de Proteção por Categoria"
           subtitle="Percentual de ativos com backup por tipo"
+          icon={Building2}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
           viewAllLink={{ href: '/ativos', label: 'Ver inventário' }}
         >
           <CategoryProtectionBars categories={categoryProtectionBars} />
         </DashboardCard>
 
-        {/* Painel 2: Evolução da Conformidade (Histórico Acumulado Honesto) */}
-        <DashboardCard title="Evolução da Conformidade" subtitle="Histórico mensal consolidado">
+        {/* Painel 2: Evolução da Conformidade */}
+        <DashboardCard
+          title="Evolução da Conformidade"
+          subtitle="Histórico mensal consolidado"
+          icon={ShieldCheck}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-100"
+        >
           <ComplianceEvolutionChart data={complianceTrendData} />
         </DashboardCard>
 
-        {/* Painel 3: Atividades Recentes (Feed da auditoria real) */}
+        {/* Painel 3: Atividades Recentes */}
         <DashboardCard
           title="Atividades Recentes"
           subtitle="Últimos eventos registrados na auditoria"
+          icon={FileText}
+          iconColor="text-slate-600"
+          iconBgColor="bg-slate-100"
           viewAllLink={{ href: '/auditoria', label: 'Ver todas' }}
         >
           <RecentActivitiesFeed activities={recentActivities} />

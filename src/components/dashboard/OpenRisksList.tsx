@@ -24,7 +24,7 @@ export const OpenRisksList: React.FC<OpenRisksListProps> = ({ items }) => {
           <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 hover:border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors group">
             <div className="flex items-center gap-2.5 min-w-0">
               <span
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${item.badgeBg} ${item.badgeText}`}
+                className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${item.badgeBg} ${item.badgeText} border border-current/20`}
               >
                 {item.count}
               </span>

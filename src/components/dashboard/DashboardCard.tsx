@@ -1,11 +1,14 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, ArrowRight } from 'lucide-react'
+import { ChevronRight, ArrowRight, LucideIcon } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 export interface DashboardCardProps {
   title: string
   subtitle?: string
+  icon?: LucideIcon
+  iconColor?: string
+  iconBgColor?: string
   viewAllLink?: {
     label?: string
     href: string
@@ -27,6 +30,9 @@ export interface DashboardCardProps {
 export const DashboardCard: React.FC<DashboardCardProps> = ({
   title,
   subtitle,
+  icon: Icon,
+  iconColor = 'text-slate-600',
+  iconBgColor = 'bg-slate-100',
   viewAllLink,
   headerAction,
   children,
@@ -39,13 +45,21 @@ export const DashboardCard: React.FC<DashboardCardProps> = ({
       className={`border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors bg-white rounded-xl overflow-hidden flex flex-col justify-between ${className}`}
     >
       <CardHeader className="p-4 sm:p-5 pb-3 border-b border-slate-100 flex flex-row items-center justify-between space-y-0 gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 flex items-center gap-2.5">
+          {Icon && (
+            <div
+              className={`w-8 h-8 rounded-lg ${iconBgColor} ${iconColor} flex items-center justify-center shrink-0 border border-slate-200/60 shadow-2xs`}
+              aria-hidden="true"
+            >
+              <Icon className="w-4 h-4" />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
             <CardTitle className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
               {title}
             </CardTitle>
+            {subtitle && <p className="text-[11px] text-slate-500 truncate mt-0.5">{subtitle}</p>}
           </div>
-          {subtitle && <p className="text-[11px] text-slate-500 truncate mt-0.5">{subtitle}</p>}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

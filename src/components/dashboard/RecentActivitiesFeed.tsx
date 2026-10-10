@@ -25,19 +25,39 @@ const getEventIcon = (
 ): { icon: LucideIcon; color: string; bg: string } => {
   switch (tipo) {
     case 'sucesso':
-      return { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100' }
+      return {
+        icon: CheckCircle2,
+        color: 'text-emerald-600',
+        bg: 'bg-emerald-50 border border-emerald-200/80',
+      }
     case 'alerta':
-      return { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-100' }
+      return {
+        icon: AlertTriangle,
+        color: 'text-amber-600',
+        bg: 'bg-amber-50 border border-amber-200/80',
+      }
     case 'documento':
-      return { icon: FileText, color: 'text-indigo-600', bg: 'bg-indigo-100' }
+      return { icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50 border border-blue-200/80' }
     case 'config':
-      return { icon: Settings, color: 'text-blue-600', bg: 'bg-blue-100' }
+      return {
+        icon: Settings,
+        color: 'text-slate-600',
+        bg: 'bg-slate-100 border border-slate-200/80',
+      }
     case 'ativo':
-      return { icon: Server, color: 'text-cyan-600', bg: 'bg-cyan-100' }
+      return { icon: Server, color: 'text-blue-600', bg: 'bg-blue-50 border border-blue-200/80' }
     case 'backup':
-      return { icon: HardDriveDownload, color: 'text-purple-600', bg: 'bg-purple-100' }
+      return {
+        icon: HardDriveDownload,
+        color: 'text-emerald-600',
+        bg: 'bg-emerald-50 border border-emerald-200/80',
+      }
     default:
-      return { icon: Info, color: 'text-blue-600', bg: 'bg-blue-100' }
+      return {
+        icon: ShieldCheck,
+        color: 'text-blue-600',
+        bg: 'bg-blue-50 border border-blue-200/80',
+      }
   }
 }
 
@@ -66,7 +86,7 @@ export const RecentActivitiesFeed: React.FC<RecentActivitiesFeedProps> = ({ acti
           >
             <div className="flex items-start gap-2.5 min-w-0 flex-1">
               <div
-                className={`w-6 h-6 rounded-full ${bg} ${color} flex items-center justify-center shrink-0 mt-0.5`}
+                className={`w-6 h-6 rounded-lg ${bg} ${color} flex items-center justify-center shrink-0 mt-0.5 shadow-2xs`}
               >
                 <Icon className="w-3.5 h-3.5" />
               </div>

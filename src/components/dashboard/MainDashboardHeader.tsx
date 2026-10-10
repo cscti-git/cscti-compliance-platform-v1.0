@@ -1,13 +1,15 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { ShieldCheck, Building2, RefreshCw, HelpCircle, FileText } from 'lucide-react'
+import { LayoutDashboard, Building2, RefreshCw, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Breadcrumb,
   BreadcrumbList,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbPage,
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 
 export interface MainDashboardHeaderProps {
@@ -29,13 +31,20 @@ export const MainDashboardHeader: React.FC<MainDashboardHeaderProps> = ({
 }) => {
   return (
     <div className={`space-y-2.5 ${className}`}>
-      {/* 1. Breadcrumb no topo: "Dashboard > Visão Geral" */}
+      {/* 1. Breadcrumb no topo com o mesmo padrão e separador do Backup e Ativos */}
       <Breadcrumb aria-label="Navegação estrutural">
         <BreadcrumbList className="text-xs text-slate-500 font-medium">
           <BreadcrumbItem>
-            <span className="text-slate-500 font-medium">CSCTI - Compliance</span>
+            <BreadcrumbLink asChild>
+              <Link
+                to="/"
+                className="hover:text-blue-700 text-slate-600 transition-colors font-medium"
+              >
+                CSCTI - Compliance
+              </Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
-          <span className="text-slate-300">/</span>
+          <BreadcrumbSeparator className="text-slate-400" />
           <BreadcrumbItem>
             <BreadcrumbPage className="font-semibold text-slate-800">
               Dashboard Principal
@@ -46,13 +55,13 @@ export const MainDashboardHeader: React.FC<MainDashboardHeaderProps> = ({
 
       {/* 2. Linha principal do cabeçalho */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-        {/* Identidade à esquerda: Ícone em quadrado azul-escuro + Título + Subtítulo */}
+        {/* Identidade à esquerda: Ícone em quadrado azul-escuro com LayoutDashboard + Título + Subtítulo */}
         <div className="flex items-center gap-3.5 min-w-0 flex-1">
           <div
             className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0B2545] to-[#124E78] text-white flex items-center justify-center shrink-0 shadow-sm border border-[#124E78]/30"
             aria-hidden="true"
           >
-            <ShieldCheck className="w-6 h-6 text-white" />
+            <LayoutDashboard className="w-6 h-6 text-white" />
           </div>
 
           <div className="min-w-0">
@@ -131,7 +140,7 @@ export const MainDashboardHeader: React.FC<MainDashboardHeaderProps> = ({
           <Button
             onClick={onReload}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold h-9 px-3 gap-1.5 rounded-xl shadow-2xs shrink-0"
+            className="bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-9 px-3.5 gap-1.5 rounded-xl shadow-xs shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Atualizar</span>
