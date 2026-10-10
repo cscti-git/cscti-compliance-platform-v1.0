@@ -30,6 +30,7 @@ import type {
   BackupMonitoramentoExternoItem,
 } from '@/types/cscti'
 // Sub-abas
+import { BackupHeader } from '@/components/backup/BackupHeader'
 import { BackupOverviewContent } from '@/components/backup/BackupOverviewContent'
 import { BackupEscopoTab } from './BackupEscopoTab'
 import { BackupPlanosTab } from './BackupPlanosTab'
@@ -60,6 +61,16 @@ export const BackupOverviewPage: React.FC = () => {
   const [testes, setTestes] = useState<BackupTesteRecuperacaoItem[]>([])
   const [assets, setAssets] = useState<InventoryAssetItem[]>([])
   const [monitoramentos, setMonitoramentos] = useState<BackupMonitoramentoExternoItem[]>([])
+
+  // Momento da última recarga efetiva dos dados
+  const [lastUpdated, setLastUpdated] = useState<string>(() => {
+    const d = new Date()
+    return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`
+  })
+
   const loadAllData = async () => {
     if (!orgId) return
     setLoading(true)
@@ -100,6 +111,14 @@ export const BackupOverviewPage: React.FC = () => {
       setTestes(tesData)
       setAssets(assData)
       setMonitoramentos(nocData)
+
+      const d = new Date()
+      setLastUpdated(
+        `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}`,
+      )
     } catch (err) {
       console.error('Erro ao carregar dados de backup:', err)
     } finally {
@@ -122,32 +141,73 @@ export const BackupOverviewPage: React.FC = () => {
     ).length
   }, [assets])
 
+  // Rótulo da aba atual para o breadcrumb ("Backup e Recuperação > {Nome da Aba}")
+  const currentTabLabel = useMemo(() => {
+    switch (activeTab) {
+      case 'escopo':
+        return 'Escopo'
+      case 'planos':
+        return 'Planos'
+      case 'rotinas':
+        return 'Rotinas & Fontes'
+      case 'evidencias':
+        return 'Evidências'
+      case 'execucoes':
+        return 'Execuções'
+      case 'regras':
+        return 'Regras & Adaptadores'
+      case 'ocorrencias':
+        return 'Ocorrências'
+      case 'testes':
+        return 'Testes de Recuperação'
+      case 'visao_geral':
+      default:
+        return 'Visão Geral'
+    }
+  }, [activeTab])
+
+  // Nome e status da serventia real logada (nunca dados fictícios)
+  const serventiaNome =
+    organization?.trade_name || organization?.corporate_name || organization?.name || 'Serventia'
+  const serventiaAtiva = organization?.status !== 'inativa'
+
   return (
-    <div className="space-y-6">
-      {/* Barra de Abas Redesenhada: Fundo Azul-Escuro (#0B2545), Pílulas e Mini-Badges */}
+    <div className="space-y-4">
+      {/* 1. Cabeçalho Claro Unificado com Breadcrumb, Serventia Real, Nova Execução e Menu */}
+      <BackupHeader
+        currentTabLabel={currentTabLabel}
+        serventiaNome={serventiaNome}
+        serventiaAtiva={serventiaAtiva}
+        onNovaExecucao={() => setSearchParams({ tab: 'execucoes' })}
+        onReload={loadAllData}
+        loading={loading}
+        lastUpdated={lastUpdated}
+        canOperate={canOperate}
+        onNovoPlano={() => setSearchParams({ tab: 'planos', action: 'novo' })}
+      />
+
+      {/* 2. Barra de Abas Redesenhada: Container Branco, Bloco Azul na Ativa, Ícone + Nome + Sub-rótulo */}
       <Tabs
         value={activeTab}
         onValueChange={(val) => setSearchParams({ tab: val })}
-        className="w-full"
+        className="w-full space-y-4"
       >
-        <div className="mb-5">
-          <BackupTabStrip
-            activeTab={activeTab}
-            onSelectTab={(val) => setSearchParams({ tab: val })}
-            ativosExigemBackupCount={ativosExigemBackupCount}
-            escoposCount={escopos.length}
-            planosCount={planos.length}
-            rotinasCount={rotinas.length}
-            evidenciasCount={evidencias.length}
-            evidenciasPendentesCount={evidenciasPendentes}
-            monitoramentosCount={monitoramentos.length}
-            execucoesCount={execucoes.length}
-            regrasCount={regras.length}
-            ocorrenciasCount={ocorrencias.length}
-            ocorrenciasAbertasCount={ocorrenciasAbertas}
-            testesCount={testes.length}
-          />
-        </div>
+        <BackupTabStrip
+          activeTab={activeTab}
+          onSelectTab={(val) => setSearchParams({ tab: val })}
+          ativosExigemBackupCount={ativosExigemBackupCount}
+          escoposCount={escopos.length}
+          planosCount={planos.length}
+          rotinasCount={rotinas.length}
+          evidenciasCount={evidencias.length}
+          evidenciasPendentesCount={evidenciasPendentes}
+          monitoramentosCount={monitoramentos.length}
+          execucoesCount={execucoes.length}
+          regrasCount={regras.length}
+          ocorrenciasCount={ocorrencias.length}
+          ocorrenciasAbertasCount={ocorrenciasAbertas}
+          testesCount={testes.length}
+        />
 
         {/* 1. VISÃO GERAL (LAYOUT HOMOLOGADO COMPLETO) */}
         <TabsContent value="visao_geral" className="space-y-6">
