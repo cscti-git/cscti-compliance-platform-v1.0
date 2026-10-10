@@ -102,8 +102,8 @@ export const BackupHeader: React.FC<BackupHeaderProps> = ({
           </div>
         </div>
 
-        {/* À direita: (1) Card da Serventia Real + (2) Botão Primário "Nova Execução" + (3) Menu "⋯" discreto + Pill Última atualização */}
-        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+        {/* À direita: (1) Card da Serventia Real + (2) Pill Última atualização + (3) Ações: Guia / Ajuda, Relatório Comprobatório, Nova Execução, + Novo Plano + (4) Menu ⋯ (recarregar / atalhos mobile) */}
+        <div className="flex items-center gap-2 flex-wrap shrink-0 justify-start lg:justify-end">
           {/* Pílula / Botão de Última Atualização com recarga efetiva */}
           {lastUpdated && (
             <div
@@ -134,7 +134,7 @@ export const BackupHeader: React.FC<BackupHeaderProps> = ({
             </div>
           )}
 
-          {/* (1) Pílula / card branco com borda contendo ícone de prédio + rótulo pequeno "Serventia Atual" + nome da serventia real + badge verde "Ativo" */}
+          {/* (1) Card da Serventia Real */}
           <div
             className="flex items-center gap-2.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs max-w-xs sm:max-w-sm"
             title={`Serventia atual: ${serventiaNome}`}
@@ -158,7 +158,33 @@ export const BackupHeader: React.FC<BackupHeaderProps> = ({
             </Badge>
           </div>
 
-          {/* (2) Botão primário azul com ícone play "Nova Execução" */}
+          {/* (2) Botão "Guia / Ajuda" (visível em telas sm+) */}
+          <Button
+            asChild
+            variant="outline"
+            className="hidden sm:inline-flex border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 text-[#0B2545] text-xs font-semibold h-9 px-3 gap-1.5 rounded-xl shadow-2xs transition-colors"
+            title="Abrir o Manual de Uso passo a passo do Backup"
+          >
+            <Link to="/backup/guia">
+              <HelpCircle className="w-4 h-4 text-blue-700" />
+              <span>Guia / Ajuda</span>
+            </Link>
+          </Button>
+
+          {/* (3) Botão "Relatório Comprobatório" (visível em telas sm+) */}
+          <Button
+            asChild
+            variant="outline"
+            className="hidden sm:inline-flex border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold h-9 px-3 gap-1.5 rounded-xl shadow-2xs transition-colors"
+            title="Abrir o Relatório Comprobatório em formato A4 para impressão ou conferência"
+          >
+            <Link to="/backup/relatorio" target="_blank">
+              <Printer className="w-4 h-4 text-slate-600" />
+              <span>Relatório Comprobatório</span>
+            </Link>
+          </Button>
+
+          {/* (4) Botão primário azul "Nova Execução" */}
           {canOperate ? (
             <Button
               onClick={onNovaExecucao}
@@ -180,7 +206,19 @@ export const BackupHeader: React.FC<BackupHeaderProps> = ({
             </Button>
           )}
 
-          {/* (3) Menu "⋯" discreto apenas com ações complementares (sem duplicar botões visíveis) */}
+          {/* (5) Botão "+ Novo Plano" consolidado (visível se canOperate) */}
+          {canOperate && onNovoPlano && (
+            <Button
+              onClick={onNovoPlano}
+              className="hidden md:inline-flex bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-bold h-9 px-3.5 gap-1.5 rounded-xl shadow-xs transition-colors"
+              title="Cadastrar novo plano de backup"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo Plano</span>
+            </Button>
+          )}
+
+          {/* (6) Menu "⋯" discreto — oferece recarregar dados e fallback para telas menores onde botões ficam ocultos */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -194,40 +232,35 @@ export const BackupHeader: React.FC<BackupHeaderProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 text-xs p-1">
-              <DropdownMenuItem asChild>
-                <Link to="/backup/relatorio" target="_blank" className="cursor-pointer gap-2 py-2">
-                  <Printer className="w-4 h-4 text-slate-500" />
-                  <span>Relatório Comprobatório (A4)</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
+              {/* Em telas menores (mobile), permitir acesso aos botões que foram colapsados */}
+              <DropdownMenuItem asChild className="sm:hidden">
                 <Link to="/backup/guia" className="cursor-pointer gap-2 py-2">
                   <HelpCircle className="w-4 h-4 text-blue-600" />
                   <span>Guia / Manual de Uso</span>
                 </Link>
               </DropdownMenuItem>
-
+              <DropdownMenuItem asChild className="sm:hidden">
+                <Link to="/backup/relatorio" target="_blank" className="cursor-pointer gap-2 py-2">
+                  <Printer className="w-4 h-4 text-slate-500" />
+                  <span>Relatório Comprobatório (A4)</span>
+                </Link>
+              </DropdownMenuItem>
               {canOperate && onNovoPlano && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={onNovoPlano}
-                    className="cursor-pointer gap-2 py-2 text-[#0B2545] font-semibold"
-                  >
-                    <Plus className="w-4 h-4 text-blue-600" />
-                    <span>Cadastrar Novo Plano</span>
-                  </DropdownMenuItem>
-                </>
+                <DropdownMenuItem
+                  onClick={onNovoPlano}
+                  className="md:hidden cursor-pointer gap-2 py-2 text-[#0B2545] font-semibold"
+                >
+                  <Plus className="w-4 h-4 text-blue-600" />
+                  <span>Cadastrar Novo Plano</span>
+                </DropdownMenuItem>
               )}
 
+              {/* Ação principal do menu dropdown: recarregar todos os dados */}
               {onReload && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onReload} className="cursor-pointer gap-2 py-2">
-                    <RefreshCw className="w-4 h-4 text-slate-500" />
-                    <span>Recarregar Todos os Dados</span>
-                  </DropdownMenuItem>
-                </>
+                <DropdownMenuItem onClick={onReload} className="cursor-pointer gap-2 py-2">
+                  <RefreshCw className="w-4 h-4 text-slate-500" />
+                  <span>Recarregar Todos os Dados</span>
+                </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
