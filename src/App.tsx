@@ -21,6 +21,8 @@ import BackupOverviewPage from './pages/backup/BackupOverviewPage'
 import BackupOverviewPreviewPage from './pages/backup/BackupOverviewPreviewPage'
 import BackupGuiaPage from './pages/backup/BackupGuiaPage'
 import BackupReportPage from './pages/backup/BackupReportPage'
+import EvidenciasPage from './pages/evidencias/EvidenciasPage'
+import EvidenciasReportPage from './pages/evidencias/EvidenciasReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
@@ -96,22 +98,7 @@ export const App = () => (
               }
             />
             {/* 3. Evidências */}
-            <Route
-              path="/evidencias"
-              element={
-                <PlaceholderPage
-                  moduleTitle="Central de Evidências"
-                  moduleSection="Evidências"
-                  description="Repositório central de arquivos e comprovações técnicas das políticas da serventia."
-                  featuresPlanned={[
-                    'Upload e indexação de evidências comprobatórias',
-                    'Vinculação direta com requisitos e controles',
-                    'Assinatura digital e carimbo de tempo nos relatórios',
-                    'Exportação de dossiê consolidado de comprovação',
-                  ]}
-                />
-              }
-            />{' '}
+            <Route path="/evidencias" element={<EvidenciasPage />} />
             <Route path="/auditoria" element={<AuditPage />} />
             {/* 4. Ambiente */}
             <Route path="/ativos" element={<AssetsPage />} />
@@ -176,6 +163,14 @@ export const App = () => (
             element={
               <ProtectedRoute>
                 <BackupReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/evidencias"
+            element={
+              <ProtectedRoute>
+                <EvidenciasReportPage />
               </ProtectedRoute>
             }
           />

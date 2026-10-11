@@ -867,3 +867,44 @@ export interface BackupTesteRecuperacaoItem {
     responsavel?: PersonItem
   }
 }
+
+// ==========================================
+// 12. Central de Evidências Fotográficas e Documentais
+// ==========================================
+
+export interface EvidenciaCategoriaItem {
+  id: string
+  organization: string
+  name: string
+  code?: string
+  description?: string
+  icone?: string
+  ordem?: number
+  status: 'ativo' | 'inativo'
+  created?: string
+  updated?: string
+}
+
+export type CentralEvidenciaStatus = 'conforme' | 'pendente_revisao' | 'arquivado'
+
+export interface EvidenciaItem {
+  id: string
+  organization: string
+  categoria?: string
+  categoria_nome: string
+  titulo: string
+  descricao?: string
+  data_evidencia: string
+  responsavel_registro: string
+  tags?: string[]
+  ativo_vinculado?: string
+  arquivos?: string[]
+  status: CentralEvidenciaStatus
+  observacoes_revisao?: string
+  created?: string
+  updated?: string
+  expand?: {
+    categoria?: EvidenciaCategoriaItem
+    ativo_vinculado?: InventoryAssetItem
+  }
+}
