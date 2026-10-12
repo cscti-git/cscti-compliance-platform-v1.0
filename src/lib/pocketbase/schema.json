@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T00:56:10.585Z",
+  "generatedAt": "2026-10-12T01:07:25.491Z",
   "collections": [
     {
       "name": "users",
@@ -1099,6 +1099,37 @@
         {
           "name": "exige_backup_replicacao",
           "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sistema_operacional",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "versao_so",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eol_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["suportado", "proximo_eol", "sem_suporte", "mitigado", "desconhecido"]
+        },
+        {
+          "name": "data_fim_suporte",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes_suporte",
+          "type": "text",
           "required": false,
           "system": false
         }
@@ -4214,7 +4245,15 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["conformidade", "seguranca", "backup", "lgpd", "inventario", "manual"]
+          "selectValues": [
+            "conformidade",
+            "seguranca",
+            "backup",
+            "lgpd",
+            "inventario",
+            "infraestrutura",
+            "manual"
+          ]
         },
         {
           "name": "referencia_origem",
@@ -4391,6 +4430,448 @@
       "indexes": [
         "CREATE INDEX idx_planos_hist_org_plano ON planos_acao_historico (organization, plano, created DESC)",
         "CREATE INDEX idx_planos_hist_org_tipo ON planos_acao_historico (organization, tipo_evento, created DESC)"
+      ]
+    },
+    {
+      "name": "infra_itens",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "categoria",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["energia", "ambiente_fisico", "camada_logica"]
+        },
+        {
+          "name": "tipo_item",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "nobreak",
+            "gerador",
+            "laudo_aterramento",
+            "plano_contingencia_energia",
+            "sala_ti",
+            "racks",
+            "ar_condicionado",
+            "combate_incendio",
+            "controle_acesso_fisico",
+            "criptografia_dados",
+            "outros"
+          ]
+        },
+        {
+          "name": "titulo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["conforme", "parcial", "pendente", "nao_conforme"]
+        },
+        {
+          "name": "modelo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "autonomia_minutos",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quantidade",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "potencia_va",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "art_numero",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel_tecnico",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_inspecao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_validade",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "redundancia_instalada",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_recarga_extintor",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_vencimento_extintor",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_controle_acesso",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "criptografia_repouso",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "criptografia_transito",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "algoritmo_criptografia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "arquivos",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "evidencia_vinculada",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "evidencias"
+        },
+        {
+          "name": "categoria_evidencia_sugerida",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel_designado",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_infra_itens_org_cat ON infra_itens (organization, categoria)",
+        "CREATE INDEX idx_infra_itens_org_tipo ON infra_itens (organization, tipo_item)",
+        "CREATE INDEX idx_infra_itens_org_status ON infra_itens (organization, status)",
+        "CREATE INDEX idx_infra_itens_org_evid ON infra_itens (organization, evidencia_vinculada)"
+      ]
+    },
+    {
+      "name": "infra_links",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "operadora",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "identificacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "velocidade_mbps",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tipo_link",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["dedicado", "compartilhado"]
+        },
+        {
+          "name": "meio_transmissao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["fibra_optica", "radio", "satelite", "cabo_metalico", "4g_5g", "outro"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo", "em_manutencao"]
+        },
+        {
+          "name": "redundancia",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ip_fixo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "circuito_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contato_suporte",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "arquivos",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_infra_links_org_status ON infra_links (organization, status)",
+        "CREATE INDEX idx_infra_links_org_tipo ON infra_links (organization, tipo_link)"
+      ]
+    },
+    {
+      "name": "infra_checklist_itens",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "codigo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "item_nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "secao",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["energia", "ambiente_fisico", "conectividade", "camada_logica"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["conforme", "parcial", "pendente", "nao_conforme"]
+        },
+        {
+          "name": "registro_vinculado",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "infra_itens"
+        },
+        {
+          "name": "link_vinculado",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "infra_links"
+        },
+        {
+          "name": "evidencia_vinculada",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "evidencias"
+        },
+        {
+          "name": "prazo",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ordem",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_infra_chk_org_status ON infra_checklist_itens (organization, status)",
+        "CREATE INDEX idx_infra_chk_org_secao ON infra_checklist_itens (organization, secao)",
+        "CREATE INDEX idx_infra_chk_org_ordem ON infra_checklist_itens (organization, ordem)"
       ]
     }
   ]

@@ -200,6 +200,11 @@ export interface InventoryAssetItem {
   exige_backup_local?: boolean
   exige_backup_nuvem?: boolean
   exige_backup_replicacao?: boolean
+  sistema_operacional?: string
+  versao_so?: string
+  eol_status?: 'suportado' | 'proximo_eol' | 'sem_suporte' | 'mitigado' | 'desconhecido'
+  data_fim_suporte?: string
+  observacoes_suporte?: string
   created?: string
   updated?: string
   expand?: {
@@ -1339,6 +1344,7 @@ export type PlanoAcaoOrigem =
   | 'backup'
   | 'lgpd'
   | 'inventario'
+  | 'infraestrutura'
   | 'manual'
 
 export type PlanoAcaoPrioridade = 'baixa' | 'media' | 'alta' | 'critica'
@@ -1420,4 +1426,149 @@ export interface PlanosAcaoRaioX {
   concluidosComAtraso: number
   mediaDiasEmAberto: number
   sugestoesMatrizPendentes: number
+}
+
+// ==========================================
+// MÓDULO INFRAESTRUTURA FÍSICA E LÓGICA
+// ==========================================
+
+export type InfraCategoria = 'energia' | 'ambiente_fisico' | 'camada_logica'
+
+export type InfraTipoItem =
+  | 'nobreak'
+  | 'gerador'
+  | 'laudo_aterramento'
+  | 'plano_contingencia_energia'
+  | 'sala_ti'
+  | 'racks'
+  | 'ar_condicionado'
+  | 'combate_incendio'
+  | 'controle_acesso_fisico'
+  | 'criptografia_dados'
+  | 'outros'
+
+export type InfraItemStatus = 'conforme' | 'parcial' | 'pendente' | 'nao_conforme'
+
+export interface InfraItem {
+  id: string
+  organization: string
+  categoria: InfraCategoria
+  tipo_item: InfraTipoItem
+  titulo: string
+  descricao?: string
+  status: InfraItemStatus
+  // Nobreak / Gerador
+  modelo?: string
+  autonomia_minutos?: number
+  quantidade?: number
+  potencia_va?: number
+  // Laudo de Aterramento
+  art_numero?: string
+  responsavel_tecnico?: string
+  data_inspecao?: string
+  data_validade?: string
+  // Ar-condicionado / Extintores / Acesso
+  redundancia_instalada?: boolean
+  data_recarga_extintor?: string
+  data_vencimento_extintor?: string
+  tipo_controle_acesso?: string
+  // Criptografia
+  criptografia_repouso?: boolean
+  criptografia_transito?: boolean
+  algoritmo_criptografia?: string
+  // Arquivos e Evidência
+  arquivos?: string[]
+  hash_sha256?: string
+  evidencia_vinculada?: string
+  categoria_evidencia_sugerida?: string
+  responsavel_designado?: string
+  observacoes?: string
+  created?: string
+  updated?: string
+  expand?: {
+    evidencia_vinculada?: EvidenciaItem
+    responsavel_designado?: PersonItem
+    organization?: OrganizationItem
+  }
+}
+
+export type InfraLinkTipo = 'dedicado' | 'compartilhado'
+export type InfraLinkMeio =
+  | 'fibra_optica'
+  | 'radio'
+  | 'satelite'
+  | 'cabo_metalico'
+  | '4g_5g'
+  | 'outro'
+export type InfraLinkStatus = 'ativo' | 'inativo' | 'em_manutencao'
+
+export interface InfraLinkItem {
+  id: string
+  organization: string
+  operadora: string
+  identificacao?: string
+  velocidade_mbps: number
+  tipo_link: InfraLinkTipo
+  meio_transmissao?: InfraLinkMeio
+  status: InfraLinkStatus
+  redundancia?: boolean
+  ip_fixo?: boolean
+  circuito_id?: string
+  contato_suporte?: string
+  observacoes?: string
+  arquivos?: string[]
+  hash_sha256?: string
+  created?: string
+  updated?: string
+  expand?: {
+    organization?: OrganizationItem
+  }
+}
+
+export interface InfraChecklistItem {
+  id: string
+  organization: string
+  codigo: string
+  item_nome: string
+  descricao?: string
+  secao: 'energia' | 'ambiente_fisico' | 'conectividade' | 'camada_logica'
+  status: InfraItemStatus
+  registro_vinculado?: string
+  link_vinculado?: string
+  evidencia_vinculada?: string
+  prazo?: string
+  observacoes?: string
+  ordem?: number
+  created?: string
+  updated?: string
+  expand?: {
+    registro_vinculado?: InfraItem
+    link_vinculado?: InfraLinkItem
+    evidencia_vinculada?: EvidenciaItem
+  }
+}
+
+export interface InfraConfrontoConectividade {
+  classeServentia: string
+  velocidadeExigidaMbps: number
+  velocidadeTotalAtivaMbps: number
+  linkPrincipal?: InfraLinkItem
+  linkRedundante?: InfraLinkItem
+  totalLinksAtivos: number
+  possuiRedundancia: boolean
+  atendeVelocidade: boolean
+  atendeRedundancia: boolean
+  statusGeral: 'conforme' | 'parcial' | 'nao_conforme'
+}
+
+export interface InfraRaioX {
+  totalItens: number
+  itensConformes: number
+  itensParciais: number
+  itensPendentes: number
+  itensNaoConformes: number
+  percentualConformidade: number
+  conectividadeConfronto: InfraConfrontoConectividade
+  ativosEolTotal: number
+  ativosEolCriticos: number
 }

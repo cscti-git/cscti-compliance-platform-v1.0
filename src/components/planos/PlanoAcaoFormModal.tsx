@@ -202,6 +202,7 @@ export const PlanoAcaoFormModal: React.FC<PlanoAcaoFormModalProps> = ({
                   <SelectItem value="backup">Continuidade & Backup</SelectItem>
                   <SelectItem value="lgpd">LGPD & Governança</SelectItem>
                   <SelectItem value="inventario">Inventário de Ativos</SelectItem>
+                  <SelectItem value="infraestrutura">Infraestrutura Física e Lógica</SelectItem>
                 </SelectContent>
               </Select>
             </div>

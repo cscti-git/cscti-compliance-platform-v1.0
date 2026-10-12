@@ -32,6 +32,8 @@ import ConformidadePage from './pages/conformidade/ConformidadePage'
 import ConformidadeReportPage from './pages/conformidade/ConformidadeReportPage'
 import PlanosAcaoPage from './pages/planos/PlanosAcaoPage'
 import PlanosAcaoReportPage from './pages/planos/PlanosAcaoReportPage'
+import InfraestruturaPage from './pages/infraestrutura/InfraestruturaPage'
+import InfraestruturaReportPage from './pages/infraestrutura/InfraestruturaReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
@@ -83,21 +85,7 @@ export const App = () => (
             <Route path="/auditoria" element={<AuditPage />} />
             {/* 4. Ambiente */}
             <Route path="/ativos" element={<AssetsPage />} />
-            <Route
-              path="/infraestrutura"
-              element={
-                <PlaceholderPage
-                  moduleTitle="Infraestrutura Física e Lógica"
-                  moduleSection="Ambiente"
-                  description="Controles de nobreak, sala de servidores, links de internet redundantes e cabeamento."
-                  featuresPlanned={[
-                    'Inspeção periódica de nobreaks e geradores',
-                    'Monitoramento de redundância de links de internet',
-                    'Controle de acesso físico à sala de servidores',
-                  ]}
-                />
-              }
-            />
+            <Route path="/infraestrutura" element={<InfraestruturaPage />} />
             {/* 5. Segurança */}
             <Route path="/seguranca" element={<SegurancaPage />} />
             {/* 6. Continuidade e Backup (Fase 3) */}
@@ -163,6 +151,14 @@ export const App = () => (
             element={
               <ProtectedRoute>
                 <ConformidadeReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/infraestrutura"
+            element={
+              <ProtectedRoute>
+                <InfraestruturaReportPage />
               </ProtectedRoute>
             }
           />

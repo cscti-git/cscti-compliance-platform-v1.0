@@ -570,6 +570,11 @@ export const Index: React.FC = () => {
         percent: pctInventario,
       },
       {
+        id: 'infraestrutura',
+        name: 'Infraestrutura Física e Lógica',
+        percent: pctSegurancaModulo,
+      },
+      {
         id: 'backup',
         name: 'Backup e Recuperação',
         percent: pctBackupModulo,
