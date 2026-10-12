@@ -60,6 +60,7 @@ import {
   getIntegrations,
   listAuditLogs,
 } from '@/services/csctiService'
+import { listPlanosAcao } from '@/services/planoAcaoService'
 import {
   listBackupPlanos,
   listBackupRotinas,
@@ -173,6 +174,7 @@ export const Index: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [assets, setAssets] = useState<InventoryAssetItem[]>([])
   const [planos, setPlanos] = useState<BackupPlanoItem[]>([])
+  const [planosAcaoItens, setPlanosAcaoItens] = useState<any[]>([])
   const [rotinas, setRotinas] = useState<BackupRotinaItem[]>([])
   const [fontes, setFontes] = useState<BackupFonteItem[]>([])
   const [evidencias, setEvidencias] = useState<BackupEvidenciaItem[]>([])
@@ -224,6 +226,7 @@ export const Index: React.FC = () => {
         cobRes,
         compRes,
         itensRes,
+        planosAcaoRes,
       ] = await Promise.all([
         listInventoryAssets(orgId),
         listBackupPlanos(orgId),
@@ -242,6 +245,7 @@ export const Index: React.FC = () => {
         listSegCoberturasExigidas(orgId).catch(() => []),
         listSegComprovantes(orgId).catch(() => []),
         listSegItensConformidade(orgId).catch(() => []),
+        listPlanosAcao(orgId).catch(() => []),
       ])
 
       setAssets(assetsData)
@@ -263,6 +267,7 @@ export const Index: React.FC = () => {
       setSegCoberturas(cobRes || [])
       setSegComprovantes(compRes || [])
       setSegItens(itensRes || [])
+      setPlanosAcaoItens(planosAcaoRes || [])
 
       const d = new Date()
       setLastUpdated(
@@ -882,66 +887,99 @@ export const Index: React.FC = () => {
 
   // ---------------------------------------------------------------------------
   // LISTA: PENDÊNCIAS E TAREFAS (Linha 3, Card 3)
-  // Geradas a partir das ocorrências reais e pendências cadastrais
+  // Unificado para os planos de ação reais + ocorrências em aberto do ambiente
   // ---------------------------------------------------------------------------
   const pendingTasks: PendingTaskItem[] = useMemo(() => {
     const list: PendingTaskItem[] = []
+    const hojeIso = new Date().toISOString().substring(0, 10)
 
-    // 1. Ocorrências em aberto
-    ocorrenciasAbertas.forEach((oc) => {
-      const isAlta = oc.severidade === 'alta'
-      const isMedia = oc.severidade === 'media'
-      list.push({
-        id: oc.id,
-        descricao: oc.titulo,
-        modulo: 'Backup',
-        prazo: oc.created ? new Date(oc.created).toLocaleDateString('pt-BR') : 'Imediato',
-        isVencido: true,
-        prioridade: isAlta ? 'alta' : isMedia ? 'media' : 'baixa',
-        href: '/backup?tab=ocorrencias',
+    // 1. Planos de Ação Reais (planos_acao_itens em aberto ou em andamento)
+    planosAcaoItens
+      .filter((p) => p.status === 'aberto' || p.status === 'em_andamento')
+      .forEach((p) => {
+        const prazo = p.data_alvo ? p.data_alvo.substring(0, 10) : null
+        const isVencido = prazo ? prazo < hojeIso : false
+        let modLabel = 'Planos'
+        if (p.origem === 'conformidade') modLabel = 'Conformidade'
+        else if (p.origem === 'seguranca') modLabel = 'Segurança'
+        else if (p.origem === 'backup') modLabel = 'Backup'
+        else if (p.origem === 'lgpd') modLabel = 'LGPD'
+        else if (p.origem === 'inventario') modLabel = 'Inventário'
+
+        list.push({
+          id: p.id,
+          descricao: p.titulo,
+          modulo: modLabel,
+          prazo: prazo ? new Date(prazo + 'T12:00:00').toLocaleDateString('pt-BR') : 'Sem prazo',
+          isVencido,
+          prioridade:
+            p.prioridade === 'critica' || p.prioridade === 'alta'
+              ? 'alta'
+              : p.prioridade === 'media'
+                ? 'media'
+                : 'baixa',
+          href: '/planos-de-acao',
+        })
       })
-    })
 
-    // 2. Conectores pendentes
-    if (!glpiActive) {
-      list.push({
-        id: 'task-glpi',
-        descricao: 'Validar credenciais do conector GLPI',
-        modulo: 'Inventário',
-        prazo: 'Aguardando',
-        isVencido: false,
-        prioridade: 'media',
-        href: '/integracoes',
+    // 2. Ocorrências em aberto se ainda houver espaço
+    if (list.length < 5) {
+      ocorrenciasAbertas.forEach((oc) => {
+        const isAlta = oc.severidade === 'alta'
+        const isMedia = oc.severidade === 'media'
+        list.push({
+          id: oc.id,
+          descricao: oc.titulo,
+          modulo: 'Backup',
+          prazo: oc.created ? new Date(oc.created).toLocaleDateString('pt-BR') : 'Imediato',
+          isVencido: true,
+          prioridade: isAlta ? 'alta' : isMedia ? 'media' : 'baixa',
+          href: '/backup?tab=ocorrencias',
+        })
       })
     }
 
-    if (!emailActive) {
-      list.push({
-        id: 'task-email',
-        descricao: 'Cadastrar caixa postal IMAP para recepção de comprovantes',
-        modulo: 'Backup',
-        prazo: 'Aguardando',
-        isVencido: false,
-        prioridade: 'alta',
-        href: '/integracoes',
-      })
-    }
+    // 3. Conectores pendentes (fallback quando não há planos nem ocorrências)
+    if (list.length === 0) {
+      if (!glpiActive) {
+        list.push({
+          id: 'task-glpi',
+          descricao: 'Validar credenciais do conector GLPI',
+          modulo: 'Inventário',
+          prazo: 'Aguardando',
+          isVencido: false,
+          prioridade: 'media',
+          href: '/integracoes',
+        })
+      }
 
-    // 3. Serventia incompleta
-    if (completedOrgSteps < 6) {
-      list.push({
-        id: 'task-org',
-        descricao: 'Completar dados cadastrais e atribuições regimentais',
-        modulo: 'Governança',
-        prazo: 'Em andamento',
-        isVencido: false,
-        prioridade: 'baixa',
-        href: '/configuracoes',
-      })
+      if (!emailActive) {
+        list.push({
+          id: 'task-email',
+          descricao: 'Cadastrar caixa postal IMAP para recepção de comprovantes',
+          modulo: 'Backup',
+          prazo: 'Aguardando',
+          isVencido: false,
+          prioridade: 'alta',
+          href: '/integracoes',
+        })
+      }
+
+      if (completedOrgSteps < 6) {
+        list.push({
+          id: 'task-org',
+          descricao: 'Completar dados cadastrais e atribuições regimentais',
+          modulo: 'Governança',
+          prazo: 'Em andamento',
+          isVencido: false,
+          prioridade: 'baixa',
+          href: '/configuracoes',
+        })
+      }
     }
 
     return list.slice(0, 5)
-  }, [ocorrenciasAbertas, glpiActive, emailActive, completedOrgSteps])
+  }, [planosAcaoItens, ocorrenciasAbertas, glpiActive, emailActive, completedOrgSteps])
 
   // ---------------------------------------------------------------------------
   // BARRAS VERTICAIS: COBERTURA DE PROTEÇÃO POR CATEGORIA (Linha 4, Card 1)
@@ -1286,7 +1324,7 @@ export const Index: React.FC = () => {
           icon={ShieldAlert}
           iconColor="text-amber-600"
           iconBgColor="bg-amber-100"
-          viewAllLink={{ href: '/backup?tab=ocorrencias', label: 'Ver todas' }}
+          viewAllLink={{ href: '/planos-de-acao', label: 'Ver planos de ação' }}
         >
           <PendingTasksList tasks={pendingTasks} />
         </DashboardCard>

@@ -55,7 +55,7 @@ const navSections: NavSection[] = [
     items: [
       { title: 'LGPD e Governança', href: '/lgpd', icon: Lock },
       { title: 'Conformidade', href: '/conformidade', icon: ShieldCheck },
-      { title: 'Planos de Ação', href: '/planos-de-acao', icon: CheckCircle2 },
+      { title: 'Planos de Ação', href: '/planos-de-acao', icon: ShieldAlert },
     ],
   },
   {

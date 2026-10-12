@@ -30,6 +30,8 @@ import SegurancaPage from './pages/seguranca/SegurancaPage'
 import SegurancaReportPage from './pages/seguranca/SegurancaReportPage'
 import ConformidadePage from './pages/conformidade/ConformidadePage'
 import ConformidadeReportPage from './pages/conformidade/ConformidadeReportPage'
+import PlanosAcaoPage from './pages/planos/PlanosAcaoPage'
+import PlanosAcaoReportPage from './pages/planos/PlanosAcaoReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
@@ -74,22 +76,8 @@ export const App = () => (
             {/* 2. Governança */}
             <Route path="/lgpd" element={<LgpdPage />} />
             <Route path="/conformidade" element={<ConformidadePage />} />
-            <Route
-              path="/planos-de-acao"
-              element={
-                <PlaceholderPage
-                  moduleTitle="Planos de Ação e Remediação"
-                  moduleSection="Governança"
-                  description="Gestão de pendências e planos de adequação para itens em desconformidade."
-                  featuresPlanned={[
-                    'Definição de prazos de remediação e responsáveis',
-                    'Status de execução dos planos corretivos',
-                    'Histórico de aprovação pelo Responsável Legal',
-                    'Alertas de vencimento de prazos',
-                  ]}
-                />
-              }
-            />
+            <Route path="/planos-de-acao" element={<PlanosAcaoPage />} />
+            <Route path="/planos-acao" element={<PlanosAcaoPage />} />
             {/* 3. Evidências */}
             <Route path="/evidencias" element={<EvidenciasPage />} />
             <Route path="/auditoria" element={<AuditPage />} />
@@ -175,6 +163,22 @@ export const App = () => (
             element={
               <ProtectedRoute>
                 <ConformidadeReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/planos-acao"
+            element={
+              <ProtectedRoute>
+                <PlanosAcaoReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/planos-de-acao"
+            element={
+              <ProtectedRoute>
+                <PlanosAcaoReportPage />
               </ProtectedRoute>
             }
           />

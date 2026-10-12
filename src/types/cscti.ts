@@ -1328,3 +1328,96 @@ export interface MatrizConformidadeConsolidada {
   etapas: EtapaConformidadeResumo[]
   etapaBloqueanteAtual: number | null
 }
+
+// ==========================================
+// MÓDULO PLANOS DE AÇÃO
+// ==========================================
+
+export type PlanoAcaoOrigem =
+  | 'conformidade'
+  | 'seguranca'
+  | 'backup'
+  | 'lgpd'
+  | 'inventario'
+  | 'manual'
+
+export type PlanoAcaoPrioridade = 'baixa' | 'media' | 'alta' | 'critica'
+
+export type PlanoAcaoStatus = 'aberto' | 'em_andamento' | 'concluido' | 'cancelado'
+
+export interface PlanoAcaoItem {
+  id: string
+  organization: string
+  titulo: string
+  descricao?: string
+  origem: PlanoAcaoOrigem
+  referencia_origem?: string
+  referencia_codigo?: string
+  prioridade: PlanoAcaoPrioridade
+  status: PlanoAcaoStatus
+  responsavel?: string
+  responsavel_nome?: string
+  data_criacao?: string
+  data_alvo?: string
+  data_conclusao?: string
+  observacoes?: string
+  created?: string
+  updated?: string
+  expand?: {
+    responsavel?: PersonItem
+  }
+}
+
+export type PlanoAcaoHistoricoTipoEvento =
+  | 'criacao'
+  | 'mudanca_status'
+  | 'reatribuicao'
+  | 'alteracao_prazo'
+  | 'dispensa_matriz'
+  | 'conclusao'
+  | 'cancelamento'
+
+export interface PlanoAcaoHistoricoItem {
+  id: string
+  organization: string
+  plano?: string
+  plano_titulo?: string
+  tipo_evento: PlanoAcaoHistoricoTipoEvento
+  campo_alterado?: string
+  valor_anterior?: string
+  valor_novo?: string
+  motivo?: string
+  autor_nome?: string
+  autor_email?: string
+  created?: string
+  updated?: string
+}
+
+export interface PlanoSugestaoMatriz {
+  itemCodigo: string
+  titulo: string
+  descricao: string
+  etapa: number
+  etapaTitulo: string
+  moduloOrigem: string
+  linkModulo: string
+  statusMatriz: 'pendente' | 'nao_conforme'
+  prioridadeSugerida: PlanoAcaoPrioridade
+  jaConvertido: boolean
+  planoId?: string
+  dispensado: boolean
+  motivoDispensa?: string
+}
+
+export interface PlanosAcaoRaioX {
+  totalPlanos: number
+  abertos: number
+  emAndamento: number
+  concluidos: number
+  cancelados: number
+  criticosAltaVencidos: number
+  concluidosNoPrazo: number
+  concluidosComAtraso: number
+  mediaDiasEmAberto: number
+  sugestoesMatrizPendentes: number
+}
