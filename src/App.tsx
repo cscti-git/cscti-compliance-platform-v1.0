@@ -30,6 +30,8 @@ import SegurancaPage from './pages/seguranca/SegurancaPage'
 import SegurancaReportPage from './pages/seguranca/SegurancaReportPage'
 import ConformidadePage from './pages/conformidade/ConformidadePage'
 import ConformidadeReportPage from './pages/conformidade/ConformidadeReportPage'
+import DossiePage from './pages/conformidade/DossiePage'
+import DossieReportPage from './pages/conformidade/DossieReportPage'
 import PlanosAcaoPage from './pages/planos/PlanosAcaoPage'
 import PlanosAcaoReportPage from './pages/planos/PlanosAcaoReportPage'
 import InfraestruturaPage from './pages/infraestrutura/InfraestruturaPage'
@@ -78,6 +80,7 @@ export const App = () => (
             {/* 2. Governança */}
             <Route path="/lgpd" element={<LgpdPage />} />
             <Route path="/conformidade" element={<ConformidadePage />} />
+            <Route path="/dossie" element={<DossiePage />} />
             <Route path="/planos-de-acao" element={<PlanosAcaoPage />} />
             <Route path="/planos-acao" element={<PlanosAcaoPage />} />
             {/* 3. Evidências */}
@@ -151,6 +154,14 @@ export const App = () => (
             element={
               <ProtectedRoute>
                 <ConformidadeReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/consolidado"
+            element={
+              <ProtectedRoute>
+                <DossieReportPage />
               </ProtectedRoute>
             }
           />

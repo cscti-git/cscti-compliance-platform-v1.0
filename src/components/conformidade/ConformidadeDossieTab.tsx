@@ -54,13 +54,23 @@ export const ConformidadeDossieTab: React.FC<ConformidadeDossieTabProps> = ({ co
           </div>
 
           <div className="flex items-center gap-2">
-            <Link to="/relatorios/conformidade">
+            <Link to="/dossie">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs font-semibold gap-1.5 border-slate-300"
+              >
+                <FileCheck2 className="w-4 h-4 text-slate-700" />
+                <span>Painel do Dossiê</span>
+              </Button>
+            </Link>
+            <Link to="/relatorios/consolidado">
               <Button
                 size="sm"
                 className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs font-semibold gap-1.5 shadow-xs"
               >
                 <Printer className="w-4 h-4" />
-                <span>Emitir Dossiê Geral A4</span>
+                <span>Dossiê Consolidado Final A4</span>
               </Button>
             </Link>
           </div>
