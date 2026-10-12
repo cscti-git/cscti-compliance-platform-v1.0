@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T00:24:02.570Z",
+  "generatedAt": "2026-10-12T00:35:00.356Z",
   "collections": [
     {
       "name": "users",
@@ -3476,6 +3476,394 @@
         "CREATE INDEX idx_lgpd_inc_org_status ON lgpd_incidentes (organization, status_fluxo)",
         "CREATE INDEX idx_lgpd_inc_org_grav ON lgpd_incidentes (organization, gravidade)",
         "CREATE INDEX idx_lgpd_inc_org_det ON lgpd_incidentes (organization, data_deteccao DESC)"
+      ]
+    },
+    {
+      "name": "seg_solucoes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "endpoint_antivirus",
+            "firewall",
+            "monitoramento_soc_noc",
+            "backup_seguranca",
+            "outros"
+          ]
+        },
+        {
+          "name": "fornecedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "versao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativa", "inativa", "em_avaliacao"]
+        },
+        {
+          "name": "escopo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "todas_estacoes_servidores",
+            "somente_servidores",
+            "somente_estacoes",
+            "especifico"
+          ]
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_seg_sol_org_status ON seg_solucoes (organization, status)",
+        "CREATE INDEX idx_seg_sol_org_tipo ON seg_solucoes (organization, tipo)"
+      ]
+    },
+    {
+      "name": "seg_cobertura_exigida",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "tipo_solucao",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "endpoint_antivirus",
+            "firewall",
+            "monitoramento_soc_noc",
+            "backup_seguranca",
+            "outros"
+          ]
+        },
+        {
+          "name": "quantidade_exigida",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "base_calculo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ajuste_manual",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_seg_cob_org_tipo ON seg_cobertura_exigida (organization, tipo_solucao)"
+      ]
+    },
+    {
+      "name": "seg_comprovantes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "solucao",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "seg_solucoes"
+        },
+        {
+          "name": "data_comprovante",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["relatorio_console", "print", "pdf", "email", "laudo_auditoria", "outro"]
+        },
+        {
+          "name": "arquivos",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "maquinas_protegidas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "maquinas_sem_agente",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_definicoes_atualizadas",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ameacas_bloqueadas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "eventos_relevantes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status_firewall",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ativo", "inativo", "em_manutencao"]
+        },
+        {
+          "name": "data_revisao_regras_firewall",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resumo_texto",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "registrado_por",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_seg_comp_org_data ON seg_comprovantes (organization, data_comprovante DESC)",
+        "CREATE INDEX idx_seg_comp_org_sol ON seg_comprovantes (organization, solucao)"
+      ]
+    },
+    {
+      "name": "seg_itens_conformidade",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "item_nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "categoria",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "endpoint",
+            "firewall",
+            "monitoramento",
+            "acessos_senhas",
+            "ativos_sistemas"
+          ]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["comprovado", "pendente", "nao_conforme"]
+        },
+        {
+          "name": "comprovante_vinculado",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "seg_comprovantes"
+        },
+        {
+          "name": "prazo",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ordem",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_seg_it_org_status ON seg_itens_conformidade (organization, status)",
+        "CREATE INDEX idx_seg_it_org_ordem ON seg_itens_conformidade (organization, ordem)"
       ]
     }
   ]

@@ -26,6 +26,8 @@ import EvidenciasPage from './pages/evidencias/EvidenciasPage'
 import EvidenciasReportPage from './pages/evidencias/EvidenciasReportPage'
 import LgpdPage from './pages/lgpd/LgpdPage'
 import LgpdReportPage from './pages/lgpd/LgpdReportPage'
+import SegurancaPage from './pages/seguranca/SegurancaPage'
+import SegurancaReportPage from './pages/seguranca/SegurancaReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
@@ -122,21 +124,7 @@ export const App = () => (
               }
             />
             {/* 5. Segurança */}
-            <Route
-              path="/seguranca"
-              element={
-                <PlaceholderPage
-                  moduleTitle="Gestão de Segurança e Riscos"
-                  moduleSection="Segurança"
-                  description="Políticas de segurança da informação, análise de vulnerabilidades e controle de acessos."
-                  featuresPlanned={[
-                    'Política de Segurança da Informação (PSI) padronizada',
-                    'Gestão de privilégios e senhas seguras',
-                    'Relatório de análise de vulnerabilidades periódica',
-                  ]}
-                />
-              }
-            />
+            <Route path="/seguranca" element={<SegurancaPage />} />
             {/* 6. Continuidade e Backup (Fase 3) */}
             <Route path="/backup" element={<BackupOverviewPage />} />
             <Route path="/backup/preview" element={<BackupOverviewPreviewPage />} />
@@ -184,6 +172,14 @@ export const App = () => (
             element={
               <ProtectedRoute>
                 <LgpdReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/seguranca"
+            element={
+              <ProtectedRoute>
+                <SegurancaReportPage />
               </ProtectedRoute>
             }
           />

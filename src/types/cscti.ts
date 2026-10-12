@@ -1109,3 +1109,126 @@ export interface LgpdIncidenteItem {
     dados_afetados_rel?: LgpdDadoItem[]
   }
 }
+
+// ==========================================
+// 15. Módulo Segurança do Ambiente
+// ==========================================
+
+export type SegSolucaoTipo =
+  | 'endpoint_antivirus'
+  | 'firewall'
+  | 'monitoramento_soc_noc'
+  | 'backup_seguranca'
+  | 'outros'
+
+export type SegSolucaoStatus = 'ativa' | 'inativa' | 'em_avaliacao'
+
+export type SegSolucaoEscopo =
+  | 'todas_estacoes_servidores'
+  | 'somente_servidores'
+  | 'somente_estacoes'
+  | 'especifico'
+
+export interface SegSolucaoItem {
+  id: string
+  organization: string
+  nome: string
+  tipo: SegSolucaoTipo
+  fornecedor?: string
+  versao?: string
+  status: SegSolucaoStatus
+  escopo?: SegSolucaoEscopo
+  observacoes?: string
+  created?: string
+  updated?: string
+}
+
+export interface SegCoberturaExigidaItem {
+  id: string
+  organization: string
+  tipo_solucao: SegSolucaoTipo
+  quantidade_exigida: number
+  base_calculo?: string
+  ajuste_manual?: boolean
+  observacoes?: string
+  created?: string
+  updated?: string
+}
+
+export type SegComprovanteTipo =
+  | 'relatorio_console'
+  | 'print'
+  | 'pdf'
+  | 'email'
+  | 'laudo_auditoria'
+  | 'outro'
+
+export type SegStatusFirewall = 'ativo' | 'inativo' | 'em_manutencao'
+
+export interface SegComprovanteItem {
+  id: string
+  organization: string
+  solucao?: string
+  data_comprovante: string
+  tipo: SegComprovanteTipo
+  arquivos?: string[]
+  hash_sha256?: string
+  maquinas_protegidas?: number
+  maquinas_sem_agente?: number
+  data_definicoes_atualizadas?: string
+  ameacas_bloqueadas?: number
+  eventos_relevantes?: string
+  status_firewall?: SegStatusFirewall
+  data_revisao_regras_firewall?: string
+  resumo_texto?: string
+  registrado_por?: string
+  created?: string
+  updated?: string
+  expand?: {
+    solucao?: SegSolucaoItem
+  }
+}
+
+export type SegItemConformidadeCategoria =
+  | 'endpoint'
+  | 'firewall'
+  | 'monitoramento'
+  | 'acessos_senhas'
+  | 'ativos_sistemas'
+
+export type SegItemConformidadeStatus = 'comprovado' | 'pendente' | 'nao_conforme'
+
+export interface SegItemConformidadeItem {
+  id: string
+  organization: string
+  item_nome: string
+  descricao?: string
+  categoria: SegItemConformidadeCategoria
+  status: SegItemConformidadeStatus
+  comprovante_vinculado?: string
+  prazo?: string
+  observacoes?: string
+  ordem?: number
+  created?: string
+  updated?: string
+  expand?: {
+    comprovante_vinculado?: SegComprovanteItem
+  }
+}
+
+export interface SegurancaCoberturaCalculada {
+  totalAtivosInventario: number
+  estacoesCount: number
+  servidoresCount: number
+  exigidasEndpoint: number
+  comprovadasEndpoint: number
+  semAgenteEndpoint: number
+  percentualCobertura: number
+  definicoesAtualizadasData?: string
+  statusFirewallConsolidado?: string
+  ameacasBloqueadasTotal: number
+  solucoesAtivasCount: number
+  itensComprovadosCount: number
+  itensTotalCount: number
+  dataUltimoComprovante?: string
+}

@@ -75,7 +75,7 @@ const navSections: NavSection[] = [
   },
   {
     title: 'Segurança',
-    items: [{ title: 'Gestão de Riscos', href: '/seguranca', icon: ShieldAlert }],
+    items: [{ title: 'Segurança do Ambiente', href: '/seguranca', icon: ShieldCheck }],
   },
   {
     title: 'Continuidade',

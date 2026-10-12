@@ -71,6 +71,13 @@ import {
   listBackupTestes,
   getBackupConfronto,
 } from '@/services/backupService'
+import {
+  listSegSolucoes,
+  listSegCoberturasExigidas,
+  listSegComprovantes,
+  listSegItensConformidade,
+  calcularCoberturaSeguranca,
+} from '@/services/segurancaService'
 import { formatDateTime } from '@/lib/dateTime'
 import type {
   InventoryAssetItem,
@@ -179,6 +186,12 @@ export const Index: React.FC = () => {
   const [glpiActive, setGlpiActive] = useState<boolean>(false)
   const [emailActive, setEmailActive] = useState<boolean>(false)
 
+  // Dados reais de Segurança do Ambiente
+  const [segSolucoes, setSegSolucoes] = useState<any[]>([])
+  const [segComprovantes, setSegComprovantes] = useState<any[]>([])
+  const [segItens, setSegItens] = useState<any[]>([])
+  const [segCoberturas, setSegCoberturas] = useState<any[]>([])
+
   // Momento da última atualização funcional
   const [lastUpdated, setLastUpdated] = useState<string>(() => {
     const d = new Date()
@@ -207,6 +220,10 @@ export const Index: React.FC = () => {
         assignmentsData,
         intsData,
         confrontoResp,
+        solRes,
+        cobRes,
+        compRes,
+        itensRes,
       ] = await Promise.all([
         listInventoryAssets(orgId),
         listBackupPlanos(orgId),
@@ -221,6 +238,10 @@ export const Index: React.FC = () => {
         listAssignments(orgId),
         getIntegrations(orgId),
         getBackupConfronto(orgId).catch(() => null),
+        listSegSolucoes(orgId).catch(() => []),
+        listSegCoberturasExigidas(orgId).catch(() => []),
+        listSegComprovantes(orgId).catch(() => []),
+        listSegItensConformidade(orgId).catch(() => []),
       ])
 
       setAssets(assetsData)
@@ -237,6 +258,11 @@ export const Index: React.FC = () => {
       setGlpiActive(Boolean(intsData.glpi?.enabled && intsData.glpi.glpi_url))
       setEmailActive(Boolean(intsData.email?.enabled && intsData.email.email_host))
       setConfrontoData(confrontoResp)
+
+      setSegSolucoes(solRes || [])
+      setSegCoberturas(cobRes || [])
+      setSegComprovantes(compRes || [])
+      setSegItens(itensRes || [])
 
       const d = new Date()
       setLastUpdated(
@@ -511,6 +537,25 @@ export const Index: React.FC = () => {
     return Math.min(100, pontos)
   }, [audits, evidencias, emailActive])
 
+  // Módulo Segurança do Ambiente (dados reais de endpoint e checklist)
+  const pctSegurancaModulo = useMemo(() => {
+    const calc = calcularCoberturaSeguranca(
+      assets,
+      segSolucoes,
+      segCoberturas,
+      segComprovantes,
+      segItens,
+    )
+    if (segSolucoes.length === 0 && segComprovantes.length === 0) return 0
+    let pontos = 0
+    if (calc.solucoesAtivasCount > 0) pontos += 25
+    pontos += Math.round(calc.percentualCobertura * 0.45)
+    if (calc.itensTotalCount > 0) {
+      pontos += Math.round((calc.itensComprovadosCount / calc.itensTotalCount) * 30)
+    }
+    return Math.min(100, pontos)
+  }, [assets, segSolucoes, segCoberturas, segComprovantes, segItens])
+
   // Módulos da Linha 2
   const complianceModules: ModuleComplianceItem[] = useMemo(() => {
     return [
@@ -525,6 +570,11 @@ export const Index: React.FC = () => {
         percent: pctBackupModulo,
       },
       {
+        id: 'seguranca',
+        name: 'Segurança do Ambiente',
+        percent: pctSegurancaModulo,
+      },
+      {
         id: 'governanca',
         name: 'Governança e Serventia',
         percent: pctGovernança,
@@ -535,15 +585,15 @@ export const Index: React.FC = () => {
         percent: pctAuditoria,
       },
     ]
-  }, [pctInventario, pctBackupModulo, pctGovernança, pctAuditoria])
+  }, [pctInventario, pctBackupModulo, pctSegurancaModulo, pctGovernança, pctAuditoria])
 
   // Média ponderada da Conformidade Geral
   const conformidadeGeral = useMemo(() => {
-    const list = [pctInventario, pctBackupModulo, pctGovernança, pctAuditoria]
+    const list = [pctInventario, pctBackupModulo, pctSegurancaModulo, pctGovernança, pctAuditoria]
     const valid = list.filter((p) => p > 0)
     if (valid.length === 0) return 0
     return Math.round(list.reduce((a, b) => a + b, 0) / list.length)
-  }, [pctInventario, pctBackupModulo, pctGovernança, pctAuditoria])
+  }, [pctInventario, pctBackupModulo, pctSegurancaModulo, pctGovernança, pctAuditoria])
 
   // ---------------------------------------------------------------------------
   // DONUT 1: SITUAÇÃO DOS ATIVOS
