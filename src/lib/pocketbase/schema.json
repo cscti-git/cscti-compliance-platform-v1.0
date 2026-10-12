@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-11T23:45:26.948Z",
+  "generatedAt": "2026-10-12T00:14:04.605Z",
   "collections": [
     {
       "name": "users",
@@ -2636,6 +2636,364 @@
         "CREATE INDEX idx_evidencias_org_data ON evidencias (organization, data_evidencia DESC)",
         "CREATE INDEX idx_evidencias_org_status ON evidencias (organization, status)",
         "CREATE INDEX idx_evidencias_org_ativo ON evidencias (organization, ativo_vinculado)"
+      ]
+    },
+    {
+      "name": "papeis_designados",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "papel",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "codigo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "descricao_curta",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "atribuicoes_detalhadas",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "e_obrigatorio",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "da_ferramenta",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "modulo_vinculado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ordem",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_papeis_desig_org ON papeis_designados (organization, ordem, papel)"
+      ]
+    },
+    {
+      "name": "designacoes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "papel_designado",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "papeis_designados"
+        },
+        {
+          "name": "colaborador",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "nome_designado",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "cpf_designado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_designado",
+          "type": "email",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telefone_designado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cargo_designado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "rascunho",
+            "pendente_assinatura",
+            "assinada_fisica",
+            "assinada_digital",
+            "revogada"
+          ]
+        },
+        {
+          "name": "data_designacao",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_assinatura",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plataforma_assinatura",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "atribuicoes_customizadas",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "anexos_comprovante",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "metodo_assinatura_detalhes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_revogacao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "motivo_revogacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "revogado_por",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_desig_org_papel ON designacoes (organization, papel_designado, status)",
+        "CREATE INDEX idx_desig_org_status ON designacoes (organization, status)",
+        "CREATE INDEX idx_desig_org_colab ON designacoes (organization, colaborador)"
+      ]
+    },
+    {
+      "name": "designacao_documentos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "designacao",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "designacoes"
+        },
+        {
+          "name": "titulo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tipo_documento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "versao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "conteudo_html",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "conteudo_texto",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dados_serventia_snapshot",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dados_designado_snapshot",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_conteudo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gerado_em",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gerado_por",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_desig_doc_org_desig ON designacao_documentos (organization, designacao)"
       ]
     }
   ]

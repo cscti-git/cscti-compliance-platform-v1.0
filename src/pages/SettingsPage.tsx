@@ -16,6 +16,7 @@ import {
   listOrganizationUsers,
   listAuditLogs,
 } from '@/services/csctiService'
+import { listPapeisDesignados, listDesignacoes } from '@/services/designacaoService'
 
 import type {
   OrganizationTypeItem,
@@ -26,6 +27,8 @@ import type {
   IntegrationItem,
   UserItem,
   AuditLogItem,
+  PapelDesignadoItem,
+  DesignacaoItem,
 } from '@/types/cscti'
 
 import { ConfigOverviewTab } from './config/ConfigOverviewTab'
@@ -49,6 +52,8 @@ export const SettingsPage: React.FC = () => {
   const [people, setPeople] = useState<PersonItem[]>([])
   const [roles, setRoles] = useState<RoleItem[]>([])
   const [assignments, setAssignments] = useState<AssignmentItem[]>([])
+  const [papeisDesignados, setPapeisDesignados] = useState<PapelDesignadoItem[]>([])
+  const [designacoes, setDesignacoes] = useState<DesignacaoItem[]>([])
   const [integrations, setIntegrations] = useState<{
     glpi: IntegrationItem | null
     email: IntegrationItem | null
@@ -64,21 +69,26 @@ export const SettingsPage: React.FC = () => {
       if (!isSilent) setIsLoading(true)
       setIsReloading(true)
       try {
-        const [tList, sList, pList, rList, aList, intObj, auditList] = await Promise.all([
-          listOrganizationTypes(),
-          listInstitutionalServices(),
-          listPeople(organization.id),
-          listRoles(),
-          listAssignments(organization.id),
-          getIntegrations(organization.id),
-          listAuditLogs(organization.id, 10).catch(() => [] as AuditLogItem[]),
-        ])
+        const [tList, sList, pList, rList, aList, intObj, auditList, pdList, desigList] =
+          await Promise.all([
+            listOrganizationTypes(),
+            listInstitutionalServices(),
+            listPeople(organization.id),
+            listRoles(),
+            listAssignments(organization.id),
+            getIntegrations(organization.id),
+            listAuditLogs(organization.id, 10).catch(() => [] as AuditLogItem[]),
+            listPapeisDesignados(organization.id),
+            listDesignacoes(organization.id),
+          ])
         setTypes(tList)
         setServices(sList)
         setPeople(pList)
         setRoles(rList)
         setAssignments(aList)
         setIntegrations(intObj)
+        setPapeisDesignados(pdList)
+        setDesignacoes(desigList)
 
         // Identificar o evento de auditoria mais recente relevante para configurações/organização
         const relevantAudit =
@@ -190,6 +200,8 @@ export const SettingsPage: React.FC = () => {
               assignments={assignments}
               users={users}
               integrations={integrations}
+              papeisDesignados={papeisDesignados}
+              designacoes={designacoes}
               lastAuditLog={lastAuditLog}
               onNavigateTab={handleNavigateFromOverview}
               isAdmin={isAdmin}
@@ -214,13 +226,17 @@ export const SettingsPage: React.FC = () => {
           {currentTab === 'papeis' && organization && (
             <PeopleRolesTab
               organizationId={organization.id}
+              organization={organization}
               people={people}
               roles={roles}
               assignments={assignments}
+              papeisDesignados={papeisDesignados}
+              designacoes={designacoes}
               onRefresh={async () => {
                 await loadAllData(true)
               }}
               readOnly={!isAdmin && !isSuporte}
+              currentUserName={user?.name || user?.email || 'Administrador'}
             />
           )}
 

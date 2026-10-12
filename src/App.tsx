@@ -15,6 +15,7 @@ import VerifyEmail from './pages/VerifyEmail'
 import SettingsPage from './pages/SettingsPage'
 import IntegrationsPage from './pages/IntegrationsPage'
 import AuditPage from './pages/AuditPage'
+import TermoDesignacaoPage from './pages/config/TermoDesignacaoPage'
 import AssetsPage from './pages/inventory/AssetsPage'
 import InventoryReportPage from './pages/inventory/InventoryReportPage'
 import BackupOverviewPage from './pages/backup/BackupOverviewPage'
@@ -147,6 +148,7 @@ export const App = () => (
             {/* 7. Administração e Integrações */}
             <Route path="/configuracoes" element={<SettingsPage />} />
             <Route path="/integracoes" element={<IntegrationsPage />} />
+            <Route path="/configuracoes/designacoes/:id/termo" element={<TermoDesignacaoPage />} />
           </Route>
 
           {/* Relatórios Comprobatórios Formatados (Visualização limpa e Impressão A4) */}

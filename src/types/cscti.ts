@@ -908,3 +908,82 @@ export interface EvidenciaItem {
     ativo_vinculado?: InventoryAssetItem
   }
 }
+
+// ==========================================
+// 13. Papéis Designados e Termos de Designação
+// ==========================================
+
+export interface PapelDesignadoItem {
+  id: string
+  organization: string
+  papel: string
+  codigo?: string
+  descricao_curta?: string
+  atribuicoes_detalhadas: string
+  e_obrigatorio: boolean
+  da_ferramenta?: boolean
+  modulo_vinculado?: string
+  ordem?: number
+  status: 'ativo' | 'inativo'
+  created?: string
+  updated?: string
+}
+
+export type DesignacaoStatus =
+  | 'rascunho'
+  | 'pendente_assinatura'
+  | 'assinada_fisica'
+  | 'assinada_digital'
+  | 'revogada'
+
+export interface DesignacaoItem {
+  id: string
+  organization: string
+  papel_designado: string
+  colaborador?: string
+  nome_designado: string
+  cpf_designado?: string
+  email_designado?: string
+  telefone_designado?: string
+  cargo_designado?: string
+  status: DesignacaoStatus
+  data_designacao: string
+  data_assinatura?: string
+  plataforma_assinatura?: string
+  observacoes?: string
+  atribuicoes_customizadas?: string
+  anexos_comprovante?: string[]
+  hash_sha256?: string
+  metodo_assinatura_detalhes?: string
+  data_revogacao?: string
+  motivo_revogacao?: string
+  revogado_por?: string
+  created?: string
+  updated?: string
+  expand?: {
+    papel_designado?: PapelDesignadoItem
+    colaborador?: PersonItem
+    organization?: OrganizationItem
+  }
+}
+
+export interface DesignacaoDocumentoItem {
+  id: string
+  organization: string
+  designacao: string
+  titulo: string
+  tipo_documento?: 'termo_designacao' | 'termo_revogacao' | string
+  versao?: string
+  conteudo_html?: string
+  conteudo_texto?: string
+  dados_serventia_snapshot?: Record<string, unknown>
+  dados_designado_snapshot?: Record<string, unknown>
+  hash_conteudo?: string
+  gerado_em?: string
+  gerado_por?: string
+  created?: string
+  updated?: string
+  expand?: {
+    designacao?: DesignacaoItem
+  }
+}
