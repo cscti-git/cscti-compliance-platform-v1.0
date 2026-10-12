@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T00:14:04.605Z",
+  "generatedAt": "2026-10-12T00:24:02.570Z",
   "collections": [
     {
       "name": "users",
@@ -2994,6 +2994,488 @@
       ],
       "indexes": [
         "CREATE INDEX idx_desig_doc_org_desig ON designacao_documentos (organization, designacao)"
+      ]
+    },
+    {
+      "name": "lgpd_finalidades",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "base_legal",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "consentimento",
+            "execução de contrato",
+            "obrigação legal",
+            "legítimo interesse",
+            "proteção de vida",
+            "tutela da saúde",
+            "exercício de direitos"
+          ]
+        },
+        {
+          "name": "categorias_titulares",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "titulares de serviços",
+            "colaboradores",
+            "fornecedores",
+            "terceiros",
+            "menores"
+          ]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_lgpd_fin_org_status ON lgpd_finalidades (organization, status)",
+        "CREATE INDEX idx_lgpd_fin_org_nome ON lgpd_finalidades (organization, nome)"
+      ]
+    },
+    {
+      "name": "lgpd_dados",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "categoria_sensibilidade",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["comum", "sensivel"]
+        },
+        {
+          "name": "finalidade",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "lgpd_finalidades"
+        },
+        {
+          "name": "sistema_origem",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ativo_vinculado",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "inventory_assets"
+        },
+        {
+          "name": "tempo_retencao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "justificativa_retencao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "forma_descarte",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["eliminação", "anonimização", "bloqueio"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_lgpd_dad_org_sens ON lgpd_dados (organization, categoria_sensibilidade)",
+        "CREATE INDEX idx_lgpd_dad_org_fin ON lgpd_dados (organization, finalidade)",
+        "CREATE INDEX idx_lgpd_dad_org_status ON lgpd_dados (organization, status)"
+      ]
+    },
+    {
+      "name": "lgpd_ciencias",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "colaborador",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "people"
+        },
+        {
+          "name": "nome_colaborador",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "email_colaborador",
+          "type": "email",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cargo_colaborador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "politica_versao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "politica_arquivo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_ciencia",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_assinatura",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["fisica", "digital"]
+        },
+        {
+          "name": "documento_assinado",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plataforma_digital",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "protocolo_digital",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["pendente", "concedida", "revogada"]
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_lgpd_cien_org_status ON lgpd_ciencias (organization, status)",
+        "CREATE INDEX idx_lgpd_cien_org_colab ON lgpd_ciencias (organization, colaborador)"
+      ]
+    },
+    {
+      "name": "lgpd_incidentes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "titulo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_deteccao",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_ocorrencia",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gravidade",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["baixa", "media", "alta", "critica"]
+        },
+        {
+          "name": "dados_afetados_texto",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dados_afetados_rel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "lgpd_dados"
+        },
+        {
+          "name": "titulares_afetados_estimativa",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status_fluxo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "detectado",
+            "em_investigacao",
+            "contido",
+            "comunicados_titulares",
+            "encerrado"
+          ]
+        },
+        {
+          "name": "data_comunicacao_titular",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "protocolo_comunicacao_titular",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_comunicacao_orgao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "protocolo_comunicacao_orgao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_72h_cumprido",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "anexos",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel_registro",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "medidas_tomadas",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "licoes_aprendidas",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_encerramento",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_lgpd_inc_org_status ON lgpd_incidentes (organization, status_fluxo)",
+        "CREATE INDEX idx_lgpd_inc_org_grav ON lgpd_incidentes (organization, gravidade)",
+        "CREATE INDEX idx_lgpd_inc_org_det ON lgpd_incidentes (organization, data_deteccao DESC)"
       ]
     }
   ]

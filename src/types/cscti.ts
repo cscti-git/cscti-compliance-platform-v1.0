@@ -987,3 +987,125 @@ export interface DesignacaoDocumentoItem {
     designacao?: DesignacaoItem
   }
 }
+
+// ==========================================
+// 14. Módulo LGPD e Governança de Dados
+// ==========================================
+
+export type LgpdBaseLegal =
+  | 'consentimento'
+  | 'execução de contrato'
+  | 'obrigação legal'
+  | 'legítimo interesse'
+  | 'proteção de vida'
+  | 'tutela da saúde'
+  | 'exercício de direitos'
+
+export type LgpdCategoriaTitular =
+  | 'titulares de serviços'
+  | 'colaboradores'
+  | 'fornecedores'
+  | 'terceiros'
+  | 'menores'
+
+export interface LgpdFinalidadeItem {
+  id: string
+  organization: string
+  nome: string
+  descricao?: string
+  base_legal: LgpdBaseLegal
+  categorias_titulares?: LgpdCategoriaTitular[]
+  status: 'ativo' | 'inativo'
+  created?: string
+  updated?: string
+}
+
+export type LgpdSensibilidade = 'comum' | 'sensivel'
+
+export type LgpdFormaDescarte = 'eliminação' | 'anonimização' | 'bloqueio'
+
+export interface LgpdDadoItem {
+  id: string
+  organization: string
+  nome: string
+  categoria_sensibilidade: LgpdSensibilidade
+  finalidade?: string
+  sistema_origem?: string
+  ativo_vinculado?: string
+  tempo_retencao?: string
+  justificativa_retencao?: string
+  forma_descarte: LgpdFormaDescarte
+  status: 'ativo' | 'inativo'
+  observacoes?: string
+  created?: string
+  updated?: string
+  expand?: {
+    finalidade?: LgpdFinalidadeItem
+    ativo_vinculado?: InventoryAssetItem
+  }
+}
+
+export type LgpdCienciaStatus = 'pendente' | 'concedida' | 'revogada'
+
+export interface LgpdCienciaItem {
+  id: string
+  organization: string
+  colaborador?: string
+  nome_colaborador: string
+  email_colaborador?: string
+  cargo_colaborador?: string
+  politica_versao?: string
+  politica_arquivo?: string
+  data_ciencia?: string
+  tipo_assinatura?: 'fisica' | 'digital'
+  documento_assinado?: string[]
+  hash_sha256?: string
+  plataforma_digital?: string
+  protocolo_digital?: string
+  status: LgpdCienciaStatus
+  observacoes?: string
+  created?: string
+  updated?: string
+  expand?: {
+    colaborador?: PersonItem
+  }
+}
+
+export type LgpdIncidenteGravidade = 'baixa' | 'media' | 'alta' | 'critica'
+
+export type LgpdIncidenteStatusFluxo =
+  | 'detectado'
+  | 'em_investigacao'
+  | 'contido'
+  | 'comunicados_titulares'
+  | 'encerrado'
+
+export interface LgpdIncidenteItem {
+  id: string
+  organization: string
+  titulo: string
+  descricao: string
+  data_deteccao: string
+  data_ocorrencia?: string
+  gravidade: LgpdIncidenteGravidade
+  dados_afetados_texto?: string
+  dados_afetados_rel?: string[]
+  titulares_afetados_estimativa?: number
+  status_fluxo: LgpdIncidenteStatusFluxo
+  data_comunicacao_titular?: string
+  protocolo_comunicacao_titular?: string
+  data_comunicacao_orgao?: string
+  protocolo_comunicacao_orgao?: string
+  prazo_72h_cumprido?: boolean
+  anexos?: string[]
+  hash_sha256?: string
+  responsavel_registro: string
+  medidas_tomadas?: string
+  licoes_aprendidas?: string
+  data_encerramento?: string
+  created?: string
+  updated?: string
+  expand?: {
+    dados_afetados_rel?: LgpdDadoItem[]
+  }
+}

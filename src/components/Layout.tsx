@@ -18,6 +18,7 @@ import {
   X,
   RefreshCw,
   Network,
+  Lock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -52,6 +53,7 @@ const navSections: NavSection[] = [
   {
     title: 'Governança',
     items: [
+      { title: 'LGPD e Governança', href: '/lgpd', icon: Lock },
       { title: 'Conformidade', href: '/conformidade', icon: ShieldCheck },
       { title: 'Planos de Ação', href: '/planos-de-acao', icon: CheckCircle2 },
     ],

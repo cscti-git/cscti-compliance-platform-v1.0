@@ -24,6 +24,8 @@ import BackupGuiaPage from './pages/backup/BackupGuiaPage'
 import BackupReportPage from './pages/backup/BackupReportPage'
 import EvidenciasPage from './pages/evidencias/EvidenciasPage'
 import EvidenciasReportPage from './pages/evidencias/EvidenciasReportPage'
+import LgpdPage from './pages/lgpd/LgpdPage'
+import LgpdReportPage from './pages/lgpd/LgpdReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
@@ -66,6 +68,7 @@ export const App = () => (
             {/* 1. Visão Geral (Dashboard) */}
             <Route path="/" element={<Index />} />
             {/* 2. Governança */}
+            <Route path="/lgpd" element={<LgpdPage />} />
             <Route
               path="/conformidade"
               element={
@@ -173,6 +176,14 @@ export const App = () => (
             element={
               <ProtectedRoute>
                 <EvidenciasReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/lgpd"
+            element={
+              <ProtectedRoute>
+                <LgpdReportPage />
               </ProtectedRoute>
             }
           />
