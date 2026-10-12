@@ -36,7 +36,6 @@ import PlanosAcaoPage from './pages/planos/PlanosAcaoPage'
 import PlanosAcaoReportPage from './pages/planos/PlanosAcaoReportPage'
 import InfraestruturaPage from './pages/infraestrutura/InfraestruturaPage'
 import InfraestruturaReportPage from './pages/infraestrutura/InfraestruturaReportPage'
-import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
 export const App = () => (

@@ -206,7 +206,7 @@ export const InfraCamadaLogicaTab: React.FC<InfraCamadaLogicaTabProps> = ({
 
           <div className="flex items-center gap-2">
             <Link
-              to="/inventario"
+              to="/ativos"
               className="text-xs font-semibold text-blue-700 hover:underline flex items-center gap-1"
             >
               <span>Abrir Inventário</span>
