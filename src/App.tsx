@@ -28,6 +28,8 @@ import LgpdPage from './pages/lgpd/LgpdPage'
 import LgpdReportPage from './pages/lgpd/LgpdReportPage'
 import SegurancaPage from './pages/seguranca/SegurancaPage'
 import SegurancaReportPage from './pages/seguranca/SegurancaReportPage'
+import ConformidadePage from './pages/conformidade/ConformidadePage'
+import ConformidadeReportPage from './pages/conformidade/ConformidadeReportPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import NotFound from './pages/NotFound'
 
@@ -71,22 +73,7 @@ export const App = () => (
             <Route path="/" element={<Index />} />
             {/* 2. Governança */}
             <Route path="/lgpd" element={<LgpdPage />} />
-            <Route
-              path="/conformidade"
-              element={
-                <PlaceholderPage
-                  moduleTitle="Conformidade Normativa"
-                  moduleSection="Governança"
-                  description="Painel de aderência aos requisitos técnicos e diretrizes vigentes."
-                  featuresPlanned={[
-                    'Matriz de requisitos por classe (C1, C2 e C3)',
-                    'Checklist interativo com pontuação e aderência',
-                    'Acompanhamento de prazos regimentais',
-                    'Relatório formal de conformidade para o juízo competente',
-                  ]}
-                />
-              }
-            />
+            <Route path="/conformidade" element={<ConformidadePage />} />
             <Route
               path="/planos-de-acao"
               element={
@@ -180,6 +167,14 @@ export const App = () => (
             element={
               <ProtectedRoute>
                 <SegurancaReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/conformidade"
+            element={
+              <ProtectedRoute>
+                <ConformidadeReportPage />
               </ProtectedRoute>
             }
           />

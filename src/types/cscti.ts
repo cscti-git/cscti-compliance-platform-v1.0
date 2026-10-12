@@ -1232,3 +1232,99 @@ export interface SegurancaCoberturaCalculada {
   itensTotalCount: number
   dataUltimoComprovante?: string
 }
+
+// ==========================================
+// MÓDULO MATRIZ DE CONFORMIDADE
+// ==========================================
+
+export type ConformidadeStatusType = 'comprovado' | 'parcial' | 'pendente' | 'nao_conforme'
+
+export interface ConformidadeItemCatalog {
+  id: string
+  codigo: string // ex: "1.1", "2.5"
+  etapa: number // 1 a 6
+  etapa_titulo: string
+  titulo: string
+  descricao: string
+  exigencia_detalhada?: string
+  modulo_origem: string // designacoes, lgpd, inventario, evidencias, backup, seguranca, manual
+  link_modulo: string
+  tipo_evidencia_esperada?: string
+  obrigatorio_c1: boolean
+  obrigatorio_c2: boolean
+  obrigatorio_c3: boolean
+  ordem: number
+  status: 'ativo' | 'inativo'
+  created?: string
+  updated?: string
+}
+
+export interface ConformidadeStatusItem {
+  id: string
+  organization: string
+  item: string
+  item_codigo: string
+  status: ConformidadeStatusType
+  fonte_modulo?: string
+  referencia_comprovante?: string
+  link_comprovante?: string
+  hash_sha256?: string
+  data_comprovacao?: string
+  avaliado_automaticamente?: boolean
+  avaliado_por?: string
+  observacoes?: string
+  metadados?: Record<string, any>
+  created?: string
+  updated?: string
+  expand?: {
+    item?: ConformidadeItemCatalog
+  }
+}
+
+export interface ConformidadeEventoItem {
+  id: string
+  organization: string
+  item_codigo: string
+  status_anterior?: string
+  status_novo: string
+  origem_avaliacao: string
+  usuario_nome?: string
+  motivo?: string
+  evidencia_referencia?: string
+  hash_sha256?: string
+  created?: string
+  updated?: string
+}
+
+export interface EtapaConformidadeResumo {
+  numero: number
+  titulo: string
+  descricao: string
+  itensTotal: number
+  itensComprovados: number
+  itensParciais: number
+  itensPendentes: number
+  itensNaoConforme: number
+  percentual: number
+  concluida: boolean
+  bloqueada: boolean
+  itens: Array<ConformidadeStatusItem & { catalog?: ConformidadeItemCatalog }>
+}
+
+export interface MatrizConformidadeConsolidada {
+  serventiaClasse: 'C1' | 'C2' | 'C3'
+  serventiaNome: string
+  prazoEtapas1e2Dias: number
+  diasRestantesEtapas1e2: number
+  prazoEtapas1a5Meses: number
+  mesesRestantesEtapas1a5: number
+  urgenciaPrazo: 'normal' | 'atencao' | 'critica'
+  totalItens: number
+  totalComprovados: number
+  totalParciais: number
+  totalPendentes: number
+  totalNaoConforme: number
+  percentualGeral: number
+  etapas: EtapaConformidadeResumo[]
+  etapaBloqueanteAtual: number | null
+}

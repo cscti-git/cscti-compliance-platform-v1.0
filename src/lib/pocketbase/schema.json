@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T00:35:00.356Z",
+  "generatedAt": "2026-10-12T00:47:18.262Z",
   "collections": [
     {
       "name": "users",
@@ -3864,6 +3864,319 @@
       "indexes": [
         "CREATE INDEX idx_seg_it_org_status ON seg_itens_conformidade (organization, status)",
         "CREATE INDEX idx_seg_it_org_ordem ON seg_itens_conformidade (organization, ordem)"
+      ]
+    },
+    {
+      "name": "conformidade_itens",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.system_role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.system_role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "codigo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "etapa",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "etapa_titulo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "titulo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "exigencia_detalhada",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "modulo_origem",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "link_modulo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_evidencia_esperada",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "obrigatorio_c1",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "obrigatorio_c2",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "obrigatorio_c3",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ordem",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_conf_itens_codigo ON conformidade_itens (codigo)",
+        "CREATE INDEX idx_conf_itens_etapa ON conformidade_itens (etapa, ordem)"
+      ]
+    },
+    {
+      "name": "conformidade_status",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "item",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "conformidade_itens"
+        },
+        {
+          "name": "item_codigo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["comprovado", "parcial", "pendente", "nao_conforme"]
+        },
+        {
+          "name": "fonte_modulo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "referencia_comprovante",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "link_comprovante",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_comprovacao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "avaliado_automaticamente",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "avaliado_por",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "metadados",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_conf_status_org_item ON conformidade_status (organization, item_codigo)",
+        "CREATE INDEX idx_conf_status_org_st ON conformidade_status (organization, status)"
+      ]
+    },
+    {
+      "name": "conformidade_eventos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "item_codigo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status_anterior",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status_novo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "origem_avaliacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "usuario_nome",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "motivo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "evidencia_referencia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_conf_eventos_org_item ON conformidade_eventos (organization, item_codigo, created DESC)"
       ]
     }
   ]
