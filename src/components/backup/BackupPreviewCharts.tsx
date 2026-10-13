@@ -108,7 +108,7 @@ export const HorizontalStackedBar: React.FC<HorizontalStackedBarProps> = ({ cate
   }
 
   return (
-    <div className="space-y-2.5 w-full">
+    <div className="space-y-2.5 w-full min-w-0">
       {categories.map((cat, idx) => {
         const total = cat.total || 1
         const pctProtegidos = (cat.protegidos / total) * 100
@@ -116,22 +116,22 @@ export const HorizontalStackedBar: React.FC<HorizontalStackedBarProps> = ({ cate
         const pctSem = (cat.semProtecao / total) * 100
 
         return (
-          <div key={idx} className="flex items-center gap-2 sm:gap-3 text-xs">
-            {/* Nome da categoria */}
+          <div key={idx} className="flex items-center gap-2 sm:gap-2.5 text-xs w-full min-w-0">
+            {/* Nome da categoria com flex-1, min-w-0 e truncate para nunca empurrar o resto para fora */}
             <span
-              className="max-w-[130px] sm:max-w-[140px] font-medium text-slate-700 truncate text-left shrink-0"
+              className="flex-1 min-w-0 font-medium text-slate-700 truncate text-left"
               title={cat.categoria}
             >
               {cat.categoria}
             </span>
 
             {/* Quantidade de ativos */}
-            <span className="w-6 sm:w-8 font-bold text-slate-800 text-right shrink-0">
+            <span className="shrink-0 font-bold text-slate-800 text-right tabular-nums px-0.5">
               {cat.total}
             </span>
 
-            {/* Barra empilhada */}
-            <div className="flex-1 min-w-[60px] h-3.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+            {/* Barra empilhada proporcional com flex-1 e min-w-[50px] para ocupar o espaço disponível sem estourar */}
+            <div className="flex-1 min-w-[50px] max-w-[120px] h-3 bg-slate-100 rounded-full overflow-hidden flex shadow-inner shrink-0">
               {cat.protegidos > 0 && (
                 <div
                   className="bg-emerald-500 h-full transition-all duration-300"
@@ -155,8 +155,8 @@ export const HorizontalStackedBar: React.FC<HorizontalStackedBarProps> = ({ cate
               )}
             </div>
 
-            {/* Percentual protegido ao final */}
-            <span className="w-12 font-bold text-slate-900 text-right shrink-0">
+            {/* Percentual protegido ao final, shrink-0, tabular-nums e alinhado à direita dentro do card */}
+            <span className="w-10 sm:w-11 shrink-0 font-bold text-slate-900 text-right tabular-nums">
               {cat.percentProtegido}%
             </span>
           </div>

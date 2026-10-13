@@ -1236,14 +1236,14 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
           {/* 3. LINHA DE 3 PAINÉIS ANALÍTICOS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Painel A: Status das Execuções (Donut) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px]">
-              <div>
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px] min-w-0 overflow-hidden">
+              <div className="min-w-0 w-full">
                 <div className="min-h-[38px] mb-2 sm:mb-3 flex items-start">
-                  <h3 className="text-xs sm:text-[13px] 2xl:text-sm font-bold text-slate-900 leading-tight">
+                  <h3 className="text-xs sm:text-[13px] 2xl:text-sm font-bold text-slate-900 leading-tight truncate">
                     Status das Execuções
                   </h3>
                 </div>
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 py-0.5">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 py-0.5 min-w-0 w-full">
                   <div className="shrink-0 flex items-center justify-center">
                     <SvgDonutChart
                       data={statusExecucoesData.segments.map((s) => ({
@@ -1263,7 +1263,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                     {statusExecucoesData.segments.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between gap-1.5 text-slate-700 hover:text-slate-900 transition-colors"
+                        className="flex items-center justify-between gap-1.5 text-slate-700 hover:text-slate-900 transition-colors min-w-0"
                       >
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span
@@ -1286,37 +1286,37 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
             </Card>
 
             {/* Painel B: Cobertura de Proteção por Tipo de Ativo (Barras horizontais reais) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px]">
-              <div>
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px] min-w-0 overflow-hidden">
+              <div className="min-w-0 w-full">
                 <div className="min-h-[38px] mb-2 sm:mb-3 flex items-start">
                   <h3
-                    className="text-xs sm:text-[13px] 2xl:text-sm font-bold text-slate-900 leading-tight"
+                    className="text-xs sm:text-[13px] 2xl:text-sm font-bold text-slate-900 leading-tight truncate"
                     title="Cobertura de Proteção por Tipo de Ativo"
                   >
                     Cobertura de Proteção por Tipo de Ativo
                   </h3>
                 </div>
-                <div className="my-1">
+                <div className="my-1 min-w-0 w-full">
                   <HorizontalStackedBar categories={coberturaPorTipoAtivo} />
                 </div>
               </div>
               {/* Legenda inferior */}
               <div className="pt-3 mt-2 border-t border-slate-100 flex items-center justify-center gap-3 text-[11px] text-slate-600 flex-wrap">
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 shrink-0">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" /> Protegidos
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 shrink-0">
                   <span className="w-2 h-2 rounded-full bg-amber-400" /> Parciais
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 shrink-0">
                   <span className="w-2 h-2 rounded-full bg-rose-500" /> Sem proteção
                 </span>
               </div>
             </Card>
 
             {/* Painel C: Conformidade das Rotinas (Donut real considerando exclusivamente rotinas de backup) */}
-            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px]">
-              <div>
+            <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3.5 sm:p-4 2xl:p-5 flex flex-col justify-between min-h-[250px] min-w-0 overflow-hidden">
+              <div className="min-w-0 w-full">
                 <div className="min-h-[38px] mb-2 sm:mb-3 flex flex-col justify-start gap-1">
                   <h3
                     className="text-xs sm:text-[13px] 2xl:text-sm font-bold text-slate-900 leading-tight whitespace-normal"
@@ -1325,19 +1325,19 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                     Conformidade das Rotinas
                   </h3>
                   {conformidadeRotinas.totalRotinasNoc > 0 && (
-                    <div>
+                    <div className="min-w-0">
                       <span
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200"
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 max-w-full truncate"
                         title="Validação Externa (NOC) mantida como análise extra, fora do cálculo comprobatório"
                       >
                         <UserCheck className="w-3 h-3 text-purple-600 shrink-0" />
-                        <span>Análise extra — não comprobatória</span>
+                        <span className="truncate">Análise extra — não comprobatória</span>
                       </span>
                     </div>
                   )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 py-0.5">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 py-0.5 min-w-0 w-full">
                   <div className="shrink-0 flex items-center justify-center">
                     <SvgDonutChart
                       data={conformidadeRotinas.segments.map((s) => ({
@@ -1357,7 +1357,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                     {conformidadeRotinas.segments.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between gap-1.5 text-slate-700 hover:text-slate-900 transition-colors"
+                        className="flex items-center justify-between gap-1.5 text-slate-700 hover:text-slate-900 transition-colors min-w-0"
                       >
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span
@@ -1378,10 +1378,10 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                     {/* Exibição visível mas separada da rotina do NOC como análise extra com wrap controlado */}
                     {conformidadeRotinas.totalRotinasNoc > 0 && (
                       <div
-                        className="pt-1.5 mt-1 border-t border-dashed border-slate-200 text-slate-500"
+                        className="pt-1.5 mt-1 border-t border-dashed border-slate-200 text-slate-500 min-w-0"
                         title="Validação Externa (NOC): análise preventiva diária do NOC (camada analítica adicional, não comprobatória)"
                       >
-                        <div className="flex items-center justify-between gap-1.5">
+                        <div className="flex items-center justify-between gap-1.5 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
                             <span
@@ -1400,13 +1400,13 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                   </div>
                 </div>
               </div>
-              <div className="pt-3 mt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-                <span>
+              <div className="pt-3 mt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium min-w-0">
+                <span className="truncate">
                   Rotinas de backup:{' '}
                   <strong className="text-slate-800">{conformidadeRotinas.total}</strong>
                 </span>
                 {conformidadeRotinas.totalRotinasNoc > 0 && (
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-slate-400 shrink-0 ml-1">
                     + {conformidadeRotinas.totalRotinasNoc} análise NOC
                   </span>
                 )}
