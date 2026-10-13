@@ -1697,19 +1697,19 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                         title="Selecionar todos os registros desta página"
                       />
                     </th>
-                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[112px] whitespace-nowrap">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[110px] whitespace-nowrap">
                       Data/Hora
                     </th>
-                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[24%]">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[23%]">
                       Ativo
                     </th>
-                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[84px] whitespace-nowrap">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[110px] whitespace-nowrap">
                       Tipo
                     </th>
                     <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[24%]">
                       Rotina / Plano
                     </th>
-                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[150px]">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[115px]">
                       Resultado
                     </th>
                     <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[86px] whitespace-nowrap">
@@ -1877,26 +1877,26 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                             </div>
                           </td>
 
-                          {/* Coluna 4: Tipo (badge pastel conforme modelo de referência + linha secundária da modalidade comprovada) */}
-                          <td className="py-2.5 px-2 whitespace-nowrap min-w-0">
-                            <div className="flex flex-col items-start min-w-0 max-w-full">
+                          {/* Coluna 4: Tipo (badge pastel conforme modelo de referência + linha secundária da modalidade contida e truncada) */}
+                          <td className="py-2.5 px-2 min-w-0 overflow-hidden">
+                            <div className="flex flex-col items-start min-w-0 w-full overflow-hidden">
                               {exec.tipoBackupLabel === 'Completo' ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-blue-100 text-blue-700 border border-blue-200 shrink-0">
                                   Completo
                                 </span>
                               ) : exec.tipoBackupLabel === 'Incremental' ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-sky-100 text-sky-700 border border-sky-200">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-sky-100 text-sky-700 border border-sky-200 shrink-0">
                                   Incremental
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
                                   Configuração
                                 </span>
                               )}
 
                               {exec.ativoModalidadeLabel && (
                                 <span
-                                  className="text-[10px] font-medium text-slate-500 block truncate max-w-[170px] mt-0.5"
+                                  className="text-[10px] font-medium text-slate-500 block truncate max-w-full w-full mt-0.5"
                                   title={`${exec.ativoModalidadeLabel} · ${exec.dataHoraFormatada}`}
                                 >
                                   {exec.ativoModalidadeLabel} · {exec.dataHoraFormatada}
@@ -1905,16 +1905,16 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                             </div>
                           </td>
 
-                          {/* Coluna 5: Rotina / Plano (nome da rotina + subtítulo do plano) */}
-                          <td className="py-2.5 px-2 min-w-0">
+                          {/* Coluna 5: Rotina / Plano (nome da rotina + subtítulo do plano, ambos contidos com truncamento) */}
+                          <td className="py-2.5 px-2 min-w-0 overflow-hidden">
                             <span
-                              className="font-semibold text-[11.5px] text-slate-900 block truncate leading-tight"
+                              className="font-semibold text-[11.5px] text-slate-900 block truncate max-w-full leading-tight"
                               title={exec.rotinaNome}
                             >
                               {exec.rotinaNome}
                             </span>
                             <span
-                              className="text-[10.5px] font-medium text-slate-500 block truncate mt-0.5"
+                              className="text-[10.5px] font-medium text-slate-500 block truncate max-w-full mt-0.5"
                               title={exec.planoNome}
                             >
                               {exec.planoNome}

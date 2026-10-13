@@ -907,60 +907,58 @@ export const AssetsPage: React.FC = () => {
             </div>
           </Card>
 
-          {/* 6. TABELA PRINCIPAL DE ATIVOS */}
+          {/* 6. TABELA PRINCIPAL DE ATIVOS (compacta, alinhada ao padrão de Últimas Execuções, sem scroll horizontal desktop) */}
           <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-hidden">
+              <table className="w-full table-fixed text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/90 border-b border-slate-200/80 text-slate-600 font-semibold text-[11px] select-none">
-                    <th className="py-3 px-3.5 w-10 text-center">
+                  <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-semibold text-[11px] select-none">
+                    <th className="py-2.5 px-2 w-[34px] text-center">
                       <input
                         type="checkbox"
                         checked={isAllPageSelected}
                         onChange={toggleSelectAll}
                         className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
+                        title="Selecionar todos os ativos desta página"
                       />
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Código
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[110px] whitespace-nowrap">
+                      Código / Origem
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[24%]">
                       Nome do Ativo
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Categoria
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[16%]">
+                      Categoria / Tipo
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[84px] whitespace-nowrap">
                       Criticidade
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[95px] whitespace-nowrap">
                       Estado
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[105px] whitespace-nowrap">
                       Conformidade
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Responsável
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[15%]">
+                      Responsável / Local
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Última Validação
-                    </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700 text-right">
-                      Ações
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 text-right w-[42px] whitespace-nowrap">
+                      <span className="sr-only">Ações</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={10} className="py-12 text-center text-slate-400">
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
                         <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-600 mb-2" />
                         Carregando inventário de ativos da serventia...
                       </td>
                     </tr>
                   ) : paginatedAssets.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-12 text-center text-slate-400">
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
                         <Server className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                         <span className="font-semibold text-slate-700 block text-xs">
                           Nenhum ativo encontrado
@@ -979,123 +977,198 @@ export const AssetsPage: React.FC = () => {
                         <tr
                           key={asset.id}
                           onClick={() => setSelectedAssetId(asset.id)}
-                          className={`cursor-pointer transition-colors ${
-                            isSelected
-                              ? 'bg-blue-50/40 border-l-4 border-l-[#1A56DB]'
-                              : 'hover:bg-slate-50/70 border-l-4 border-l-transparent'
+                          className={`cursor-pointer transition-colors group ${
+                            isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/70'
                           }`}
                         >
                           {/* Checkbox */}
                           <td
-                            className="py-3 px-3.5 text-center"
+                            className="py-2.5 px-2 text-center"
                             onClick={(e) => toggleSelectRow(asset.id, e)}
                           >
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => {}}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5 align-middle"
                             />
                           </td>
 
-                          {/* Código com ícone circular do tipo (conforme esboço de referência) */}
-                          <td className="py-3 px-3.5 whitespace-nowrap">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200/80 shadow-2xs">
-                                {getAssetTypeIcon(asset.tipo, 'w-4 h-4 text-slate-700')}
-                              </div>
-                              <span className="font-mono text-xs font-bold text-slate-700">
+                          {/* Coluna 2: Código + Badge de Origem GLPI/Manual */}
+                          <td className="py-2.5 px-2 whitespace-nowrap min-w-0">
+                            <div className="flex flex-col items-start min-w-0">
+                              <span className="font-mono text-[11px] font-bold text-slate-800 leading-tight">
                                 {asset.displayCode}
+                              </span>
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-medium mt-0.5 ${
+                                  asset.origem === 'glpi'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                }`}
+                                title={
+                                  asset.origem === 'glpi'
+                                    ? `Sincronizado do GLPI (ID #${asset.external_id || '—'})`
+                                    : 'Cadastrado manualmente no sistema'
+                                }
+                              >
+                                {asset.origem === 'glpi' ? 'GLPI' : 'Manual'}
                               </span>
                             </div>
                           </td>
 
-                          {/* Nome do Ativo (Nome em negrito + subtipo em cinza embaixo) */}
-                          <td className="py-3 px-3.5 min-w-[180px]">
-                            <span className="font-bold text-slate-900 block leading-tight">
-                              {asset.name}
+                          {/* Coluna 3: Nome do Ativo (ícone compacto + nome truncado + subtítulo com tooltip) */}
+                          <td className="py-2.5 px-2 min-w-0 overflow-hidden">
+                            <div className="flex items-start gap-2 min-w-0">
+                              <div
+                                className="w-6 h-6 rounded-md bg-blue-50/80 text-blue-700 flex items-center justify-center shrink-0 border border-blue-100 mt-0.5"
+                                title={asset.subtipoFormatado}
+                              >
+                                {getAssetTypeIcon(asset.tipo, 'w-3.5 h-3.5 text-blue-700')}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span
+                                  className="font-semibold text-[11.5px] text-slate-900 block truncate leading-tight"
+                                  title={asset.name}
+                                >
+                                  {asset.name}
+                                </span>
+                                <span
+                                  className="text-[10px] font-medium text-slate-500 block truncate mt-0.5"
+                                  title={asset.descricao || asset.subtipoFormatado}
+                                >
+                                  {asset.descricao || asset.subtipoFormatado}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Coluna 4: Categoria / Tipo */}
+                          <td className="py-2.5 px-2 min-w-0 overflow-hidden">
+                            <span
+                              className="font-medium text-[11px] text-slate-800 block truncate"
+                              title={asset.subtipoFormatado}
+                            >
+                              {asset.subtipoFormatado}
                             </span>
-                            <span className="text-[11px] text-slate-400 block mt-0.5 truncate max-w-xs">
-                              {asset.descricao || asset.subtipoFormatado}
+                            <span
+                              className="text-[10px] text-slate-400 font-mono block truncate mt-0.5"
+                              title={asset.ip_address || asset.serial_number || 'Sem IP/Serial'}
+                            >
+                              {asset.ip_address || asset.serial_number || '—'}
                             </span>
                           </td>
 
-                          {/* Categoria */}
-                          <td className="py-3 px-3.5 whitespace-nowrap text-slate-700 font-medium">
-                            {asset.subtipoFormatado}
-                          </td>
-
-                          {/* Criticidade: Badge com ponto colorido */}
-                          <td className="py-3 px-3.5 whitespace-nowrap">
+                          {/* Coluna 5: Criticidade (badge pastel) */}
+                          <td className="py-2.5 px-2 whitespace-nowrap min-w-0">
                             {asset.criticidade === 'alta' ? (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-100 text-red-700">
-                                <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-rose-100 text-rose-800 border border-rose-200"
+                                title="Criticidade Alta / Crítica"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                                 Crítica
                               </span>
                             ) : asset.criticidade === 'media' ? (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-700">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-amber-100 text-amber-800 border border-amber-200"
+                                title="Criticidade Média"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
                                 Média
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-700">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                title="Criticidade Baixa"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                                 Baixa
                               </span>
                             )}
                           </td>
 
-                          {/* Estado Operacional */}
-                          <td className="py-3 px-3.5 whitespace-nowrap">
+                          {/* Coluna 6: Estado Operacional (badge pastel) */}
+                          <td className="py-2.5 px-2 whitespace-nowrap min-w-0">
                             {asset.status === 'ativo' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Em operação
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                title="Ativo em operação regular"
+                              >
+                                Operacional
                               </span>
                             ) : asset.status === 'inativo' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                Em manutenção
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-amber-100 text-amber-800 border border-amber-200"
+                                title="Ativo em manutenção ou inativo"
+                              >
+                                Manutenção
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                                title="Ativo desativado"
+                              >
                                 Desativado
                               </span>
                             )}
                           </td>
 
-                          {/* Conformidade */}
-                          <td className="py-3 px-3.5 whitespace-nowrap">
+                          {/* Coluna 7: Conformidade (badge pastel idêntico ao modelo) */}
+                          <td className="py-2.5 px-2 whitespace-nowrap min-w-0">
                             {asset.conformidadeStatus === 'conforme' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Conforme
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                title={`Conforme — validado em ${asset.ultimaValidacao}`}
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                <span>Conforme</span>
                               </span>
                             ) : asset.conformidadeStatus === 'pendente' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                Pendente
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                                title="Pendente — requer adequação de salvaguardas"
+                              >
+                                <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                <span>Pendente</span>
                               </span>
                             ) : asset.conformidadeStatus === 'nao_conforme' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
-                                Não conforme
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-rose-100 text-rose-800 border border-rose-200"
+                                title="Não conforme — salvaguarda obrigatória ausente"
+                              >
+                                <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+                                <span>Não conf.</span>
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                                title="Não avaliado pelo motor de confronto"
+                              >
                                 Não avaliado
                               </span>
                             )}
                           </td>
 
-                          {/* Responsável */}
-                          <td className="py-3 px-3.5 whitespace-nowrap text-slate-700 font-medium">
-                            {asset.expand?.responsavel?.name || '—'}
+                          {/* Coluna 8: Responsável / Localização */}
+                          <td className="py-2.5 px-2 min-w-0 overflow-hidden">
+                            <span
+                              className="font-medium text-[11px] text-slate-800 block truncate leading-tight"
+                              title={asset.expand?.responsavel?.name || 'Responsável não atribuído'}
+                            >
+                              {asset.expand?.responsavel?.name || '—'}
+                            </span>
+                            <span
+                              className="text-[10px] text-slate-500 block truncate mt-0.5"
+                              title={asset.localizacao || 'Localização não definida'}
+                            >
+                              {asset.localizacao || 'Sem local'}
+                            </span>
                           </td>
 
-                          {/* Última Validação */}
-                          <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-600">
-                            {asset.ultimaValidacao}
-                          </td>
-
-                          {/* Ações (menu ⋯) */}
+                          {/* Coluna 9: Ações (menu ...) */}
                           <td
-                            className="py-3 px-3.5 text-right whitespace-nowrap"
+                            className="py-2.5 px-2 text-right whitespace-nowrap"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <DropdownMenu>

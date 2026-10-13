@@ -1,0 +1,39 @@
+[Unit]
+Description=CSCTI Compliance Platform - PocketBase Backend
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cscti
+Group=cscti
+WorkingDirectory=/opt/cscti/backend
+EnvironmentFile=-/etc/cscti/cscti.env
+
+# Inicia o PocketBase escutando apenas em localhost (o Nginx faz o proxy reverso seguro)
+ExecStart=/opt/cscti/backend/pocketbase serve \
+    --http="127.0.0.1:8090" \
+    --dir="/opt/cscti/backend/pb_data" \
+    --publicDir="/opt/cscti/frontend" \
+    --hooksDir="/opt/cscti/backend/pb_hooks" \
+    --migrationsDir="/opt/cscti/backend/pb_migrations"
+
+# Políticas de reinicialização em caso de falha
+Restart=always
+RestartSec=5s
+
+# Hardening e limites de segurança
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/cscti/backend/pb_data /var/log/cscti /tmp
+
+# Logs gerenciados pelo systemd journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cscti-pocketbase
+
+[Install]
+WantedBy=multi-user.target
