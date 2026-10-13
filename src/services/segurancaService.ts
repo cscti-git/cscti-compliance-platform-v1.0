@@ -403,6 +403,23 @@ export async function deleteSegItemConformidade(
  * Confronta os ativos do inventário que devem possuir proteção com os comprovantes
  * mais recentes da serventia ativa.
  */
+export function isAssetRelevantForEndpoint(asset: InventoryAssetItem): boolean {
+  if (asset.status === 'inativo' || asset.status === 'desativado') return false
+  if (asset.exige_endpoint_protection !== undefined && asset.exige_endpoint_protection !== null) {
+    return Boolean(asset.exige_endpoint_protection)
+  }
+  return (
+    asset.tipo === 'estacao' ||
+    asset.tipo === 'servidor_aplicacao' ||
+    asset.tipo === 'servidor_virtualizado' ||
+    asset.tipo === 'banco_dados'
+  )
+}
+
+/**
+ * Confronta os ativos do inventário real que devem possuir proteção endpoint
+ * contra os comprovantes vinculados e status individual máquina por máquina.
+ */
 export function calcularCoberturaSeguranca(
   assets: InventoryAssetItem[],
   solucoes: SegSolucaoItem[],
@@ -410,27 +427,36 @@ export function calcularCoberturaSeguranca(
   comprovantes: SegComprovanteItem[],
   itensConformidade: SegItemConformidadeItem[],
 ): SegurancaCoberturaCalculada {
-  const estacoes = assets.filter(
-    (a) => a.tipo === 'estacao' && a.status !== 'inativo' && a.status !== 'desativado',
-  )
-  const servidores = assets.filter(
-    (a) =>
-      (a.tipo === 'servidor_aplicacao' ||
-        a.tipo === 'servidor_virtualizado' ||
-        a.tipo === 'banco_dados') &&
-      a.status !== 'inativo' &&
-      a.status !== 'desativado',
-  )
-  const totalAtivos = estacoes.length + servidores.length
+  const ativosValidos = assets.filter((a) => a.status !== 'inativo' && a.status !== 'desativado')
 
-  // Cobertura exigida de endpoint (ajuste manual ou total derivado)
+  const estacoes = ativosValidos.filter((a) => a.tipo === 'estacao')
+  const servidores = ativosValidos.filter(
+    (a) =>
+      a.tipo === 'servidor_aplicacao' ||
+      a.tipo === 'servidor_virtualizado' ||
+      a.tipo === 'banco_dados',
+  )
+  const outros = ativosValidos.filter((a) => !estacoes.includes(a) && !servidores.includes(a))
+
+  // Ativos que exigem proteção endpoint no inventário
+  const ativosExigidos = ativosValidos.filter(isAssetRelevantForEndpoint)
+  const totalExigidosInventario = ativosExigidos.length
+
+  // Cobertura exigida de endpoint (ajuste manual da serventia ou total do inventário)
   const cobEndpointItem = coberturasExigidas.find((c) => c.tipo_solucao === 'endpoint_antivirus')
   const exigidasEndpoint =
     cobEndpointItem && cobEndpointItem.quantidade_exigida > 0
       ? cobEndpointItem.quantidade_exigida
-      : Math.max(totalAtivos, 1)
+      : totalExigidosInventario
 
-  // Encontrar o comprovante mais recente de endpoint
+  // Contagem nominal máquina por máquina nos ativos do inventário
+  const protegidosNominais = ativosExigidos.filter((a) => a.endpoint_status === 'protegido').length
+  const semAgenteNominais = ativosExigidos.filter((a) => a.endpoint_status === 'sem_agente').length
+  const semComprovacaoNominais = ativosExigidos.filter(
+    (a) => !a.endpoint_status || a.endpoint_status === 'sem_comprovacao',
+  ).length
+
+  // Comprovante mais recente de endpoint para dados temporais/laudo
   const comprovantesEndpoint = comprovantes.filter((c) => {
     const solTipo = c.expand?.solucao?.tipo
     return (
@@ -440,23 +466,35 @@ export function calcularCoberturaSeguranca(
     )
   })
 
-  // Comprovante mais recente geral
   const comprovanteMaisRecente = comprovantes.length > 0 ? comprovantes[0] : null
   const dataUltimoComprovante = comprovanteMaisRecente
     ? comprovanteMaisRecente.data_comprovante
     : undefined
 
-  // Mais recente de endpoint
   const compEndpointRecente = comprovantesEndpoint.length > 0 ? comprovantesEndpoint[0] : null
-  const comprovadasEndpoint = compEndpointRecente?.maquinas_protegidas ?? 0
-  const semAgenteEndpoint = compEndpointRecente?.maquinas_sem_agente ?? 0
   const definicoesAtualizadasData = compEndpointRecente?.data_definicoes_atualizadas
 
-  // Percentual real: (comprovadas ÷ exigidas) * 100, limitado a 100%
-  const percentualCobertura = Math.min(
-    100,
-    Math.round((comprovadasEndpoint / Math.max(exigidasEndpoint, 1)) * 100),
-  )
+  // Se houver ativos exigidos no inventário, a verdade nominal prevalece
+  // Se não houver ativos no inventário cadastrados, o cálculo fica honesto (0%)
+  const comprovadasEndpoint =
+    totalExigidosInventario > 0
+      ? protegidosNominais
+      : (compEndpointRecente?.maquinas_protegidas ?? 0)
+
+  const semAgenteEndpoint =
+    totalExigidosInventario > 0
+      ? semAgenteNominais
+      : (compEndpointRecente?.maquinas_sem_agente ?? 0)
+
+  const semComprovacaoEndpoint = totalExigidosInventario > 0 ? semComprovacaoNominais : 0
+
+  // Percentual real: (comprovadas ÷ exigidas) * 100
+  const divisor = Math.max(exigidasEndpoint, 1)
+  const percentualCobertura =
+    totalExigidosInventario === 0 &&
+    (!compEndpointRecente || !compEndpointRecente.maquinas_protegidas)
+      ? 0
+      : Math.min(100, Math.round((comprovadasEndpoint / divisor) * 100))
 
   // Firewall status consolidado
   const compFirewall = comprovantes.find(
@@ -464,7 +502,6 @@ export function calcularCoberturaSeguranca(
   )
   const statusFirewallConsolidado = compFirewall?.status_firewall || 'pendente_comprovacao'
 
-  // Total de ameaças bloqueadas somadas de comprovantes
   const ameacasBloqueadasTotal = comprovantes.reduce(
     (acc, curr) => acc + (curr.ameacas_bloqueadas || 0),
     0,
@@ -475,12 +512,14 @@ export function calcularCoberturaSeguranca(
   const itensTotalCount = itensConformidade.length
 
   return {
-    totalAtivosInventario: totalAtivos,
+    totalAtivosInventario: totalExigidosInventario,
     estacoesCount: estacoes.length,
     servidoresCount: servidores.length,
+    outrosAtivosCount: outros.length,
     exigidasEndpoint,
     comprovadasEndpoint,
     semAgenteEndpoint,
+    semComprovacaoEndpoint,
     percentualCobertura,
     definicoesAtualizadasData,
     statusFirewallConsolidado,
@@ -490,4 +529,175 @@ export function calcularCoberturaSeguranca(
     itensTotalCount,
     dataUltimoComprovante,
   }
+}
+
+// ==========================================
+// 6. GESTÃO DE COBERTURA NOMINAL DE ATIVOS
+// ==========================================
+
+export interface VincularEndpointAtivoPayload {
+  ativoId: string
+  endpoint_status: 'protegido' | 'sem_agente' | 'sem_comprovacao'
+  comprovanteId?: string
+  solucaoId?: string
+  data_comprovacao?: string
+  hash_sha256?: string
+  observacoes?: string
+}
+
+/**
+ * Atualiza o status de cobertura de um único ativo com registro na auditoria append-only
+ */
+export async function updateAssetEndpointCoverage(
+  orgId: string,
+  asset: InventoryAssetItem,
+  payload: VincularEndpointAtivoPayload,
+): Promise<InventoryAssetItem> {
+  const updateData: Record<string, any> = {
+    endpoint_status: payload.endpoint_status,
+    endpoint_comprovante: payload.comprovanteId || null,
+    endpoint_solucao: payload.solucaoId || null,
+    endpoint_data_comprovacao: payload.data_comprovacao || null,
+    endpoint_hash_sha256: payload.hash_sha256 || '',
+    endpoint_observacoes: payload.observacoes || '',
+  }
+
+  const updatedAsset = await pb
+    .collection('inventory_assets')
+    .update<InventoryAssetItem>(asset.id, updateData, {
+      expand: 'endpoint_comprovante,endpoint_solucao,responsavel',
+    })
+
+  const statusLabel =
+    payload.endpoint_status === 'protegido'
+      ? 'Protegido (Comprovado)'
+      : payload.endpoint_status === 'sem_agente'
+        ? 'Sem agente / Não protegido'
+        : 'Sem comprovação'
+
+  await logAudit({
+    action: 'SEG_ATIVO_COVERAGE_UPDATE',
+    entity: 'Segurança do Ambiente',
+    detail: `Status de proteção do ativo "${asset.name}" (${asset.tipo}) alterado para: ${statusLabel}${
+      payload.comprovanteId ? ` via comprovante [${payload.comprovanteId}]` : ''
+    }`,
+    organizationId: orgId,
+    metadata: {
+      ativo_id: asset.id,
+      ativo_nome: asset.name,
+      ativo_tipo: asset.tipo,
+      origem: asset.origem,
+      status_anterior: asset.endpoint_status || 'sem_comprovacao',
+      status_novo: payload.endpoint_status,
+      comprovante_id: payload.comprovanteId || null,
+      hash_sha256: payload.hash_sha256 || null,
+    },
+  })
+
+  return updatedAsset
+}
+
+export interface BatchVincularEndpointPayload {
+  assetIds: string[]
+  endpoint_status: 'protegido' | 'sem_agente' | 'sem_comprovacao'
+  comprovanteId?: string
+  solucaoId?: string
+  data_comprovacao?: string
+  hash_sha256?: string
+  observacoes?: string
+}
+
+/**
+ * Atualiza o status de cobertura de múltiplos ativos em lote com auditoria append-only
+ */
+export async function batchUpdateAssetsEndpointCoverage(
+  orgId: string,
+  assets: InventoryAssetItem[],
+  payload: BatchVincularEndpointPayload,
+): Promise<{ successCount: number; errors: string[] }> {
+  let successCount = 0
+  const errors: string[] = []
+  const targetAssets = assets.filter((a) => payload.assetIds.includes(a.id))
+
+  for (const asset of targetAssets) {
+    try {
+      const updateData: Record<string, any> = {
+        endpoint_status: payload.endpoint_status,
+        endpoint_comprovante: payload.comprovanteId || null,
+        endpoint_solucao: payload.solucaoId || null,
+        endpoint_data_comprovacao: payload.data_comprovacao || null,
+        endpoint_hash_sha256: payload.hash_sha256 || '',
+        endpoint_observacoes: payload.observacoes || '',
+      }
+
+      await pb.collection('inventory_assets').update(asset.id, updateData)
+      successCount++
+    } catch (err: any) {
+      console.error(`Erro ao atualizar ativo ${asset.id}:`, err)
+      errors.push(`${asset.name}: ${err?.message || 'Falha ao atualizar'}`)
+    }
+  }
+
+  const statusLabel =
+    payload.endpoint_status === 'protegido'
+      ? 'Protegido'
+      : payload.endpoint_status === 'sem_agente'
+        ? 'Sem agente / Não protegido'
+        : 'Sem comprovação'
+
+  await logAudit({
+    action: 'SEG_ATIVOS_COVERAGE_BATCH',
+    entity: 'Segurança do Ambiente',
+    detail: `Atualização em lote de cobertura: ${successCount} ativo(s) marcados como "${statusLabel}"${
+      payload.comprovanteId ? ` vinculados ao comprovante [${payload.comprovanteId}]` : ''
+    }`,
+    organizationId: orgId,
+    metadata: {
+      total_solicitado: payload.assetIds.length,
+      sucessos: successCount,
+      falhas: errors.length,
+      status_definido: payload.endpoint_status,
+      comprovante_id: payload.comprovanteId || null,
+      hash_sha256: payload.hash_sha256 || null,
+      ativos: targetAssets.map((a) => ({ id: a.id, name: a.name, tipo: a.tipo })),
+    },
+  })
+
+  return { successCount, errors }
+}
+
+/**
+ * Altera a flag se o ativo exige endpoint protection no inventário
+ */
+export async function toggleAssetExigeEndpoint(
+  orgId: string,
+  asset: InventoryAssetItem,
+  exige: boolean,
+): Promise<InventoryAssetItem> {
+  const updated = await pb.collection('inventory_assets').update<InventoryAssetItem>(
+    asset.id,
+    {
+      exige_endpoint_protection: exige,
+    },
+    {
+      expand: 'endpoint_comprovante,endpoint_solucao,responsavel',
+    },
+  )
+
+  await logAudit({
+    action: 'SEG_ATIVO_EXIGENCIA_TOGGLE',
+    entity: 'Segurança do Ambiente',
+    detail: `Exigência de endpoint protection para "${asset.name}" alterada para: ${
+      exige ? 'Exigida' : 'Dispensada'
+    }`,
+    organizationId: orgId,
+    metadata: {
+      ativo_id: asset.id,
+      ativo_nome: asset.name,
+      exige_anterior: Boolean(asset.exige_endpoint_protection),
+      exige_novo: exige,
+    },
+  })
+
+  return updated
 }

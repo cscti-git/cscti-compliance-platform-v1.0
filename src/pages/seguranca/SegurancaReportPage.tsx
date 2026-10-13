@@ -301,12 +301,12 @@ export const SegurancaReportPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Seção 2: Confronto de Cobertura e Ativos Protegidos */}
-        <div className="space-y-2 pt-2">
+        {/* Seção 2: Confronto de Cobertura e Tabela Nominal de Ativos */}
+        <div className="space-y-3 pt-2">
           <div className="flex items-center gap-2 border-b border-slate-300 pb-1">
             <Activity className="w-4 h-4 text-[#0B2545]" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-[#0B2545]">
-              2. Confronto de Cobertura (Ativos vs. Agentes Comprovados)
+              2. Confronto e Tabela Nominal de Cobertura por Ativo
             </h2>
           </div>
 
@@ -314,39 +314,132 @@ export const SegurancaReportPage: React.FC = () => {
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                  Ativos Inventariados
+                  Ativos com Proteção Exigida
                 </span>
                 <span className="text-base font-bold text-slate-800">
-                  {assets.length} ativos ({coberturaCalculada.estacoesCount} estações,{' '}
-                  {coberturaCalculada.servidoresCount} servidores)
+                  {coberturaCalculada.exigidasEndpoint} máquinas ({coberturaCalculada.estacoesCount}{' '}
+                  estações, {coberturaCalculada.servidoresCount} servidores)
                 </span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                  Exigência de Proteção
-                </span>
-                <span className="text-base font-bold text-slate-800">
-                  {coberturaCalculada.exigidasEndpoint} máquinas
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                  Comprovadas Ativas
+                  Ativos Protegidos (Comprovados)
                 </span>
                 <span className="text-base font-bold text-emerald-700">
-                  {coberturaCalculada.comprovadasEndpoint} máquinas (
-                  {coberturaCalculada.percentualCobertura}%)
+                  {coberturaCalculada.comprovadasEndpoint} de {coberturaCalculada.exigidasEndpoint}{' '}
+                  ({coberturaCalculada.percentualCobertura}%)
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                  Sem Agente / Sem Comprovação
+                </span>
+                <span className="text-base font-bold text-amber-700">
+                  {coberturaCalculada.semAgenteEndpoint} sem agente •{' '}
+                  {coberturaCalculada.semComprovacaoEndpoint} sem laudo
                 </span>
               </div>
             </div>
 
             {coberturaCalculada.semAgenteEndpoint > 0 && (
               <div className="text-[11px] text-rose-700 font-semibold bg-rose-50 border border-rose-200 p-2 rounded">
-                Atenção: O último laudo de console reportou {coberturaCalculada.semAgenteEndpoint}{' '}
-                máquina(s) sem agente ou desprotegidas no ambiente.
+                Atenção: Constam {coberturaCalculada.semAgenteEndpoint} máquina(s) sem agente ou
+                desprotegidas no inventário ativo da serventia.
               </div>
             )}
           </div>
+
+          {/* Tabela Nominal Máquina por Máquina */}
+          <table className="w-full text-left text-[10px] text-slate-700 border border-slate-200">
+            <thead className="bg-slate-100 text-[9px] font-bold text-slate-700 uppercase">
+              <tr>
+                <th className="p-2 border-b border-slate-200">Nome / Hostname</th>
+                <th className="p-2 border-b border-slate-200">Tipo de Ativo</th>
+                <th className="p-2 border-b border-slate-200">Origem</th>
+                <th className="p-2 border-b border-slate-200">Exigência</th>
+                <th className="p-2 border-b border-slate-200">Status de Proteção</th>
+                <th className="p-2 border-b border-slate-200">Comprovante Vinculado</th>
+                <th className="p-2 border-b border-slate-200">Data Documento</th>
+                <th className="p-2 border-b border-slate-200">Hash SHA-256</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {assets.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-3 text-center text-slate-400 italic">
+                    Nenhum ativo registrado no inventário da serventia.
+                  </td>
+                </tr>
+              ) : (
+                assets.map((a) => {
+                  const statusProt = a.endpoint_status || 'sem_comprovacao'
+                  const compVinculado =
+                    a.expand?.endpoint_comprovante ||
+                    comprovantes.find((c) => c.id === a.endpoint_comprovante)
+
+                  const dataDoc = compVinculado?.data_comprovante || a.endpoint_data_comprovacao
+                  const hashDoc = compVinculado?.hash_sha256 || a.endpoint_hash_sha256
+
+                  return (
+                    <tr key={a.id}>
+                      <td className="p-2 font-semibold text-slate-900">
+                        <div>{a.name}</div>
+                        {a.ip_address && (
+                          <div className="text-[9px] text-slate-400 font-mono">{a.ip_address}</div>
+                        )}
+                      </td>
+                      <td className="p-2 capitalize">{a.tipo.replace('_', ' ')}</td>
+                      <td className="p-2">
+                        {a.origem === 'glpi' ? (
+                          <span className="font-semibold text-blue-700">
+                            GLPI #{a.external_id || ''}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">Manual</span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {a.exige_endpoint_protection !== false ? (
+                          <span className="text-slate-800 font-medium">Exigida</span>
+                        ) : (
+                          <span className="text-slate-400">Dispensada</span>
+                        )}
+                      </td>
+                      <td className="p-2 font-bold">
+                        {statusProt === 'protegido' ? (
+                          <span className="text-emerald-700">Protegido</span>
+                        ) : statusProt === 'sem_agente' ? (
+                          <span className="text-rose-700">Sem Agente</span>
+                        ) : (
+                          <span className="text-amber-700">Sem Comprovação</span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {compVinculado ? (
+                          <span>
+                            {compVinculado.expand?.solucao?.nome || 'Comprovante Console'} (
+                            {compVinculado.tipo.replace('_', ' ')})
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">—</span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {dataDoc ? (
+                          formatSpDateOnly(dataDoc)
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="p-2 font-mono text-[8px] text-slate-500 truncate max-w-[110px]">
+                        {hashDoc ? `${hashDoc.substring(0, 16)}...` : '—'}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
         </div>
 
         {/* Seção 3: Checklist do Ambiente */}

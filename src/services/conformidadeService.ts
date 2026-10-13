@@ -449,26 +449,66 @@ export async function avaliarStatusModulosIntegrados(
       }
     }
 
-    // 2.7 Endpoint / Antivírus em todas as estações
+    // 2.7 Endpoint / Antivírus em todas as estações e servidores (cruzamento por ativo real)
     else if (catItem.codigo === '2.7') {
       const endpointSol = segSolucoes.filter(
         (s) => s.tipo === 'endpoint_antivirus' && s.status === 'ativa',
       )
+      const ativosExigidos = inventoryAssets.filter((a) => {
+        if (a.status === 'inativo' || a.status === 'desativado') return false
+        if (a.exige_endpoint_protection !== undefined && a.exige_endpoint_protection !== null) {
+          return Boolean(a.exige_endpoint_protection)
+        }
+        return (
+          a.tipo === 'estacao' ||
+          a.tipo === 'servidor_aplicacao' ||
+          a.tipo === 'servidor_virtualizado' ||
+          a.tipo === 'banco_dados'
+        )
+      })
+
+      const protegidosNominais = ativosExigidos.filter((a) => a.endpoint_status === 'protegido')
+      const totalExigidos = ativosExigidos.length
       const compRecente = segComprovantes.find(
-        (c) => c.maquinas_protegidas && c.maquinas_protegidas > 0,
+        (c) =>
+          c.expand?.solucao?.tipo === 'endpoint_antivirus' ||
+          (c.maquinas_protegidas && c.maquinas_protegidas > 0) ||
+          c.tipo === 'relatorio_console',
       )
-      if (endpointSol.length > 0 && compRecente) {
+
+      if (totalExigidos > 0 && protegidosNominais.length === totalExigidos) {
         computedStatus = 'comprovado'
-        referencia = `${endpointSol[0].nome} ativo com ${compRecente.maquinas_protegidas} máquinas protegidas`
+        const solNome = endpointSol[0]?.nome || 'Antivírus Corporativo'
+        const primeiroComp = protegidosNominais[0]?.expand?.endpoint_comprovante || compRecente
+        referencia = `${solNome} com 100% de cobertura (${protegidosNominais.length}/${totalExigidos} ativos protegidos)`
+        link = `/seguranca?tab=cobertura`
+        dataComp =
+          primeiroComp?.data_comprovante || primeiroComp?.updated || new Date().toISOString()
+        hash = primeiroComp?.hash_sha256 || ''
+        obs = 'Cobertura integral comprovada máquina por máquina contra o Inventário de Ativos.'
+      } else if (totalExigidos > 0 && protegidosNominais.length > 0) {
+        computedStatus = 'parcial'
+        referencia = `${protegidosNominais.length} de ${totalExigidos} ativos protegidos no inventário`
+        link = `/seguranca?tab=cobertura`
+        dataComp = compRecente?.data_comprovante || compRecente?.updated
+        hash = compRecente?.hash_sha256 || ''
+        obs = 'Cobertura parcial no inventário: pendente de comprovação nos demais ativos.'
+      } else if (endpointSol.length > 0 && compRecente && (!totalExigidos || totalExigidos === 0)) {
+        computedStatus = 'comprovado'
+        referencia = `${endpointSol[0].nome} ativo (${compRecente.maquinas_protegidas || 0} máquinas declaradas em console)`
         link = `/seguranca?tab=cobertura`
         dataComp = compRecente.data_comprovante || compRecente.updated
         hash = compRecente.hash_sha256 || ''
         obs = 'Relatório de console de endpoint anexado no módulo Segurança.'
       } else if (endpointSol.length > 0) {
         computedStatus = 'parcial'
-        referencia = `${endpointSol[0].nome} cadastrado, aguardando relatório de console`
+        referencia = `${endpointSol[0].nome} cadastrado, aguardando comprovação dos ativos`
+        link = `/seguranca?tab=cobertura`
+        obs = 'Solução ativa, aguardando vinculação de comprovação aos ativos do inventário.'
       } else {
         computedStatus = 'pendente'
+        link = `/seguranca?tab=cobertura`
+        obs = 'Nenhuma solução de endpoint ativa ou ativos sem comprovação cadastrada.'
       }
     }
 

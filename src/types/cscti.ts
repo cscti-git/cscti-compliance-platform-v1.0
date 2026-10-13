@@ -200,6 +200,13 @@ export interface InventoryAssetItem {
   exige_backup_local?: boolean
   exige_backup_nuvem?: boolean
   exige_backup_replicacao?: boolean
+  exige_endpoint_protection?: boolean
+  endpoint_status?: 'protegido' | 'sem_agente' | 'sem_comprovacao'
+  endpoint_comprovante?: string
+  endpoint_data_comprovacao?: string
+  endpoint_hash_sha256?: string
+  endpoint_solucao?: string
+  endpoint_observacoes?: string
   sistema_operacional?: string
   versao_so?: string
   eol_status?: 'suportado' | 'proximo_eol' | 'sem_suporte' | 'mitigado' | 'desconhecido'
@@ -210,6 +217,8 @@ export interface InventoryAssetItem {
   expand?: {
     responsavel?: PersonItem
     organization?: OrganizationItem
+    endpoint_comprovante?: any
+    endpoint_solucao?: any
   }
 }
 
@@ -1225,9 +1234,11 @@ export interface SegurancaCoberturaCalculada {
   totalAtivosInventario: number
   estacoesCount: number
   servidoresCount: number
+  outrosAtivosCount?: number
   exigidasEndpoint: number
   comprovadasEndpoint: number
   semAgenteEndpoint: number
+  semComprovacaoEndpoint: number
   percentualCobertura: number
   definicoesAtualizadasData?: string
   statusFirewallConsolidado?: string

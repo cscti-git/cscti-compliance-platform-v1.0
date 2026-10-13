@@ -228,7 +228,7 @@ export const SegurancaPage: React.FC = () => {
           supportText={`${solucoes.length} cadastradas no catálogo`}
         />
 
-        {/* KPI 2: Cobertura de Endpoint (% real com tooltip) */}
+        {/* KPI 2: Cobertura de Endpoint (% real máquina por máquina com tooltip) */}
         <KpiCard
           label="Cobertura de Endpoint"
           value={coberturaCalculada.percentualCobertura}
@@ -240,8 +240,8 @@ export const SegurancaPage: React.FC = () => {
           iconColor={
             coberturaCalculada.percentualCobertura >= 80 ? 'text-emerald-700' : 'text-amber-700'
           }
-          supportText={`${coberturaCalculada.comprovadasEndpoint} de ${coberturaCalculada.exigidasEndpoint} máquinas comprovadas`}
-          infoTooltip="Fórmula: (Máquinas com agente comprovado ativo ÷ Total de ativos exigidos) × 100. Confronta os comprovantes ingeridos contra o inventário real."
+          supportText={`${coberturaCalculada.comprovadasEndpoint} de ${coberturaCalculada.exigidasEndpoint} ativos protegidos`}
+          infoTooltip="Fórmula: (Ativos com status Protegido comprovado ÷ Total de ativos exigidos no inventário) × 100. Confronta os comprovantes reais contra o Inventário de Ativos (incluindo GLPI)."
         />
 
         {/* KPI 3: Itens Comprovados */}
