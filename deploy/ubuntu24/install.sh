@@ -62,8 +62,22 @@ mkdir -p /var/log/cscti
 mkdir -p /var/backups/cscti
 
 # 3. Baixar binário oficial do PocketBase para Linux amd64
-POCKETBASE_VERSION="0.22.21"
-if [[ ! -f "${BACKEND_DIR}/pocketbase" ]]; then
+POCKETBASE_VERSION="0.24.4"
+NEED_DOWNLOAD=false
+
+if [[ -f "${BACKEND_DIR}/pocketbase" ]]; then
+    INSTALLED_VER="$("${BACKEND_DIR}/pocketbase" --version 2>&1 | tr -d 'v' || true)"
+    if [[ "${INSTALLED_VER}" == *"${POCKETBASE_VERSION}"* ]]; then
+        echo -e "\n${YELLOW}[3/7] Binário PocketBase v${POCKETBASE_VERSION} já verificado em ${BACKEND_DIR}/pocketbase.${NC}"
+    else
+        echo -e "\n${YELLOW}[3/7] Binário existente possui versão diferente (${INSTALLED_VER}). Atualizando para v${POCKETBASE_VERSION}...${NC}"
+        NEED_DOWNLOAD=true
+    fi
+else
+    NEED_DOWNLOAD=true
+fi
+
+if [[ "${NEED_DOWNLOAD}" == "true" ]]; then
     echo -e "\n${YELLOW}[3/7] Baixando binário oficial do PocketBase v${POCKETBASE_VERSION}...${NC}"
     PB_TMP="$(mktemp -d /tmp/pb_dl_XXXXXX)"
     wget -q --show-progress "https://github.com/pocketbase/pocketbase/releases/download/v${POCKETBASE_VERSION}/pocketbase_${POCKETBASE_VERSION}_linux_amd64.zip" -O "${PB_TMP}/pocketbase.zip"
@@ -71,9 +85,16 @@ if [[ ! -f "${BACKEND_DIR}/pocketbase" ]]; then
     rm -rf "${PB_TMP}"
     chmod +x "${BACKEND_DIR}/pocketbase"
     echo -e "  - PocketBase instalado em ${BACKEND_DIR}/pocketbase"
-else
-    echo -e "\n${YELLOW}[3/7] Binário do PocketBase já presente em ${BACKEND_DIR}/pocketbase.${NC}"
 fi
+
+# Verificação rigorosa pós-download: pocketbase --version deve retornar 0.24.4
+CHECK_VERSION="$("${BACKEND_DIR}/pocketbase" --version 2>&1 || true)"
+if [[ "${CHECK_VERSION}" != *"0.24.4"* ]]; then
+    echo -e "${RED}ERRO CRÍTICO: Falha na validação do binário do PocketBase!${NC}"
+    echo -e "${RED}Esperado versão contendo '0.24.4', porém o comando retornou: '${CHECK_VERSION}'${NC}"
+    exit 1
+fi
+echo -e "  - Validação de versão concluída com sucesso: ${GREEN}${CHECK_VERSION}${NC}"
 
 # 4. Copiar migrações, hooks do backend e build do frontend
 echo -e "\n${YELLOW}[4/7] Copiando migrações, hooks e build do frontend...${NC}"

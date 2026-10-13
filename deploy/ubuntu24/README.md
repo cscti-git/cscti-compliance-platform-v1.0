@@ -57,7 +57,7 @@ sudo ./install.sh
 O instalador irá automaticamente:
 1. Instalar Nginx, SQLite3, Curl, OpenSSL, Tar, UFW;
 2. Criar o usuário de sistema seguro `cscti`;
-3. Baixar o binário oficial do PocketBase para Linux amd64;
+3. Baixar e validar o binário oficial do PocketBase v0.24.4 para Linux amd64 (com verificação estrita de versão);
 4. Copiar todas as 74+ migrações do banco e os hooks de integração (GLPI, comprovantes Veeam/Acronis/NOC);
 5. Copiar os arquivos estáticos compilados do frontend para `/opt/cscti/frontend`;
 6. Gerar certificado SSL autoassinado de 10 anos (ou preparar para certificado comercial);
@@ -88,7 +88,42 @@ O instalador irá automaticamente:
 
 ---
 
-### 5. Comandos de Gerenciamento do Sistema
+### 5. Atualização de VM Já Instalada (Correção para PocketBase v0.24.4)
+
+Caso a VM já tenha sido provisionada anteriormente com um binário mais antigo (ex.: v0.22.x) e apresente erro em migrações que utilizam a API moderna do PocketBase (`findCollectionByNameOrId`), execute a sequência cirúrgica abaixo como `root` (`sudo -i` ou com `sudo`):
+
+```bash
+# 1. Parar o serviço do PocketBase
+sudo systemctl stop cscti-pocketbase
+
+# 2. Baixar e instalar o binário oficial v0.24.4
+PB_TMP="$(mktemp -d)"
+wget -q --show-progress "https://github.com/pocketbase/pocketbase/releases/download/v0.24.4/pocketbase_0.24.4_linux_amd64.zip" -O "${PB_TMP}/pocketbase.zip"
+sudo unzip -q -o "${PB_TMP}/pocketbase.zip" -d /opt/cscti/backend/
+rm -rf "${PB_TMP}"
+
+# 3. Ajustar permissões de execução e proprietário
+sudo chmod +x /opt/cscti/backend/pocketbase
+sudo chown -R cscti:cscti /opt/cscti/backend/
+
+# 4. Validar que a versão instalada é a 0.24.4
+/opt/cscti/backend/pocketbase --version
+
+# 5. Aplicar as migrações diretamente via linha de comando
+sudo -u cscti /opt/cscti/backend/pocketbase migrate up \
+  --dir=/opt/cscti/backend/pb_data \
+  --migrationsDir=/opt/cscti/backend/pb_migrations
+
+# 6. Reiniciar o serviço systemd
+sudo systemctl restart cscti-pocketbase
+
+# 7. Confirmar inicialização limpa (procurar pela mensagem "Server started")
+sudo journalctl -u cscti-pocketbase -n 50 --no-pager
+```
+
+---
+
+### 6. Comandos de Gerenciamento do Sistema
 
 #### Verificar status do backend:
 ```bash
@@ -122,7 +157,7 @@ sudo /opt/cscti/backend/scripts/restore-cscti.sh /var/backups/cscti/cscti_backup
 
 ---
 
-### 6. Configuração de Notificações SMTP da Serventia
+### 7. Configuração de Notificações SMTP da Serventia
 
 Para configurar o servidor de e-mail (ex.: Exchange, Google Workspace, Postfix interno):
 1. Edite o arquivo `/etc/cscti/cscti.env` com os dados do SMTP do cartório;
@@ -132,7 +167,7 @@ Para configurar o servidor de e-mail (ex.: Exchange, Google Workspace, Postfix i
 
 ---
 
-### 7. Motor de Integração com GLPI Local
+### 8. Motor de Integração com GLPI Local
 
 A VM conta com o hook nativo `glpi_sync.js`:
 - Endpoint de sincronização manual: `POST https://<IP-OU-DOMINIO>/backend/v1/inventory/glpi-sync`
