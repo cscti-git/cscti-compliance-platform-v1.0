@@ -1877,21 +1877,32 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                             </div>
                           </td>
 
-                          {/* Coluna 4: Tipo (badge pastel conforme modelo de referência) */}
-                          <td className="py-2.5 px-2 whitespace-nowrap">
-                            {exec.tipoBackupLabel === 'Completo' ? (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
-                                Completo
-                              </span>
-                            ) : exec.tipoBackupLabel === 'Incremental' ? (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-sky-100 text-sky-700 border border-sky-200">
-                                Incremental
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                                Configuração
-                              </span>
-                            )}
+                          {/* Coluna 4: Tipo (badge pastel conforme modelo de referência + linha secundária da modalidade comprovada) */}
+                          <td className="py-2.5 px-2 whitespace-nowrap min-w-0">
+                            <div className="flex flex-col items-start min-w-0 max-w-full">
+                              {exec.tipoBackupLabel === 'Completo' ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                                  Completo
+                                </span>
+                              ) : exec.tipoBackupLabel === 'Incremental' ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-sky-100 text-sky-700 border border-sky-200">
+                                  Incremental
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                  Configuração
+                                </span>
+                              )}
+
+                              {exec.ativoModalidadeLabel && (
+                                <span
+                                  className="text-[10px] font-medium text-slate-500 block truncate max-w-[170px] mt-0.5"
+                                  title={`${exec.ativoModalidadeLabel} · ${exec.dataHoraFormatada}`}
+                                >
+                                  {exec.ativoModalidadeLabel} · {exec.dataHoraFormatada}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Coluna 5: Rotina / Plano (nome da rotina + subtítulo do plano) */}
@@ -1910,36 +1921,46 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                             </span>
                           </td>
 
-                          {/* Coluna 6: Resultado (badge pastel com ícone + selo modalidade/data) */}
+                          {/* Coluna 6: Resultado (SOMENTE o badge de status padrão; tooltip preserva rastreabilidade) */}
                           <td className="py-2.5 px-2 min-w-0">
-                            <div className="flex flex-col gap-0.5 items-start min-w-0 max-w-full">
+                            <div className="flex items-center">
                               {exec.status === 'sucesso' ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                  title={
+                                    exec.ativoModalidadeLabel
+                                      ? `Sucesso — Modalidade comprovada: ${exec.ativoModalidadeLabel} em ${exec.dataHoraFormatada}`
+                                      : 'Sucesso'
+                                  }
+                                >
                                   <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
                                   <span>Sucesso</span>
                                 </span>
                               ) : exec.status === 'erro' ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-rose-100 text-rose-800 border border-rose-200"
+                                  title={
+                                    exec.ativoModalidadeLabel
+                                      ? `Falha — Modalidade comprovada: ${exec.ativoModalidadeLabel} em ${exec.dataHoraFormatada}`
+                                      : 'Falha'
+                                  }
+                                >
                                   <XCircle className="w-3 h-3 text-rose-600 shrink-0" />
                                   <span>Falha</span>
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                                  title={
+                                    exec.ativoModalidadeLabel
+                                      ? `Com alertas — Modalidade comprovada: ${exec.ativoModalidadeLabel} em ${exec.dataHoraFormatada}`
+                                      : 'Com alertas'
+                                  }
+                                >
                                   <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
                                   <span>Com alertas</span>
                                 </span>
                               )}
-
-                              {/* Selo comprovatório de modalidade (regra de ouro do projeto) */}
-                              <span
-                                className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-medium truncate max-w-full"
-                                title={`Modalidade ${exec.ativoModalidadeLabel} comprovada em ${exec.dataHoraFormatada}`}
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                <span className="truncate">
-                                  {exec.ativoModalidadeLabel}: {exec.dataHoraFormatada}
-                                </span>
-                              </span>
                             </div>
                           </td>
 
