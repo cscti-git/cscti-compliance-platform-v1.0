@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { formatDateTime } from '@/lib/dateTime'
 import {
   Database,
@@ -48,6 +49,11 @@ import {
   ShieldCheck,
   HelpCircle,
   Printer,
+  SlidersHorizontal,
+  Monitor,
+  Database as DatabaseIcon,
+  HardDrive,
+  FileText,
 } from 'lucide-react'
 import {
   listBackupEscopos,
@@ -134,7 +140,11 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipoAtivo, setFilterTipoAtivo] = useState('todos')
   const [filterStatusExecucao, setFilterStatusExecucao] = useState('todos')
-  const [filterPeriodo, setFilterPeriodo] = useState('todos') // 'todos' | '30dias' | '7dias' | '24h'
+  const [filterConformidade, setFilterConformidade] = useState('todos') // 'todos' | 'conforme' | 'nao_conforme' | 'atencao'
+  const [filterPeriodo, setFilterPeriodo] = useState('30dias') // Padrão conforme modelo de referência: 'Últimos 30 dias'
+  const [filterModalidade, setFilterModalidade] = useState('todos') // 'todos' | 'local' | 'nuvem' | 'replicacao'
+  const [filterTipoBackup, setFilterTipoBackup] = useState('todos') // 'todos' | 'completo' | 'incremental' | 'configuracao'
+  const [maisFiltrosOpen, setMaisFiltrosOpen] = useState(false)
 
   // Seleção e paginação da tabela
   const [selectedExecIds, setSelectedExecIds] = useState<Set<string>>(new Set())
@@ -847,9 +857,52 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
         }
       }
 
+      if (filterConformidade !== 'todos') {
+        if (filterConformidade === 'conforme' && exec.status !== 'sucesso') return false
+        if (filterConformidade === 'atencao' && exec.status !== 'parcial') return false
+        if (
+          filterConformidade === 'nao_conforme' &&
+          exec.status !== 'erro' &&
+          exec.status !== 'nao_executada'
+        )
+          return false
+      }
+
+      if (filterModalidade !== 'todos') {
+        const modLower = (exec.ativoModalidadeKey || exec.ativoModalidadeLabel || '').toLowerCase()
+        if (filterModalidade === 'local' && !modLower.includes('local')) return false
+        if (
+          filterModalidade === 'nuvem' &&
+          !modLower.includes('nuvem') &&
+          !modLower.includes('cloud')
+        )
+          return false
+        if (
+          filterModalidade === 'replicacao' &&
+          !modLower.includes('replic') &&
+          !modLower.includes('offsite')
+        )
+          return false
+      }
+
+      if (filterTipoBackup !== 'todos') {
+        const tipoLabelLower = exec.tipoBackupLabel.toLowerCase()
+        if (filterTipoBackup === 'completo' && tipoLabelLower !== 'completo') return false
+        if (filterTipoBackup === 'incremental' && tipoLabelLower !== 'incremental') return false
+        if (filterTipoBackup === 'configuracao' && tipoLabelLower !== 'configuração') return false
+      }
+
       return true
     })
-  }, [enrichedExecucoes, searchTerm, filterTipoAtivo, filterPeriodo])
+  }, [
+    enrichedExecucoes,
+    searchTerm,
+    filterTipoAtivo,
+    filterPeriodo,
+    filterConformidade,
+    filterModalidade,
+    filterTipoBackup,
+  ])
 
   const filteredExecucoes = useMemo(() => {
     if (filterStatusExecucao === 'todos') {
@@ -904,7 +957,15 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterTipoAtivo, filterStatusExecucao, filterPeriodo])
+  }, [
+    searchTerm,
+    filterTipoAtivo,
+    filterStatusExecucao,
+    filterConformidade,
+    filterPeriodo,
+    filterModalidade,
+    filterTipoBackup,
+  ])
 
   const allCurrentIds = paginatedExecucoes.map((e) => e.id)
   const isAllCurrentSelected =
@@ -1414,11 +1475,11 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
             </Card>
           </div>
 
-          {/* BARRA DE FILTROS */}
-          <Card className="bg-white border-slate-200 shadow-2xs rounded-xl p-3">
-            <div className="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between">
+          {/* BARRA DE FILTROS (MODELO DE REFERÊNCIA) */}
+          <div className="bg-white border border-slate-200/90 shadow-2xs rounded-xl p-3">
+            <div className="flex flex-col xl:flex-row gap-2.5 items-stretch xl:items-center justify-between">
               {/* Campo de Busca */}
-              <div className="relative flex-1 min-w-[220px]">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <Input
                   value={searchTerm}
@@ -1428,72 +1489,177 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                 />
               </div>
 
-              {/* Dropdowns */}
+              {/* Filtros em Linha: Tipo de Ativo, Status, Conformidade, Período + Mais Filtros */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* Tipo de Ativo */}
-                <Select value={filterTipoAtivo} onValueChange={setFilterTipoAtivo}>
-                  <SelectTrigger className="h-9 text-xs w-[190px] bg-white border-slate-200">
-                    <span className="text-slate-500 mr-1">Tipo:</span>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="servidor">Servidores virtualizados</SelectItem>
-                    <SelectItem value="estacao">Estações de trabalho</SelectItem>
-                    <SelectItem value="banco">Bancos de dados</SelectItem>
-                    <SelectItem value="rede">Rede e segurança</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col">
+                  <Select value={filterTipoAtivo} onValueChange={setFilterTipoAtivo}>
+                    <SelectTrigger className="h-9 text-xs w-[155px] bg-white border-slate-200 shadow-none">
+                      <span className="text-slate-500 mr-1 font-normal">Tipo:</span>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="servidor">Servidores (VMs)</SelectItem>
+                      <SelectItem value="estacao">Estações</SelectItem>
+                      <SelectItem value="banco">Banco de dados</SelectItem>
+                      <SelectItem value="rede">Rede / Firewall</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Status da Execução */}
-                <Select value={filterStatusExecucao} onValueChange={setFilterStatusExecucao}>
-                  <SelectTrigger className="h-9 text-xs w-[150px] bg-white border-slate-200">
-                    <span className="text-slate-500 mr-1">Status:</span>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="sucesso">Sucesso</SelectItem>
-                    <SelectItem value="parcial">Com alertas</SelectItem>
-                    <SelectItem value="erro">Falhas</SelectItem>
-                    <SelectItem value="nao_executada">Não executadas</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col">
+                  <Select value={filterStatusExecucao} onValueChange={setFilterStatusExecucao}>
+                    <SelectTrigger className="h-9 text-xs w-[155px] bg-white border-slate-200 shadow-none">
+                      <span className="text-slate-500 mr-1 font-normal">Status:</span>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="sucesso">Sucesso</SelectItem>
+                      <SelectItem value="parcial">Com alertas</SelectItem>
+                      <SelectItem value="erro">Falhas</SelectItem>
+                      <SelectItem value="nao_executada">Não executadas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Conformidade */}
+                <div className="flex flex-col">
+                  <Select value={filterConformidade} onValueChange={setFilterConformidade}>
+                    <SelectTrigger className="h-9 text-xs w-[165px] bg-white border-slate-200 shadow-none">
+                      <span className="text-slate-500 mr-1 font-normal">Conformidade:</span>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="conforme">Conforme</SelectItem>
+                      <SelectItem value="atencao">Em atenção</SelectItem>
+                      <SelectItem value="nao_conforme">Não conforme</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 {/* Período */}
-                <Select value={filterPeriodo} onValueChange={setFilterPeriodo}>
-                  <SelectTrigger className="h-9 text-xs w-[150px] bg-white border-slate-200">
-                    <span className="text-slate-500 mr-1">Período:</span>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todo o histórico</SelectItem>
-                    <SelectItem value="24h">Últimas 24h</SelectItem>
-                    <SelectItem value="7dias">Últimos 7 dias</SelectItem>
-                    <SelectItem value="30dias">Últimos 30 dias</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col">
+                  <Select value={filterPeriodo} onValueChange={setFilterPeriodo}>
+                    <SelectTrigger className="h-9 text-xs w-[170px] bg-white border-slate-200 shadow-none">
+                      <span className="text-slate-500 mr-1 font-normal">Período:</span>
+                      <SelectValue placeholder="Últimos 30 dias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30dias">Últimos 30 dias</SelectItem>
+                      <SelectItem value="7dias">Últimos 7 dias</SelectItem>
+                      <SelectItem value="24h">Últimas 24h</SelectItem>
+                      <SelectItem value="todos">Todo o histórico</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                {/* Botão Limpar */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSearchTerm('')
-                    setFilterTipoAtivo('todos')
-                    setFilterStatusExecucao('todos')
-                    setFilterPeriodo('todos')
-                  }}
-                  className="h-9 text-xs text-slate-600 border-slate-200 hover:bg-slate-50"
-                  title="Limpar filtros"
-                >
-                  Limpar
-                </Button>
+                {/* Botão Mais filtros (Popover com Modalidade e Tipo de Backup) */}
+                <Popover open={maisFiltrosOpen} onOpenChange={setMaisFiltrosOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`h-9 px-3 text-xs gap-1.5 border-slate-200 font-medium ${
+                        filterModalidade !== 'todos' || filterTipoBackup !== 'todos'
+                          ? 'bg-blue-50 text-blue-700 border-blue-300'
+                          : 'text-[#1A56DB] hover:bg-blue-50/50 hover:text-blue-800'
+                      }`}
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-[#1A56DB]" />
+                      <span>Mais filtros</span>
+                      {(filterModalidade !== 'todos' || filterTipoBackup !== 'todos') && (
+                        <span className="w-2 h-2 rounded-full bg-blue-600 ml-0.5" />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 p-3 space-y-3 text-xs">
+                    <div className="font-semibold text-slate-800 pb-1.5 border-b border-slate-100 flex items-center justify-between">
+                      <span>Filtros adicionais</span>
+                      {(filterModalidade !== 'todos' || filterTipoBackup !== 'todos') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterModalidade('todos')
+                            setFilterTipoBackup('todos')
+                          }}
+                          className="text-[11px] text-blue-600 hover:underline font-normal"
+                        >
+                          Limpar adicionais
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium text-slate-600 block">
+                        Modalidade Comprovada
+                      </label>
+                      <Select value={filterModalidade} onValueChange={setFilterModalidade}>
+                        <SelectTrigger className="h-8 text-xs w-full bg-white border-slate-200">
+                          <SelectValue placeholder="Todas as modalidades" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todas as modalidades</SelectItem>
+                          <SelectItem value="local">Local (Disco / Storage)</SelectItem>
+                          <SelectItem value="nuvem">Nuvem (Off-site / Cloud)</SelectItem>
+                          <SelectItem value="replicacao">Replicação (Standby)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium text-slate-600 block">
+                        Tipo de Backup
+                      </label>
+                      <Select value={filterTipoBackup} onValueChange={setFilterTipoBackup}>
+                        <SelectTrigger className="h-8 text-xs w-full bg-white border-slate-200">
+                          <SelectValue placeholder="Todos os tipos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos os tipos</SelectItem>
+                          <SelectItem value="completo">Completo (Full)</SelectItem>
+                          <SelectItem value="incremental">Incremental</SelectItem>
+                          <SelectItem value="configuracao">Configuração / Export</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Botão Limpar (caso filtros estejam ativos) */}
+                {(searchTerm ||
+                  filterTipoAtivo !== 'todos' ||
+                  filterStatusExecucao !== 'todos' ||
+                  filterConformidade !== 'todos' ||
+                  filterPeriodo !== '30dias' ||
+                  filterModalidade !== 'todos' ||
+                  filterTipoBackup !== 'todos') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchTerm('')
+                      setFilterTipoAtivo('todos')
+                      setFilterStatusExecucao('todos')
+                      setFilterConformidade('todos')
+                      setFilterPeriodo('30dias')
+                      setFilterModalidade('todos')
+                      setFilterTipoBackup('todos')
+                    }}
+                    className="h-9 px-2 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                    title="Limpar todos os filtros"
+                  >
+                    Limpar
+                  </Button>
+                )}
               </div>
             </div>
-          </Card>
+          </div>
 
-          {/* TABELA "ÚLTIMAS EXECUÇÕES DE BACKUP" */}
-          <Card className="bg-white border-slate-200 shadow-2xs rounded-xl overflow-hidden">
+          {/* TABELA "ÚLTIMAS EXECUÇÕES DE BACKUP" (REDESENHADA CONFORME MODELO DE REFERÊNCIA) */}
+          <Card className="bg-white border-slate-200/90 shadow-2xs rounded-xl overflow-hidden">
             <PanelHeader
               title="Últimas Execuções de Backup"
               icon={CheckCircle2}
@@ -1502,7 +1668,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
               action={
                 <Button
                   onClick={() => handleNavigateTab('execucoes')}
-                  className="bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-8 px-3 gap-1 shadow-2xs rounded-lg"
+                  className="bg-[#1A56DB] hover:bg-[#1E429F] text-white text-xs font-semibold h-8 px-3.5 gap-1.5 shadow-2xs rounded-lg"
                 >
                   Ver histórico completo
                 </Button>
@@ -1513,33 +1679,37 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-semibold text-[11px] select-none">
-                    <th className="py-3 px-3.5 w-10 text-center">
+                    <th className="py-3 px-3 w-10 text-center">
                       <input
                         type="checkbox"
                         checked={isAllCurrentSelected}
                         onChange={toggleSelectAll}
                         className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
+                        title="Selecionar todos os registros desta página"
                       />
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
+                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 w-[125px] whitespace-nowrap">
+                      Data/Hora
+                    </th>
+                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 min-w-[210px] max-w-[280px]">
                       Ativo
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Tipo / Rotina
+                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 w-[100px] whitespace-nowrap">
+                      Tipo
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
-                      Comprovação da Modalidade
+                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 min-w-[170px] max-w-[230px]">
+                      Rotina / Plano
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
+                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 min-w-[140px] max-w-[220px]">
                       Resultado
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
+                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 w-[80px] whitespace-nowrap">
                       Duração
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700">
+                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 w-[80px] whitespace-nowrap">
                       Tamanho
                     </th>
-                    <th className="py-3 px-3.5 font-bold uppercase tracking-wider text-slate-700 text-right">
+                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 text-right w-[60px] whitespace-nowrap">
                       Detalhes
                     </th>
                   </tr>
@@ -1547,20 +1717,20 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
                         <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-600 mb-2" />
                         Carregando execuções de backup...
                       </td>
                     </tr>
                   ) : paginatedExecucoes.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
                         <Server className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                         <span className="font-semibold text-slate-700 block text-xs">
                           Nenhuma execução encontrada
                         </span>
                         <p className="text-[11px] text-slate-400 mt-1">
-                          Ajuste os filtros ou verifique as evidências recebidas.
+                          Ajuste os filtros de busca ou período para visualizar registros.
                         </p>
                       </td>
                     </tr>
@@ -1568,134 +1738,193 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                     paginatedExecucoes.map((exec) => {
                       const isChecked = selectedExecIds.has(exec.id)
 
+                      // Resolução de ícone contextual para o tipo de ativo
+                      const isBanco =
+                        exec.ativoTipo === 'banco_dados' ||
+                        exec.ativoTitulo.toLowerCase().includes('banco') ||
+                        exec.ativoTitulo.toLowerCase().includes('sql')
+                      const isRede =
+                        exec.ativoTipo === 'equipamento_rede' ||
+                        exec.ativoTitulo.toLowerCase().includes('firewall') ||
+                        exec.ativoTitulo.toLowerCase().includes('router') ||
+                        exec.ativoTitulo.toLowerCase().includes('switch')
+                      const isEstacao =
+                        exec.ativoTipo === 'estacao' ||
+                        exec.ativoTitulo.toLowerCase().includes('pc-') ||
+                        exec.ativoTitulo.toLowerCase().includes('desk')
+
+                      const RowIcon = isBanco
+                        ? DatabaseIcon
+                        : isRede
+                          ? ShieldCheck
+                          : isEstacao
+                            ? Monitor
+                            : Server
+
                       return (
                         <tr
                           key={exec.id}
-                          className="hover:bg-slate-50/70 transition-colors cursor-pointer"
+                          className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
                           onClick={() => setExecDetail(exec)}
                         >
-                          {/* Checkbox + Ativo */}
-                          <td className="py-3 px-3.5 min-w-[240px]">
-                            <div className="flex items-start gap-2.5">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {}}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  toggleSelectRow(exec.id)
-                                }}
-                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5 mt-1 shrink-0"
-                              />
+                          {/* Coluna 1: Checkbox */}
+                          <td
+                            className="py-3 px-3 text-center w-10"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleSelectRow(exec.id)}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5 align-middle"
+                            />
+                          </td>
+
+                          {/* Coluna 2: Data/Hora (regra de ouro: data_email com verdade temporal) */}
+                          <td className="py-3 px-3 whitespace-nowrap text-slate-800 font-medium text-[11.5px]">
+                            {exec.dataHoraFormatada}
+                          </td>
+
+                          {/* Coluna 3: Ativo (nome em negrito + subtítulo descritivo abaixo) */}
+                          <td className="py-3 px-3 min-w-[210px] max-w-[280px]">
+                            <div className="flex items-start gap-2.5 min-w-0">
                               <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200/80 mt-0.5">
-                                <Server className="w-3.5 h-3.5" />
+                                <RowIcon className="w-3.5 h-3.5 text-slate-700" />
                               </div>
                               <div className="min-w-0 flex-1">
                                 {exec.vmsComprovadas.length > 0 ? (
                                   exec.temMultiplasVms ? (
-                                    <div className="space-y-1">
+                                    <>
                                       <span
-                                        className="font-mono text-xs font-bold text-slate-900 block leading-tight truncate"
+                                        className="font-mono text-xs font-bold text-slate-900 block truncate leading-tight"
                                         title={exec.vmsNomesFormatados}
                                       >
                                         {exec.vmsComprovadas.map((v) => v.nome).join(', ')}
                                       </span>
-                                      <span className="text-[11px] font-medium text-slate-500 block truncate leading-tight">
+                                      <span
+                                        className="text-[11px] font-medium text-slate-500 block truncate mt-0.5"
+                                        title={`${exec.vmsComprovadas.length} VMs comprovadas`}
+                                      >
                                         {exec.vmsComprovadas.length} VMs comprovadas
                                       </span>
-                                    </div>
+                                    </>
                                   ) : (
-                                    <div>
-                                      <span className="font-mono text-xs font-bold text-slate-900 block leading-tight truncate">
+                                    <>
+                                      <span
+                                        className="font-mono text-xs font-bold text-slate-900 block truncate leading-tight"
+                                        title={exec.ativoTitulo}
+                                      >
                                         {exec.ativoTitulo}
                                       </span>
-                                      <span className="text-[11px] font-medium text-slate-500 block truncate mt-0.5">
-                                        1 VM comprovada
+                                      <span
+                                        className="text-[11px] font-medium text-slate-500 block truncate mt-0.5"
+                                        title={exec.ativoNome || '1 VM comprovada'}
+                                      >
+                                        {exec.ativoNome && exec.ativoNome !== exec.ativoTitulo
+                                          ? exec.ativoNome
+                                          : '1 VM comprovada'}
                                       </span>
-                                    </div>
+                                    </>
                                   )
                                 ) : (
-                                  <div>
-                                    <span className="font-semibold text-xs text-slate-900 block leading-tight truncate">
+                                  <>
+                                    <span
+                                      className="font-semibold text-xs text-slate-900 block truncate leading-tight"
+                                      title={exec.ativoTitulo}
+                                    >
                                       {exec.ativoTitulo}
                                     </span>
-                                    <span className="text-[11px] font-medium text-slate-500 block truncate mt-0.5">
-                                      {exec.rotinaNome}
+                                    <span
+                                      className="text-[11px] font-medium text-slate-500 block truncate mt-0.5"
+                                      title={exec.ativoNome || exec.rotinaNome}
+                                    >
+                                      {exec.ativoNome || exec.rotinaNome}
                                     </span>
-                                  </div>
+                                  </>
                                 )}
                               </div>
                             </div>
                           </td>
 
-                          {/* Tipo / Rotina */}
-                          <td className="py-3 px-3.5 min-w-[150px]">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {exec.tipoBackupLabel === 'Completo' ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
-                                  Completo
-                                </span>
-                              ) : exec.tipoBackupLabel === 'Incremental' ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-sky-100 text-sky-700 border border-sky-200">
-                                  Incremental
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-                                  Configuração
-                                </span>
-                              )}
-                            </div>
+                          {/* Coluna 4: Tipo (badge pastel conforme modelo de referência) */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            {exec.tipoBackupLabel === 'Completo' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                                Completo
+                              </span>
+                            ) : exec.tipoBackupLabel === 'Incremental' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-sky-100 text-sky-700 border border-sky-200">
+                                Incremental
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                Configuração
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Coluna 5: Rotina / Plano (nome da rotina + subtítulo do plano) */}
+                          <td className="py-3 px-3 min-w-[170px] max-w-[230px]">
                             <span
-                              className="text-[11px] text-slate-500 block truncate mt-1"
-                              title={`${exec.planoNome} • ${exec.rotinaNome}`}
+                              className="font-semibold text-xs text-slate-900 block truncate leading-tight"
+                              title={exec.rotinaNome}
+                            >
+                              {exec.rotinaNome}
+                            </span>
+                            <span
+                              className="text-[11px] font-medium text-slate-500 block truncate mt-0.5"
+                              title={exec.planoNome}
                             >
                               {exec.planoNome}
                             </span>
                           </td>
 
-                          {/* Comprovação da Modalidade */}
-                          <td className="py-3 px-3.5 whitespace-nowrap min-w-[200px]">
-                            <span
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 shadow-2xs"
-                              title={`Modalidade ${exec.ativoModalidadeLabel} comprovada via e-mail em ${exec.dataHoraFormatada}`}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>
-                                {exec.ativoModalidadeLabel}: {exec.dataHoraFormatada}
+                          {/* Coluna 6: Resultado (badge pastel com ícone + selo modalidade/data) */}
+                          <td className="py-3 px-3 min-w-[140px] max-w-[220px]">
+                            <div className="flex flex-col gap-1 items-start">
+                              {exec.status === 'sucesso' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  <span>Sucesso</span>
+                                </span>
+                              ) : exec.status === 'erro' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                                  <XCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                                  <span>Falha</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                  <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                  <span>Com alertas</span>
+                                </span>
+                              )}
+
+                              {/* Selo comprovatório de modalidade (regra de ouro do projeto) */}
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-medium truncate max-w-full"
+                                title={`Modalidade ${exec.ativoModalidadeLabel} comprovada em ${exec.dataHoraFormatada}`}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                <span className="truncate">
+                                  {exec.ativoModalidadeLabel}: {exec.dataHoraFormatada}
+                                </span>
                               </span>
-                            </span>
+                            </div>
                           </td>
 
-                          {/* Resultado */}
-                          <td className="py-3 px-3.5 whitespace-nowrap">
-                            {exec.status === 'sucesso' ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Sucesso
-                              </span>
-                            ) : exec.status === 'erro' ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                                <XCircle className="w-3 h-3 text-rose-600" /> Falha
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                <AlertTriangle className="w-3 h-3 text-amber-600" /> Com alertas
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Duração */}
-                          <td className="py-3 px-3.5 whitespace-nowrap text-slate-700 font-mono text-[11px]">
+                          {/* Coluna 7: Duração */}
+                          <td className="py-3 px-3 whitespace-nowrap text-slate-700 font-medium text-[11.5px]">
                             {exec.duracaoFormatada}
                           </td>
 
-                          {/* Tamanho */}
-                          <td className="py-3 px-3.5 whitespace-nowrap text-slate-700 font-mono text-[11px]">
+                          {/* Coluna 8: Tamanho */}
+                          <td className="py-3 px-3 whitespace-nowrap text-slate-700 font-medium text-[11.5px]">
                             {exec.tamanhoDisplay}
                           </td>
 
-                          {/* Menu ⋯ por linha */}
+                          {/* Coluna 9: Detalhes (menu "...") */}
                           <td
-                            className="py-3 px-3.5 text-right whitespace-nowrap"
+                            className="py-3 px-3 text-right whitespace-nowrap"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <DropdownMenu>
@@ -1703,17 +1932,17 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 text-slate-500 hover:text-slate-900"
+                                  className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md"
                                 >
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="text-xs">
+                              <DropdownMenuContent align="end" className="text-xs w-48">
                                 <DropdownMenuItem onClick={() => setExecDetail(exec)}>
-                                  Ver detalhes completos
+                                  Ver evidência / execução
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleNavigateTab('execucoes')}>
-                                  Abrir na aba Execuções
+                                  Abrir no histórico de execuções
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -1726,7 +1955,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
               </table>
             </div>
 
-            {/* Paginação real: "Mostrando 1 a 5 de N registros" */}
+            {/* Rodapé de Paginação funcional (cliente) */}
             <div className="p-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500">
               <span>
                 Mostrando{' '}
@@ -1747,6 +1976,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                   className="h-7 w-7 text-slate-600 border-slate-200"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
+                  title="Página anterior"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </Button>
@@ -1759,10 +1989,10 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                       variant={currentPage === pNum ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setCurrentPage(pNum)}
-                      className={`h-7 w-7 p-0 text-xs ${
+                      className={`h-7 w-7 p-0 text-xs font-semibold ${
                         currentPage === pNum
                           ? 'bg-[#1A56DB] text-white hover:bg-[#1E429F]'
-                          : 'text-slate-700 border-slate-200'
+                          : 'text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
                       {pNum}
@@ -1777,7 +2007,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                       variant={currentPage === totalPages ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setCurrentPage(totalPages)}
-                      className="h-7 w-7 p-0 text-xs text-slate-700 border-slate-200"
+                      className="h-7 w-7 p-0 text-xs text-slate-700 border-slate-200 hover:bg-slate-50"
                     >
                       {totalPages}
                     </Button>
@@ -1790,6 +2020,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                   className="h-7 w-7 text-slate-600 border-slate-200"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
+                  title="Próxima página"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
                 </Button>
