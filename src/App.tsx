@@ -38,7 +38,6 @@ import InfraestruturaPage from './pages/infraestrutura/InfraestruturaPage'
 import InfraestruturaReportPage from './pages/infraestrutura/InfraestruturaReportPage'
 import MapaInfraestruturaReportPage from './pages/infraestrutura/MapaInfraestruturaReportPage'
 import MapaInfraestruturaPreviewPage from './pages/infraestrutura/MapaInfraestruturaPreviewPage'
-import BackupRedesignPreviewPage from './pages/backup/BackupRedesignPreviewPage'
 import NotFound from './pages/NotFound'
 
 export const App = () => (
@@ -96,8 +95,6 @@ export const App = () => (
               path="/preview/mapa-infraestrutura"
               element={<MapaInfraestruturaPreviewPage />}
             />
-            {/* Rota de Prévia — Redesign do Módulo Backup (Homologação isolada) */}
-            <Route path="/preview/backup-redesign" element={<BackupRedesignPreviewPage />} />
             {/* 5. Segurança */}
             <Route path="/seguranca" element={<SegurancaPage />} />
             {/* 6. Continuidade e Backup (Fase 3) */}
