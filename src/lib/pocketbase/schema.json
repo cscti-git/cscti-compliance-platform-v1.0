@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-13T12:34:59.634Z",
+  "generatedAt": "2026-10-13T13:01:43.280Z",
   "collections": [
     {
       "name": "users",
@@ -1129,6 +1129,51 @@
         },
         {
           "name": "observacoes_suporte",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "exige_endpoint_protection",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endpoint_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["protegido", "sem_agente", "sem_comprovacao"]
+        },
+        {
+          "name": "endpoint_comprovante",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "seg_comprovantes"
+        },
+        {
+          "name": "endpoint_data_comprovacao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endpoint_hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endpoint_solucao",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "seg_solucoes"
+        },
+        {
+          "name": "endpoint_observacoes",
           "type": "text",
           "required": false,
           "system": false
