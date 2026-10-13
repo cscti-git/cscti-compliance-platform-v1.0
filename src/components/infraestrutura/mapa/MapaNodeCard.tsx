@@ -112,6 +112,7 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
   isOfuscado = false,
 }) => {
   const isPendente = !!equipamento.precisaCadastro
+  const hasImagem = Boolean(equipamento.imagemAnexada?.dataUrl)
 
   return (
     <div
@@ -140,30 +141,31 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
       }`}
     >
       <div className="flex items-start gap-3">
-        {/* Ícone estilizado ou miniatura da imagem */}
+        {/* Ícone estilizado ou miniatura da imagem em destaque claro */}
         <div className="relative shrink-0">
-          {equipamento.imagemAnexada?.dataUrl ? (
-            <div className="w-10 h-10 rounded-xl overflow-hidden border border-slate-300 bg-white shadow-2xs relative group-hover:scale-105 transition-transform">
+          {hasImagem ? (
+            <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-blue-300 bg-white shadow-xs relative group-hover:scale-105 group-hover:border-blue-500 transition-all">
               <img
-                src={equipamento.imagemAnexada.dataUrl}
+                src={equipamento.imagemAnexada!.dataUrl}
                 alt={equipamento.nome}
                 className="w-full h-full object-cover"
+                loading="lazy"
               />
               <span
-                title="Imagem anexada com SHA-256"
-                className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-blue-600 rounded-full border border-white flex items-center justify-center text-[7px] text-white font-bold"
+                title={`Foto/desenho anexado: ${equipamento.imagemAnexada!.nomeArquivo || 'comprovante'}`}
+                className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-600 rounded-full border-2 border-white flex items-center justify-center text-[8px] text-white font-bold shadow-2xs"
               >
-                ●
+                📷
               </span>
             </div>
           ) : (
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-2xs transition-transform group-hover:scale-105 ${getIconBadgeColor(
+              className={`w-12 h-12 rounded-xl flex items-center justify-center border shadow-2xs transition-transform group-hover:scale-105 ${getIconBadgeColor(
                 equipamento.camadaId,
                 isPendente,
               )}`}
             >
-              {getIconForEquipamento(equipamento.iconKey, 'w-5 h-5')}
+              {getIconForEquipamento(equipamento.iconKey, 'w-6 h-6')}
             </div>
           )}
         </div>

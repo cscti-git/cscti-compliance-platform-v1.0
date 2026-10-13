@@ -41,6 +41,7 @@ export interface EditorCanvasDiagramProps {
   onAbrirNovaConexao: (origemId?: string) => void
   onEditarConexao: (conexao: TopologiaConexao) => void
   onRemoverConexao: (conexaoId: string) => void
+  canEdit?: boolean
 }
 
 export const EditorCanvasDiagram: React.FC<EditorCanvasDiagramProps> = ({
@@ -57,10 +58,13 @@ export const EditorCanvasDiagram: React.FC<EditorCanvasDiagramProps> = ({
   onAbrirNovaConexao,
   onEditarConexao,
   onRemoverConexao,
+  canEdit = true,
 }) => {
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
   const [exibirGrid, setExibirGrid] = useState(true)
+  const [isFullScreen, setIsFullScreen] = useState(false)
 
   // Estado de arrasto de nó
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
@@ -199,8 +203,8 @@ export const EditorCanvasDiagram: React.FC<EditorCanvasDiagramProps> = ({
           </span>
         </div>
 
-        {/* Controles de Zoom e Grade */}
-        <div className="flex items-center gap-2">
+        {/* Controles de Zoom, Grade e Tela Cheia */}
+        <div className="flex items-center gap-2 flex-wrap">
           {modoEdicao && (
             <Button
               variant="outline"
@@ -250,280 +254,358 @@ export const EditorCanvasDiagram: React.FC<EditorCanvasDiagramProps> = ({
             size="sm"
             onClick={() => setZoom(1)}
             className="text-xs h-7 text-slate-500 hover:text-slate-800"
-            title="Resetar Zoom"
+            title="Resetar Zoom para 100%"
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5" />
+          </Button>
+
+          {/* Botão de Tela Cheia Explícito */}
+          <Button
+            variant={isFullScreen ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setIsFullScreen((prev) => !prev)}
+            className={`text-xs h-7 gap-1.5 font-semibold ${
+              isFullScreen
+                ? 'bg-[#0B2545] text-white hover:bg-[#124E78]'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+            }`}
+            title={
+              isFullScreen ? 'Sair do modo tela cheia (ESC)' : 'Expandir diagrama em tela cheia'
+            }
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-blue-600" />
+            <span>{isFullScreen ? 'Sair da tela cheia' : 'Tela cheia'}</span>
           </Button>
         </div>
       </div>
 
-      {/* ÁREA DO CANVAS INTERATIVO */}
+      {/* ÁREA DO CANVAS INTERATIVO (Suporta Tela Cheia Fixa na Viewport sem Perder Zoom/Grade) */}
       <div
-        ref={containerRef}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        className={`relative w-full min-h-[720px] rounded-2xl border border-slate-200 p-6 overflow-x-auto select-none transition-all ${
-          exibirGrid
-            ? 'bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-[size:24px_24px] bg-slate-50/70'
-            : 'bg-slate-50/60'
-        }`}
-        style={{
-          transformOrigin: 'top left',
-        }}
+        ref={wrapperRef}
+        className={
+          isFullScreen
+            ? 'fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex flex-col p-4 sm:p-6 overflow-hidden'
+            : 'relative w-full'
+        }
       >
-        {/* Camada SVG para traçar conexões entre os nós */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none z-0"
-          style={{ minWidth: '1000px', minHeight: '700px' }}
-        >
-          <defs>
-            {TIPOS_CONEXAO_CATALOGO.map((t) => (
-              <marker
-                key={t.tipo}
-                id={`arrow-${t.tipo}`}
-                markerWidth="8"
-                markerHeight="8"
-                refX="6"
-                refY="4"
-                orient="auto"
+        {isFullScreen && (
+          <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-t-2xl border-x border-t border-slate-300 shadow-md shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-bold text-slate-900">
+                Diagrama Topológico em Tela Cheia
+              </span>
+              <span className="text-[11px] text-slate-500">
+                • {equipamentos.length} nós • {conexoes.length} conexões (Zoom{' '}
+                {Math.round(zoom * 100)}%)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExibirGrid(!exibirGrid)}
+                className="text-xs h-7 gap-1 border-slate-300"
               >
-                <path d="M 0 0 L 8 4 L 0 8 z" fill={t.cor} />
-              </marker>
-            ))}
-          </defs>
-
-          {conexoesFiltradas.map((cx) => {
-            const pOrigem = nodePositions[cx.origemId]
-            const pDestino = nodePositions[cx.destinoId]
-            if (!pOrigem || !pDestino) return null
-
-            const x1 = pOrigem.x + pOrigem.w / 2
-            const y1 = pOrigem.y + pOrigem.h / 2
-            const x2 = pDestino.x + pDestino.w / 2
-            const y2 = pDestino.y + pDestino.h / 2
-
-            // Ponto médio para curva de bezier suave
-            const dx = x2 - x1
-            const dy = y2 - y1
-            const mx = (x1 + x2) / 2
-            const my = (y1 + y2) / 2 - Math.min(30, Math.abs(dx) * 0.15)
-            const pathD = `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
-            const cor = getCorLinha(cx.tipo)
-
-            return (
-              <g
-                key={cx.id}
-                className="group/cx cursor-pointer pointer-events-auto"
-                onClick={() => modoEdicao && onEditarConexao(cx)}
+                <Grid className="w-3.5 h-3.5" />
+                <span>Grade</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setIsFullScreen(false)}
+                className="text-xs h-7 bg-[#0B2545] hover:bg-[#124E78] text-white font-semibold"
               >
-                {/* Linha de fundo para ampliar área clicável */}
-                <path
-                  d={pathD}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth="14"
-                  className="cursor-pointer"
-                />
+                Sair da tela cheia
+              </Button>
+            </div>
+          </div>
+        )}
 
-                {/* Linha principal da conexão */}
-                <path
-                  d={pathD}
-                  fill="none"
-                  stroke={cor}
-                  strokeWidth={modoEdicao ? '2.5' : '2'}
-                  strokeDasharray={
-                    cx.tipo === 'fibra' ? '4 3' : cx.tipo === 'eletrica' ? '6 4' : 'none'
-                  }
-                  markerEnd={`url(#arrow-${cx.tipo})`}
-                  className={`${cx.animada ? 'animate-pulse' : ''} transition-all group-hover/cx:stroke-width-[3.5]`}
-                />
-
-                {/* Rótulo da conexão centralizado */}
-                {cx.rotulo && (
-                  <g transform={`translate(${mx}, ${my - 6})`}>
-                    <rect
-                      x={-(cx.rotulo.length * 3.3) - 8}
-                      y="-10"
-                      width={cx.rotulo.length * 6.6 + 16}
-                      height="18"
-                      rx="6"
-                      fill="white"
-                      stroke={cor}
-                      strokeWidth="1"
-                      className="shadow-2xs"
-                    />
-                    <text
-                      textAnchor="middle"
-                      dy="2"
-                      className="text-[9px] font-bold fill-slate-700 font-mono"
-                    >
-                      {cx.rotulo}
-                    </text>
-                  </g>
-                )}
-              </g>
-            )
-          })}
-        </svg>
-
-        {/* SEÇÕES EM BLOCOS DE CAMADAS/SETORES */}
         <div
-          className="relative z-10 flex flex-col gap-6"
+          ref={containerRef}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={`relative w-full overflow-auto select-none transition-all ${
+            isFullScreen
+              ? 'flex-1 rounded-b-2xl border-x border-b border-slate-300 bg-white p-6 shadow-2xl'
+              : 'min-h-[720px] rounded-2xl border border-slate-200 p-6'
+          } ${
+            exibirGrid
+              ? 'bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-[size:24px_24px] bg-slate-50/70'
+              : 'bg-slate-50/60'
+          }`}
           style={{
-            transform: `scale(${zoom})`,
             transformOrigin: 'top left',
           }}
         >
-          {CAMADAS_TOPOLOGIA.map((camada) => {
-            const itensCamada = equipamentosPorCamada[camada.id] || []
-
-            return (
-              <section
-                key={camada.id}
-                className={`bg-white rounded-2xl border ${camada.corBorda} shadow-2xs overflow-hidden transition-all`}
-              >
-                {/* Cabeçalho da Camada / Setor */}
-                <div
-                  className={`px-4 py-3 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${camada.corFundo}`}
+          {/* Camada SVG para traçar conexões entre os nós */}
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none z-0"
+            style={{ minWidth: '1000px', minHeight: '700px' }}
+          >
+            <defs>
+              {TIPOS_CONEXAO_CATALOGO.map((t) => (
+                <marker
+                  key={t.tipo}
+                  id={`arrow-${t.tipo}`}
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="6"
+                  refY="4"
+                  orient="auto"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-                    <div>
-                      <h3
-                        className={`text-sm font-extrabold flex items-center gap-2 ${camada.corCabecalho}`}
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill={t.cor} />
+                </marker>
+              ))}
+            </defs>
+
+            {conexoesFiltradas.map((cx) => {
+              const pOrigem = nodePositions[cx.origemId]
+              const pDestino = nodePositions[cx.destinoId]
+              if (!pOrigem || !pDestino) return null
+
+              const x1 = pOrigem.x + pOrigem.w / 2
+              const y1 = pOrigem.y + pOrigem.h / 2
+              const x2 = pDestino.x + pDestino.w / 2
+              const y2 = pDestino.y + pDestino.h / 2
+
+              // Ponto médio para curva de bezier suave
+              const dx = x2 - x1
+              const dy = y2 - y1
+              const mx = (x1 + x2) / 2
+              const my = (y1 + y2) / 2 - Math.min(30, Math.abs(dx) * 0.15)
+              const pathD = `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
+              const cor = getCorLinha(cx.tipo)
+
+              return (
+                <g
+                  key={cx.id}
+                  className="group/cx cursor-pointer pointer-events-auto"
+                  onClick={() => modoEdicao && onEditarConexao(cx)}
+                >
+                  {/* Linha de fundo para ampliar área clicável */}
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth="14"
+                    className="cursor-pointer"
+                  />
+
+                  {/* Linha principal da conexão */}
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke={cor}
+                    strokeWidth={modoEdicao ? '2.5' : '2'}
+                    strokeDasharray={
+                      cx.tipo === 'fibra' ? '4 3' : cx.tipo === 'eletrica' ? '6 4' : 'none'
+                    }
+                    markerEnd={`url(#arrow-${cx.tipo})`}
+                    className={`${cx.animada ? 'animate-pulse' : ''} transition-all group-hover/cx:stroke-width-[3.5]`}
+                  />
+
+                  {/* Rótulo da conexão centralizado */}
+                  {cx.rotulo && (
+                    <g transform={`translate(${mx}, ${my - 6})`}>
+                      <rect
+                        x={-(cx.rotulo.length * 3.3) - 8}
+                        y="-10"
+                        width={cx.rotulo.length * 6.6 + 16}
+                        height="18"
+                        rx="6"
+                        fill="white"
+                        stroke={cor}
+                        strokeWidth="1"
+                        className="shadow-2xs"
+                      />
+                      <text
+                        textAnchor="middle"
+                        dy="2"
+                        className="text-[9px] font-bold fill-slate-700 font-mono"
                       >
-                        {camada.titulo}
-                        <Badge variant="outline" className={`text-[10px] py-0 ${camada.corBadge}`}>
-                          {camada.badge}
-                        </Badge>
-                      </h3>
-                      <p className="text-[11px] text-slate-600 mt-0.5">{camada.subtitulo}</p>
+                        {cx.rotulo}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              )
+            })}
+          </svg>
+
+          {/* SEÇÕES EM BLOCOS DE CAMADAS/SETORES */}
+          <div
+            className="relative z-10 flex flex-col gap-6"
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
+            }}
+          >
+            {CAMADAS_TOPOLOGIA.map((camada) => {
+              const itensCamada = equipamentosPorCamada[camada.id] || []
+
+              return (
+                <section
+                  key={camada.id}
+                  id={`camada-bloco-${camada.id}`}
+                  className={`bg-white rounded-2xl border ${camada.corBorda} shadow-2xs overflow-hidden transition-all scroll-mt-6`}
+                >
+                  {/* Cabeçalho da Camada / Setor */}
+                  <div
+                    className={`px-4 py-3 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${camada.corFundo}`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                      <div>
+                        <h3
+                          className={`text-sm font-extrabold flex items-center gap-2 ${camada.corCabecalho}`}
+                        >
+                          {camada.titulo}
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] py-0 ${camada.corBadge}`}
+                          >
+                            {camada.badge}
+                          </Badge>
+                        </h3>
+                        <p className="text-[11px] text-slate-600 mt-0.5">{camada.subtitulo}</p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono font-medium text-slate-600 bg-white/80 px-2 py-0.5 rounded border border-slate-200">
-                      {itensCamada.length} equipamento(s)
-                    </span>
-
-                    {/* Botão de Adicionar Nó nesta Camada */}
-                    {modoEdicao && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onAdicionarNodeNaCamada(camada.id)}
-                        className="text-xs h-7 bg-white hover:bg-slate-50 border-slate-300 text-slate-800 gap-1 shadow-2xs"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Adicionar Nó</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Área dos Nós da Camada */}
-                <div className="p-4 sm:p-5">
-                  {itensCamada.length === 0 ? (
-                    <div className="rounded-xl border-2 border-dashed border-slate-300/80 bg-slate-50/40 p-6 flex flex-col items-center justify-center text-center space-y-2 min-h-[110px]">
-                      <span className="text-xs font-semibold text-slate-600">
-                        Nenhum nó posicionado nesta camada
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono font-medium text-slate-600 bg-white/80 px-2 py-0.5 rounded border border-slate-200">
+                        {itensCamada.length} equipamento(s)
                       </span>
-                      {modoEdicao && (
+
+                      {/* Botão de Adicionar Nó nesta Camada */}
+                      {canEdit && modoEdicao && (
                         <Button
                           size="sm"
+                          variant="outline"
                           onClick={() => onAdicionarNodeNaCamada(camada.id)}
-                          className="text-xs h-7 bg-[#0B2545] text-white hover:bg-[#124E78] gap-1 mt-1"
+                          className="text-xs h-7 bg-white hover:bg-slate-50 border-slate-300 text-slate-800 gap-1 shadow-2xs font-semibold"
                         >
-                          <Plus className="w-3 h-3" />
-                          <span>Adicionar Nó a esta camada</span>
+                          <Plus className="w-3.5 h-3.5 text-blue-600" />
+                          <span>+ Adicionar equipamento</span>
                         </Button>
                       )}
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 relative">
-                      {itensCamada.map((eq) => {
-                        const isSelected = eq.id === equipamentoSelecionadoId
-                        const isDragging = eq.id === draggingNodeId
+                  </div>
 
-                        return (
-                          <div
-                            key={eq.id}
-                            id={`node-card-${eq.id}`}
-                            onMouseDown={(e) => handleMouseDownNode(e, eq)}
-                            className={`relative group/node ${
-                              modoEdicao ? 'cursor-grab active:cursor-grabbing' : ''
-                            } ${isDragging ? 'opacity-70 scale-95' : ''}`}
-                            style={{
-                              transform: eq.posicaoCanvas
-                                ? `translate3d(${eq.posicaoCanvas.x % 40}px, 0px, 0px)`
-                                : undefined,
-                            }}
+                  {/* Área dos Nós da Camada */}
+                  <div className="p-4 sm:p-5">
+                    {itensCamada.length === 0 ? (
+                      <div className="rounded-xl border-2 border-dashed border-slate-300/80 bg-slate-50/40 p-6 flex flex-col items-center justify-center text-center space-y-2.5 min-h-[120px]">
+                        <span className="text-xs font-semibold text-slate-700">
+                          Sem equipamentos cadastrados nesta camada
+                        </span>
+                        <p className="text-[11px] text-slate-500 max-w-sm">
+                          Nenhum componente ou ativo foi posicionado no bloco de{' '}
+                          <em>{camada.titulo.replace(/^[0-9]\.\s*/, '')}</em>.
+                        </p>
+                        {canEdit && (
+                          <Button
+                            size="sm"
+                            onClick={() => onAdicionarNodeNaCamada(camada.id)}
+                            className="text-xs h-7 bg-[#0B2545] text-white hover:bg-[#124E78] gap-1 mt-1 font-semibold shadow-2xs"
                           >
-                            <MapaNodeCard
-                              equipamento={eq}
-                              selecionado={isSelected}
-                              onClick={() => onSelectEquipamento(eq)}
-                            />
+                            <Plus className="w-3.5 h-3.5 text-amber-300" />
+                            <span>+ Adicionar equipamento nesta camada</span>
+                          </Button>
+                        )}
+                        {!canEdit && (
+                          <span className="text-[10px] text-slate-400 italic">
+                            (Visualização somente leitura — cadastro liberado para
+                            Administrador/Suporte)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 relative">
+                        {itensCamada.map((eq) => {
+                          const isSelected = eq.id === equipamentoSelecionadoId
+                          const isDragging = eq.id === draggingNodeId
 
-                            {/* Overlay de Ações Rápidas no Modo de Edição */}
-                            {modoEdicao && (
-                              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/node:opacity-100 transition-opacity z-20">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onEditarNode(eq)
-                                  }}
-                                  title="Editar propriedades do nó / Imagem"
-                                  className="w-6 h-6 rounded bg-white/95 border border-slate-300 text-slate-700 hover:text-blue-700 hover:border-blue-400 flex items-center justify-center shadow-xs"
-                                >
-                                  <Edit2 className="w-3 h-3" />
-                                </button>
+                          return (
+                            <div
+                              key={eq.id}
+                              id={`node-card-${eq.id}`}
+                              onMouseDown={(e) => handleMouseDownNode(e, eq)}
+                              className={`relative group/node ${
+                                modoEdicao ? 'cursor-grab active:cursor-grabbing' : ''
+                              } ${isDragging ? 'opacity-70 scale-95' : ''}`}
+                              style={{
+                                transform: eq.posicaoCanvas
+                                  ? `translate3d(${eq.posicaoCanvas.x % 40}px, 0px, 0px)`
+                                  : undefined,
+                              }}
+                            >
+                              <MapaNodeCard
+                                equipamento={eq}
+                                selecionado={isSelected}
+                                onClick={() => onSelectEquipamento(eq)}
+                              />
 
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onAbrirNovaConexao(eq.id)
-                                  }}
-                                  title="Conectar a outro nó"
-                                  className="w-6 h-6 rounded bg-white/95 border border-slate-300 text-slate-700 hover:text-cyan-700 hover:border-cyan-400 flex items-center justify-center shadow-xs"
-                                >
-                                  <Cable className="w-3 h-3" />
-                                </button>
+                              {/* Overlay de Ações Rápidas no Modo de Edição */}
+                              {modoEdicao && (
+                                <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/node:opacity-100 transition-opacity z-20">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onEditarNode(eq)
+                                    }}
+                                    title="Editar propriedades do nó / Imagem"
+                                    className="w-6 h-6 rounded bg-white/95 border border-slate-300 text-slate-700 hover:text-blue-700 hover:border-blue-400 flex items-center justify-center shadow-xs"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (confirm(`Remover nó "${eq.nome}" do diagrama?`)) {
-                                      onRemoverNode(eq.id)
-                                    }
-                                  }}
-                                  title="Remover nó"
-                                  className="w-6 h-6 rounded bg-white/95 border border-slate-300 text-slate-700 hover:text-red-700 hover:border-red-400 flex items-center justify-center shadow-xs"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onAbrirNovaConexao(eq.id)
+                                    }}
+                                    title="Conectar a outro nó"
+                                    className="w-6 h-6 rounded bg-white/95 border border-slate-300 text-slate-700 hover:text-cyan-700 hover:border-cyan-400 flex items-center justify-center shadow-xs"
+                                  >
+                                    <Cable className="w-3 h-3" />
+                                  </button>
 
-                            {/* Badge discreto indicando arrasto permitido */}
-                            {modoEdicao && (
-                              <div className="absolute bottom-1 right-2 opacity-0 group-hover/node:opacity-60 text-[9px] text-slate-400 font-mono pointer-events-none">
-                                ⠿ arrastar
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </section>
-            )
-          })}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (confirm(`Remover nó "${eq.nome}" do diagrama?`)) {
+                                        onRemoverNode(eq.id)
+                                      }
+                                    }}
+                                    title="Remover nó"
+                                    className="w-6 h-6 rounded bg-white/95 border border-slate-300 text-slate-700 hover:text-red-700 hover:border-red-400 flex items-center justify-center shadow-xs"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Badge discreto indicando arrasto permitido */}
+                              {modoEdicao && (
+                                <div className="absolute bottom-1 right-2 opacity-0 group-hover/node:opacity-60 text-[9px] text-slate-400 font-mono pointer-events-none">
+                                  ⠿ arrastar
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>

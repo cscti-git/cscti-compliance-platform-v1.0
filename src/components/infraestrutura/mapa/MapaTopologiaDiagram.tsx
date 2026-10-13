@@ -3,6 +3,7 @@ import {
   EquipamentoSimulado,
   TopologiaConexao,
   CamadaConfig,
+  CamadaId,
   CAMADAS_TOPOLOGIA,
   EQUIPAMENTOS_SIMULADOS,
   CONEXOES_SIMULADAS,
@@ -38,19 +39,23 @@ export interface MapaTopologiaDiagramProps {
   conexoesCustomizadas?: TopologiaConexao[]
   isModoReal?: boolean
   mapaVazioSemGeracao?: boolean
+  canEdit?: boolean
   onGerarMapa?: () => void
+  onAdicionarNodeNaCamada?: (camadaId: CamadaId) => void
 }
 
 export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
   onSelectEquipamento,
   equipamentoSelecionadoId,
   filtroConexao = 'todos',
-  orientacao = 'horizontal',
+  orientacao: _orientacao = 'horizontal',
   equipamentosCustomizados,
   conexoesCustomizadas,
-  isModoReal = false,
+  isModoReal: _isModoReal = false,
   mapaVazioSemGeracao = false,
+  canEdit = false,
   onGerarMapa,
+  onAdicionarNodeNaCamada,
 }) => {
   const navigate = useNavigate()
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
@@ -93,30 +98,42 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
 
   // Componente de bloco tracejado honesto quando a camada não possui equipamentos cadastrados
   const BlocoCamadaVazia: React.FC<{
+    camadaId: CamadaId
     camadaNome: string
     moduloNome: string
     rotaModulo: string
-    iconeDica?: string
-  }> = ({ camadaNome, moduloNome, rotaModulo }) => (
-    <div className="rounded-xl border-2 border-dashed border-slate-300/80 bg-slate-50/50 p-6 flex flex-col items-center justify-center text-center space-y-2 min-h-[140px] hover:border-slate-400 transition-colors">
+  }> = ({ camadaId, camadaNome, moduloNome, rotaModulo }) => (
+    <div className="rounded-xl border-2 border-dashed border-slate-300/80 bg-slate-50/50 p-6 flex flex-col items-center justify-center text-center space-y-2.5 min-h-[140px] hover:border-slate-400 transition-colors">
       <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200">
         <AlertTriangle className="w-4 h-4 text-slate-400" />
       </div>
       <div className="text-xs font-semibold text-slate-700">
         Sem equipamentos cadastrados nesta camada
       </div>
-      <p className="text-[11px] text-slate-500 max-w-sm">
+      <p className="text-[11px] text-slate-500 max-w-md leading-relaxed">
         Nenhum ativo ou elemento de <em>{camadaNome}</em> foi registrado no banco desta serventia.
       </p>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => navigate(rotaModulo)}
-        className="text-[11px] h-7 border-slate-300 text-slate-700 hover:text-blue-700 hover:border-blue-300 gap-1 mt-1 bg-white"
-      >
-        <span>Cadastrar no módulo {moduloNome}</span>
-        <ExternalLink className="w-3 h-3 text-slate-400" />
-      </Button>
+      <div className="flex items-center gap-2 flex-wrap justify-center pt-1">
+        {canEdit && onAdicionarNodeNaCamada && (
+          <Button
+            size="sm"
+            onClick={() => onAdicionarNodeNaCamada(camadaId)}
+            className="text-[11px] h-7 bg-[#0B2545] hover:bg-[#124E78] text-white gap-1 shadow-2xs font-semibold"
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-amber-300" />
+            <span>+ Adicionar equipamento nesta camada</span>
+          </Button>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate(rotaModulo)}
+          className="text-[11px] h-7 border-slate-300 text-slate-700 hover:text-blue-700 hover:border-blue-300 gap-1 bg-white"
+        >
+          <span>Ir para {moduloNome}</span>
+          <ExternalLink className="w-3 h-3 text-slate-400" />
+        </Button>
+      </div>
     </div>
   )
 
@@ -239,6 +256,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
           <div className="p-4 sm:p-5">
             {!equipamentosPorCamada['energia'] || equipamentosPorCamada['energia'].length === 0 ? (
               <BlocoCamadaVazia
+                camadaId="energia"
                 camadaNome="Energia Elétrica (Nobreaks / Gerador / Aterramento)"
                 moduloNome="Infraestrutura Física → Energia"
                 rotaModulo="/infraestrutura"
@@ -317,6 +335,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
             {!equipamentosPorCamada['sala_servidores'] ||
             equipamentosPorCamada['sala_servidores'].length === 0 ? (
               <BlocoCamadaVazia
+                camadaId="sala_servidores"
                 camadaNome="Sala de Servidores (Servidores / Storages / Switches / Racks)"
                 moduloNome="Inventário de Ativos & Infraestrutura"
                 rotaModulo="/inventario"
@@ -403,6 +422,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
               {!equipamentosPorCamada['setor_atendimento'] ||
               equipamentosPorCamada['setor_atendimento'].length === 0 ? (
                 <BlocoCamadaVazia
+                  camadaId="setor_atendimento"
                   camadaNome="Atendimento ao Público"
                   moduloNome="Inventário de Ativos"
                   rotaModulo="/inventario"
@@ -455,6 +475,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
               {!equipamentosPorCamada['setor_frente'] ||
               equipamentosPorCamada['setor_frente'].length === 0 ? (
                 <BlocoCamadaVazia
+                  camadaId="setor_frente"
                   camadaNome="Setor Interno Frente"
                   moduloNome="Inventário de Ativos"
                   rotaModulo="/inventario"
@@ -507,6 +528,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
               {!equipamentosPorCamada['setor_fundo'] ||
               equipamentosPorCamada['setor_fundo'].length === 0 ? (
                 <BlocoCamadaVazia
+                  camadaId="setor_fundo"
                   camadaNome="Setor Interno Fundo"
                   moduloNome="Inventário de Ativos"
                   rotaModulo="/inventario"
@@ -567,6 +589,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
             {!equipamentosPorCamada['setor_diretoria'] ||
             equipamentosPorCamada['setor_diretoria'].length === 0 ? (
               <BlocoCamadaVazia
+                camadaId="setor_diretoria"
                 camadaNome="Gabinete / Diretoria"
                 moduloNome="Inventário de Ativos"
                 rotaModulo="/inventario"

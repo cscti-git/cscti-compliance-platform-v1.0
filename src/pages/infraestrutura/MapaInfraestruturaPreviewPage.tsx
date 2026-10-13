@@ -539,6 +539,7 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
                 conexoesCustomizadas={conexoesExibidas}
                 isModoReal={modoMapa === 'real'}
                 mapaVazioSemGeracao={modoMapa === 'em_branco'}
+                canEdit={true}
                 onGerarMapa={handleGerarMapaReal}
               />
             </div>
@@ -600,6 +601,7 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
             conexoesCustomizadas={conexoesExibidas}
             isModoReal={modoMapa === 'real'}
             mapaVazioSemGeracao={modoMapa === 'em_branco'}
+            canEdit={true}
             onGerarMapa={handleGerarMapaReal}
           />
 

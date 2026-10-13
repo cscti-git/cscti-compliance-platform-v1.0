@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { KpiCard } from '@/components/common/KpiCard'
@@ -24,11 +24,15 @@ import {
   Check,
   AlertTriangle,
   Move,
+  ArrowRight,
+  Maximize2,
+  Sparkles,
 } from 'lucide-react'
 import {
   EquipamentoSimulado,
   TopologiaConexao,
   CamadaId,
+  CAMADAS_TOPOLOGIA,
 } from '@/components/infraestrutura/mapa/topologiaData'
 import { MapaNodeDetailsDrawer } from '@/components/infraestrutura/mapa/MapaNodeDetailsDrawer'
 import { MapaConexoesLegenda } from '@/components/infraestrutura/mapa/MapaConexoesLegenda'
@@ -78,6 +82,10 @@ export const InfraMapaTab: React.FC<InfraMapaTabProps> = ({ orgId, serventiaNome
   const [mapaSalvo, setMapaSalvo] = useState<InfraMapaRecord | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [carregandoInicial, setCarregandoInicial] = useState(true)
+
+  // Ref para auto-scroll suave e destaque do canvas
+  const canvasAreaRef = useRef<HTMLDivElement>(null)
+  const [canvasDestacado, setCanvasDestacado] = useState(false)
 
   // MODO DE EDIÇÃO VISUAL FUNCIONAL (Apenas Administrador e Suporte: canEdit)
   const [modoEdicao, setModoEdicao] = useState(false)
@@ -259,6 +267,19 @@ export const InfraMapaTab: React.FC<InfraMapaTabProps> = ({ orgId, serventiaNome
     }
   }, [orgId, gerarTopologiaDoBanco])
 
+  // Função utilitária de rolagem suave até a área do canvas com destaque visual por 2 segundos
+  const dispararAutoScrollEDestaque = useCallback(() => {
+    setTimeout(() => {
+      if (canvasAreaRef.current) {
+        canvasAreaRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        setCanvasDestacado(true)
+        setTimeout(() => {
+          setCanvasDestacado(false)
+        }, 2200)
+      }
+    }, 150)
+  }, [])
+
   // Ação de Gerar/Regenerar o Mapa Real e persistir automaticamente no PocketBase
   const handleGerarMapaReal = async () => {
     if (!canEdit) {
@@ -323,6 +344,9 @@ export const InfraMapaTab: React.FC<InfraMapaTabProps> = ({ orgId, serventiaNome
       })
 
       setMapaSalvo(salvo)
+
+      // Auto-scroll e destaque animado do canvas para o usuário ver onde o diagrama apareceu
+      dispararAutoScrollEDestaque()
 
       toast({
         title: 'Mapa da Infraestrutura Gerado e Salvo',
@@ -461,6 +485,9 @@ export const InfraMapaTab: React.FC<InfraMapaTabProps> = ({ orgId, serventiaNome
       setModoMapa('real')
       setModoEdicao(false)
       setHistoricoUndo([])
+
+      // Auto-scroll suave até o diagrama atualizado com anel de destaque
+      dispararAutoScrollEDestaque()
 
       toast({
         title: `Versão v${salvo.versao} do Mapa Salva com Sucesso`,
@@ -982,6 +1009,7 @@ export const InfraMapaTab: React.FC<InfraMapaTabProps> = ({ orgId, serventiaNome
                   setModalConexaoAberto(true)
                 }}
                 onRemoverConexao={handleRemoverConexao}
+                canEdit={canEdit}
               />
             </div>
           </div>
@@ -1038,87 +1066,221 @@ export const InfraMapaTab: React.FC<InfraMapaTabProps> = ({ orgId, serventiaNome
             onSelectFiltro={(f) => setFiltroConexao(f)}
           />
 
-          {/* DIAGRAMA / CANVAS VISUAL FUNCIONAL */}
-          {equipamentosAtuais.length === 0 && !modoEdicao ? (
-            <div className="w-full bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8 sm:p-12 text-center space-y-5 shadow-xs">
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-700 mx-auto flex items-center justify-center border border-blue-200 shadow-xs">
-                <Layers className="w-8 h-8 text-blue-600 animate-pulse" />
+          {/* RESUMO COMPACTO POR CAMADA (CHIPS CLAROS PARA O USUÁRIO SABER ONDE ESTÃO OS NÓS) */}
+          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-[#0B2545]" />
+                <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                  Distribuição por Camada ({equipamentosAtuais.length} nós no total):
+                </span>
               </div>
-              <div className="space-y-1.5 max-w-xl mx-auto">
-                <Badge
-                  variant="outline"
-                  className="bg-slate-100 text-slate-700 border-slate-300 text-[11px] font-bold uppercase tracking-wider"
-                >
-                  Diagrama em Branco • Sem Dados Fictícios
-                </Badge>
-                <h3 className="text-lg font-bold text-slate-900">
-                  Nenhum diagrama fictício gerado previamente
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Gere o mapa a partir dos dados reais da serventia ou clique em &quot;Editar
-                  mapa&quot; para desenhar os nós manualmente.
-                </p>
-              </div>
-
-              {canEdit && (
-                <div className="pt-2 flex items-center justify-center gap-3">
-                  <Button
-                    size="default"
-                    onClick={handleGerarMapaReal}
-                    className="bg-[#0B2545] hover:bg-[#124E78] text-white text-xs sm:text-sm font-semibold shadow-md gap-2 px-6"
-                  >
-                    <RefreshCw className="w-4 h-4 text-amber-300" />
-                    <span>Gerar mapa a partir dos dados da serventia</span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => {
-                      setModoEdicao(true)
-                      setNodeEmEdicao(null)
-                      setCamadaParaNovoNode('sala_servidores')
-                      setModalNodeAberto(true)
-                    }}
-                    className="text-xs sm:text-sm font-semibold border-blue-300 text-blue-700 hover:bg-blue-50 gap-2"
-                  >
-                    <Plus className="w-4 h-4 text-blue-600" />
-                    <span>Criar diagrama do zero</span>
-                  </Button>
-                </div>
-              )}
+              <span className="text-[11px] text-slate-500">
+                Localize rapidamente os equipamentos antes de rolar o canvas
+              </span>
             </div>
-          ) : (
-            <EditorCanvasDiagram
-              equipamentos={equipamentosAtuais}
-              conexoes={conexoesAtuais}
-              modoEdicao={modoEdicao}
-              filtroConexao={filtroConexao}
-              equipamentoSelecionadoId={equipamentoSelecionado?.id || null}
-              onSelectEquipamento={(eq) => setEquipamentoSelecionado(eq)}
-              onEditarNode={(eq) => {
-                setNodeEmEdicao(eq)
-                setModalNodeAberto(true)
-              }}
-              onRemoverNode={handleRemoverNode}
-              onAtualizarPosicaoNode={handleAtualizarPosicaoNode}
-              onAdicionarNodeNaCamada={(camadaId) => {
-                setNodeEmEdicao(null)
-                setCamadaParaNovoNode(camadaId)
-                setModalNodeAberto(true)
-              }}
-              onAbrirNovaConexao={(origemId) => {
-                setConexaoEmEdicao(null)
-                setOrigemConexaoPreDefinida(origemId)
-                setModalConexaoAberto(true)
-              }}
-              onEditarConexao={(cx) => {
-                setConexaoEmEdicao(cx)
-                setModalConexaoAberto(true)
-              }}
-              onRemoverConexao={handleRemoverConexao}
-            />
-          )}
+
+            <div className="flex items-center gap-2 flex-wrap pt-0.5">
+              {CAMADAS_TOPOLOGIA.map((camada) => {
+                const qtd = equipamentosAtuais.filter((e) => e.camadaId === camada.id).length
+                const temEquip = qtd > 0
+
+                return (
+                  <button
+                    key={camada.id}
+                    type="button"
+                    onClick={() => {
+                      // Se tem equipamento, rola até o bloco da camada
+                      const el = document.getElementById(`camada-bloco-${camada.id}`)
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                      temEquip
+                        ? 'bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100 hover:border-blue-300 cursor-pointer shadow-2xs'
+                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100/70'
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        temEquip ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
+                    />
+                    <span>{camada.titulo.replace(/^[0-9]\.\s*/, '')}</span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] px-1.5 py-0 h-4 font-mono font-bold ${
+                        temEquip
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-slate-200 text-slate-600 border-slate-300'
+                      }`}
+                    >
+                      {qtd}
+                    </Badge>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* DIAGRAMA / CANVAS VISUAL FUNCIONAL (COM CONTAINER DE AUTO-SCROLL E DESTAQUE) */}
+          <div
+            ref={canvasAreaRef}
+            className={`rounded-2xl transition-all duration-700 ${
+              canvasDestacado
+                ? 'ring-4 ring-blue-500 ring-offset-4 ring-offset-slate-50 shadow-2xl scale-[1.002]'
+                : ''
+            }`}
+          >
+            {equipamentosAtuais.length === 0 && !modoEdicao ? (
+              <div className="w-full bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8 sm:p-12 text-center space-y-6 shadow-xs">
+                <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-700 mx-auto flex items-center justify-center border border-blue-200 shadow-xs">
+                  <Layers className="w-8 h-8 text-blue-600 animate-pulse" />
+                </div>
+                <div className="space-y-2 max-w-xl mx-auto">
+                  <Badge
+                    variant="outline"
+                    className="bg-slate-100 text-slate-700 border-slate-300 text-[11px] font-bold uppercase tracking-wider"
+                  >
+                    Nenhum Equipamento Mapeado Ainda
+                  </Badge>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Nenhum equipamento cadastrado ainda — gere o mapa após cadastrar
+                    ativos/infraestrutura
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    Conforme as diretrizes de conformidade, nenhum dado fictício é pré-carregado.
+                    Cadastre os elementos nas abas de <strong>Energia</strong>,{' '}
+                    <strong>Ambiente Físico</strong>, <strong>Conectividade</strong> ou no{' '}
+                    <strong>Inventário GLPI</strong>, ou gere a topologia real agora:
+                  </p>
+                </div>
+
+                {/* Ações principais do estado vazio */}
+                <div className="pt-2 flex items-center justify-center gap-3 flex-wrap">
+                  {canEdit && (
+                    <Button
+                      size="default"
+                      onClick={handleGerarMapaReal}
+                      disabled={carregandoDadosReais}
+                      className="bg-gradient-to-r from-[#0B2545] to-[#124E78] hover:opacity-95 text-white text-xs sm:text-sm font-semibold shadow-md gap-2 px-6"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>Gerar mapa a partir dos dados da serventia</span>
+                    </Button>
+                  )}
+
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="default"
+                      onClick={() => {
+                        setModoEdicao(true)
+                        setNodeEmEdicao(null)
+                        setCamadaParaNovoNode('sala_servidores')
+                        setModalNodeAberto(true)
+                      }}
+                      className="text-xs sm:text-sm font-semibold border-blue-300 text-blue-700 hover:bg-blue-50 gap-2"
+                    >
+                      <Plus className="w-4 h-4 text-blue-600" />
+                      <span>Adicionar nós manualmente</span>
+                    </Button>
+                  )}
+                </div>
+
+                {/* Atalhos rápidos para as abas de cadastro do módulo e do sistema */}
+                <div className="pt-4 border-t border-slate-200/80 max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-left">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/infraestrutura?tab=energia')}
+                    className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/50 hover:bg-amber-100/60 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900">
+                      <Zap className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>1. Energia Elétrica</span>
+                    </div>
+                    <div className="text-[10px] text-amber-800/80 mt-0.5">
+                      Nobreaks, aterramento, gerador
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/infraestrutura?tab=ambiente_fisico')}
+                    className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-100/60 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-900">
+                      <Layers className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>2. Ambiente Físico</span>
+                    </div>
+                    <div className="text-[10px] text-blue-800/80 mt-0.5">
+                      Sala TI, racks, climatização
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/infraestrutura?tab=conectividade')}
+                    className="p-2.5 rounded-xl border border-cyan-200 bg-cyan-50/50 hover:bg-cyan-100/60 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-cyan-900">
+                      <Cable className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+                      <span>3. Conectividade</span>
+                    </div>
+                    <div className="text-[10px] text-cyan-800/80 mt-0.5">
+                      Links fibra e redundância
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/inventario')}
+                    className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-800">
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                      <span>4. Inventário</span>
+                    </div>
+                    <div className="text-[10px] text-slate-600 mt-0.5">
+                      Servidores, switches, PCs
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <EditorCanvasDiagram
+                equipamentos={equipamentosAtuais}
+                conexoes={conexoesAtuais}
+                modoEdicao={modoEdicao}
+                filtroConexao={filtroConexao}
+                equipamentoSelecionadoId={equipamentoSelecionado?.id || null}
+                onSelectEquipamento={(eq) => setEquipamentoSelecionado(eq)}
+                onEditarNode={(eq) => {
+                  setNodeEmEdicao(eq)
+                  setModalNodeAberto(true)
+                }}
+                onRemoverNode={handleRemoverNode}
+                onAtualizarPosicaoNode={handleAtualizarPosicaoNode}
+                onAdicionarNodeNaCamada={(camadaId) => {
+                  setNodeEmEdicao(null)
+                  setCamadaParaNovoNode(camadaId)
+                  setModalNodeAberto(true)
+                }}
+                onAbrirNovaConexao={(origemId) => {
+                  setConexaoEmEdicao(null)
+                  setOrigemConexaoPreDefinida(origemId)
+                  setModalConexaoAberto(true)
+                }}
+                onEditarConexao={(cx) => {
+                  setConexaoEmEdicao(cx)
+                  setModalConexaoAberto(true)
+                }}
+                onRemoverConexao={handleRemoverConexao}
+                canEdit={canEdit}
+              />
+            )}
+          </div>
 
           {/* Bloco de Proteção Sobreposta (quando não estiver em edição para manter foco) */}
           {!modoEdicao && <MapaProtecaoOverlay />}
