@@ -53,6 +53,7 @@ import {
   Monitor,
   Database as DatabaseIcon,
   HardDrive,
+  HardDriveDownload,
   FileText,
 } from 'lucide-react'
 import {
@@ -1500,7 +1501,15 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="servidor">Servidores (VMs)</SelectItem>
+                      <SelectItem value="servidor" title="Backup de máquina virtual">
+                        <span
+                          className="inline-flex items-center gap-1.5"
+                          title="Backup de máquina virtual"
+                        >
+                          <HardDriveDownload className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>Servidores (VMs)</span>
+                        </span>
+                      </SelectItem>
                       <SelectItem value="estacao">Estações</SelectItem>
                       <SelectItem value="banco">Banco de dados</SelectItem>
                       <SelectItem value="rede">Rede / Firewall</SelectItem>
@@ -1675,11 +1684,11 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
               }
             />
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-hidden">
+              <table className="w-full table-fixed text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-semibold text-[11px] select-none">
-                    <th className="py-3 px-3 w-10 text-center">
+                    <th className="py-2.5 px-2 w-[34px] text-center">
                       <input
                         type="checkbox"
                         checked={isAllCurrentSelected}
@@ -1688,43 +1697,40 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                         title="Selecionar todos os registros desta página"
                       />
                     </th>
-                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 w-[125px] whitespace-nowrap">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[112px] whitespace-nowrap">
                       Data/Hora
                     </th>
-                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 min-w-[210px] max-w-[280px]">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[24%]">
                       Ativo
                     </th>
-                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 w-[100px] whitespace-nowrap">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[84px] whitespace-nowrap">
                       Tipo
                     </th>
-                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 min-w-[170px] max-w-[230px]">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[24%]">
                       Rotina / Plano
                     </th>
-                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 min-w-[140px] max-w-[220px]">
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[150px]">
                       Resultado
                     </th>
-                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 w-[80px] whitespace-nowrap">
-                      Duração
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 w-[86px] whitespace-nowrap">
+                      Duração/Tam.
                     </th>
-                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 w-[80px] whitespace-nowrap">
-                      Tamanho
-                    </th>
-                    <th className="py-3 px-3 font-bold uppercase tracking-wider text-slate-700 text-right w-[60px] whitespace-nowrap">
-                      Detalhes
+                    <th className="py-2.5 px-2 font-bold uppercase tracking-wider text-slate-700 text-right w-[42px] whitespace-nowrap">
+                      <span className="sr-only">Ações</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-600 mb-2" />
                         Carregando execuções de backup...
                       </td>
                     </tr>
                   ) : paginatedExecucoes.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         <Server className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                         <span className="font-semibold text-slate-700 block text-xs">
                           Nenhuma execução encontrada
@@ -1753,13 +1759,35 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                         exec.ativoTitulo.toLowerCase().includes('pc-') ||
                         exec.ativoTitulo.toLowerCase().includes('desk')
 
+                      // Ativos de servidores/VMs usam HardDriveDownload como ícone oficial de backup de máquina virtual
+                      const isVM =
+                        !isBanco &&
+                        !isRede &&
+                        !isEstacao &&
+                        (exec.vmsComprovadas.length > 0 ||
+                          exec.ativoTipo.includes('servidor') ||
+                          exec.ativoTitulo.toLowerCase().includes('spcm-') ||
+                          exec.rotinaNome.toLowerCase().includes('vm'))
+
                       const RowIcon = isBanco
                         ? DatabaseIcon
                         : isRede
                           ? ShieldCheck
                           : isEstacao
                             ? Monitor
-                            : Server
+                            : isVM
+                              ? HardDriveDownload
+                              : Server
+
+                      const iconTooltip = isVM
+                        ? 'Backup de máquina virtual'
+                        : isBanco
+                          ? 'Banco de dados'
+                          : isRede
+                            ? 'Equipamento de rede'
+                            : isEstacao
+                              ? 'Estação de trabalho'
+                              : 'Servidor físico'
 
                       return (
                         <tr
@@ -1769,7 +1797,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                         >
                           {/* Coluna 1: Checkbox */}
                           <td
-                            className="py-3 px-3 text-center w-10"
+                            className="py-2.5 px-2 text-center"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <input
@@ -1781,29 +1809,32 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                           </td>
 
                           {/* Coluna 2: Data/Hora (regra de ouro: data_email com verdade temporal) */}
-                          <td className="py-3 px-3 whitespace-nowrap text-slate-800 font-medium text-[11.5px]">
+                          <td className="py-2.5 px-2 whitespace-nowrap text-slate-800 font-medium text-[11px]">
                             {exec.dataHoraFormatada}
                           </td>
 
                           {/* Coluna 3: Ativo (nome em negrito + subtítulo descritivo abaixo) */}
-                          <td className="py-3 px-3 min-w-[210px] max-w-[280px]">
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200/80 mt-0.5">
-                                <RowIcon className="w-3.5 h-3.5 text-slate-700" />
+                          <td className="py-2.5 px-2 min-w-0">
+                            <div className="flex items-start gap-2 min-w-0">
+                              <div
+                                className="w-6 h-6 rounded-md bg-blue-50/80 text-blue-700 flex items-center justify-center shrink-0 border border-blue-100 mt-0.5"
+                                title={iconTooltip}
+                              >
+                                <RowIcon className="w-3.5 h-3.5 text-blue-700" />
                               </div>
                               <div className="min-w-0 flex-1">
                                 {exec.vmsComprovadas.length > 0 ? (
                                   exec.temMultiplasVms ? (
                                     <>
                                       <span
-                                        className="font-mono text-xs font-bold text-slate-900 block truncate leading-tight"
+                                        className="font-mono text-[11.5px] font-bold text-slate-900 block truncate leading-tight"
                                         title={exec.vmsNomesFormatados}
                                       >
                                         {exec.vmsComprovadas.map((v) => v.nome).join(', ')}
                                       </span>
                                       <span
-                                        className="text-[11px] font-medium text-slate-500 block truncate mt-0.5"
-                                        title={`${exec.vmsComprovadas.length} VMs comprovadas`}
+                                        className="text-[10.5px] font-medium text-slate-500 block truncate mt-0.5"
+                                        title={`${exec.vmsComprovadas.length} VMs comprovadas (${exec.vmsNomesFormatados})`}
                                       >
                                         {exec.vmsComprovadas.length} VMs comprovadas
                                       </span>
@@ -1811,13 +1842,13 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                                   ) : (
                                     <>
                                       <span
-                                        className="font-mono text-xs font-bold text-slate-900 block truncate leading-tight"
+                                        className="font-mono text-[11.5px] font-bold text-slate-900 block truncate leading-tight"
                                         title={exec.ativoTitulo}
                                       >
                                         {exec.ativoTitulo}
                                       </span>
                                       <span
-                                        className="text-[11px] font-medium text-slate-500 block truncate mt-0.5"
+                                        className="text-[10.5px] font-medium text-slate-500 block truncate mt-0.5"
                                         title={exec.ativoNome || '1 VM comprovada'}
                                       >
                                         {exec.ativoNome && exec.ativoNome !== exec.ativoTitulo
@@ -1829,13 +1860,13 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                                 ) : (
                                   <>
                                     <span
-                                      className="font-semibold text-xs text-slate-900 block truncate leading-tight"
+                                      className="font-semibold text-[11.5px] text-slate-900 block truncate leading-tight"
                                       title={exec.ativoTitulo}
                                     >
                                       {exec.ativoTitulo}
                                     </span>
                                     <span
-                                      className="text-[11px] font-medium text-slate-500 block truncate mt-0.5"
+                                      className="text-[10.5px] font-medium text-slate-500 block truncate mt-0.5"
                                       title={exec.ativoNome || exec.rotinaNome}
                                     >
                                       {exec.ativoNome || exec.rotinaNome}
@@ -1847,32 +1878,32 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                           </td>
 
                           {/* Coluna 4: Tipo (badge pastel conforme modelo de referência) */}
-                          <td className="py-3 px-3 whitespace-nowrap">
+                          <td className="py-2.5 px-2 whitespace-nowrap">
                             {exec.tipoBackupLabel === 'Completo' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
                                 Completo
                               </span>
                             ) : exec.tipoBackupLabel === 'Incremental' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-sky-100 text-sky-700 border border-sky-200">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-sky-100 text-sky-700 border border-sky-200">
                                 Incremental
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
                                 Configuração
                               </span>
                             )}
                           </td>
 
                           {/* Coluna 5: Rotina / Plano (nome da rotina + subtítulo do plano) */}
-                          <td className="py-3 px-3 min-w-[170px] max-w-[230px]">
+                          <td className="py-2.5 px-2 min-w-0">
                             <span
-                              className="font-semibold text-xs text-slate-900 block truncate leading-tight"
+                              className="font-semibold text-[11.5px] text-slate-900 block truncate leading-tight"
                               title={exec.rotinaNome}
                             >
                               {exec.rotinaNome}
                             </span>
                             <span
-                              className="text-[11px] font-medium text-slate-500 block truncate mt-0.5"
+                              className="text-[10.5px] font-medium text-slate-500 block truncate mt-0.5"
                               title={exec.planoNome}
                             >
                               {exec.planoNome}
@@ -1880,20 +1911,20 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                           </td>
 
                           {/* Coluna 6: Resultado (badge pastel com ícone + selo modalidade/data) */}
-                          <td className="py-3 px-3 min-w-[140px] max-w-[220px]">
-                            <div className="flex flex-col gap-1 items-start">
+                          <td className="py-2.5 px-2 min-w-0">
+                            <div className="flex flex-col gap-0.5 items-start min-w-0 max-w-full">
                               {exec.status === 'sucesso' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                   <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
                                   <span>Sucesso</span>
                                 </span>
                               ) : exec.status === 'erro' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
                                   <XCircle className="w-3 h-3 text-rose-600 shrink-0" />
                                   <span>Falha</span>
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
                                   <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
                                   <span>Com alertas</span>
                                 </span>
@@ -1912,19 +1943,22 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                             </div>
                           </td>
 
-                          {/* Coluna 7: Duração */}
-                          <td className="py-3 px-3 whitespace-nowrap text-slate-700 font-medium text-[11.5px]">
-                            {exec.duracaoFormatada}
-                          </td>
-
-                          {/* Coluna 8: Tamanho */}
-                          <td className="py-3 px-3 whitespace-nowrap text-slate-700 font-medium text-[11.5px]">
-                            {exec.tamanhoDisplay}
-                          </td>
-
-                          {/* Coluna 9: Detalhes (menu "...") */}
+                          {/* Coluna 7: Duração e Tamanho fundidos de forma compacta e legível */}
                           <td
-                            className="py-3 px-3 text-right whitespace-nowrap"
+                            className="py-2.5 px-2 whitespace-nowrap min-w-0"
+                            title={`Duração: ${exec.duracaoFormatada} | Tamanho: ${exec.tamanhoDisplay}`}
+                          >
+                            <span className="text-slate-800 font-medium text-[11px] block leading-tight">
+                              {exec.duracaoFormatada}
+                            </span>
+                            <span className="text-slate-500 font-mono text-[10px] block mt-0.5 leading-tight truncate">
+                              {exec.tamanhoDisplay}
+                            </span>
+                          </td>
+
+                          {/* Coluna 8: Detalhes (menu "...") */}
+                          <td
+                            className="py-2.5 px-2 text-right whitespace-nowrap"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <DropdownMenu>
@@ -1933,6 +1967,7 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md"
+                                  title="Ver opções desta execução"
                                 >
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
@@ -2245,6 +2280,25 @@ export const BackupOverviewContent: React.FC<BackupOverviewContentProps> = ({
           {execDetail && (
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="col-span-2 flex items-center justify-between pb-2 border-b border-slate-200/80">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                      Duração da Execução
+                    </span>
+                    <span className="font-semibold text-slate-900 block mt-0.5 text-xs">
+                      {(execDetail as any).duracaoFormatada || '—'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                      Tamanho dos Dados
+                    </span>
+                    <span className="font-semibold font-mono text-slate-900 block mt-0.5 text-xs">
+                      {execDetail.tamanho_formatado || (execDetail as any).tamanhoDisplay || '—'}
+                    </span>
+                  </div>
+                </div>
+
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-bold block">
                     Status
