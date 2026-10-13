@@ -170,6 +170,7 @@ export async function avaliarStatusModulosIntegrados(
   let segSolucoes: any[] = []
   let segComprovantes: any[] = []
   let segItens: any[] = []
+  let infraMapa: any = null
 
   try {
     const [
@@ -186,6 +187,7 @@ export async function avaliarStatusModulosIntegrados(
       segSolRes,
       segCompRes,
       segItensRes,
+      infraMapaRes,
     ] = await Promise.allSettled([
       pb
         .collection('designacoes')
@@ -224,6 +226,10 @@ export async function avaliarStatusModulosIntegrados(
         limit: 20,
       }),
       pb.collection('seg_itens_conformidade').getFullList({ filter: `organization = "${orgId}"` }),
+      pb.collection('infra_mapas').getList(1, 1, {
+        filter: `organization = "${orgId}"`,
+        sort: '-created',
+      }),
     ])
 
     if (desigRes.status === 'fulfilled') designacoes = desigRes.value
@@ -239,6 +245,7 @@ export async function avaliarStatusModulosIntegrados(
     if (segSolRes.status === 'fulfilled') segSolucoes = segSolRes.value
     if (segCompRes.status === 'fulfilled') segComprovantes = segCompRes.value
     if (segItensRes.status === 'fulfilled') segItens = segItensRes.value
+    if (infraMapaRes.status === 'fulfilled') infraMapa = infraMapaRes.value.items[0] || null
   } catch (err) {
     console.warn('[conformidadeService] Erro ao carregar fontes dos módulos:', err)
   }
@@ -462,6 +469,23 @@ export async function avaliarStatusModulosIntegrados(
         referencia = `${endpointSol[0].nome} cadastrado, aguardando relatório de console`
       } else {
         computedStatus = 'pendente'
+      }
+    }
+
+    // 2.8 Documento formal de arquitetura tecnológica e topologia de rede
+    else if (catItem.codigo === '2.8') {
+      if (infraMapa && (infraMapa.status === 'gerado' || infraMapa.status === 'revisado')) {
+        computedStatus = 'comprovado'
+        referencia = `Mapa da Infraestrutura v${infraMapa.versao || 1} ativo (${infraMapa.nos_reais_count || 0} nós reais mapeados)`
+        link = '/infraestrutura?tab=mapa'
+        dataComp = infraMapa.updated
+        hash = infraMapa.hash_sha256 || ''
+        obs = 'Topologia física e lógica documentada e homologada na aba Mapa da Infraestrutura.'
+      } else {
+        computedStatus = 'pendente'
+        link = '/infraestrutura?tab=mapa'
+        obs =
+          'Pendente de geração do Mapa da Infraestrutura no módulo Infraestrutura Física e Lógica.'
       }
     }
 

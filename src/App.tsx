@@ -36,6 +36,7 @@ import PlanosAcaoPage from './pages/planos/PlanosAcaoPage'
 import PlanosAcaoReportPage from './pages/planos/PlanosAcaoReportPage'
 import InfraestruturaPage from './pages/infraestrutura/InfraestruturaPage'
 import InfraestruturaReportPage from './pages/infraestrutura/InfraestruturaReportPage'
+import MapaInfraestruturaReportPage from './pages/infraestrutura/MapaInfraestruturaReportPage'
 import MapaInfraestruturaPreviewPage from './pages/infraestrutura/MapaInfraestruturaPreviewPage'
 import NotFound from './pages/NotFound'
 
@@ -89,7 +90,7 @@ export const App = () => (
             {/* 4. Ambiente */}
             <Route path="/ativos" element={<AssetsPage />} />
             <Route path="/infraestrutura" element={<InfraestruturaPage />} />
-            {/* Rota Isolada de Preview — Mapa da Infraestrutura (Protótipo para Leandro) */}
+            {/* Rota de Compatibilidade — Mapa da Infraestrutura (Redirecionamento/Aviso para recurso oficial) */}
             <Route
               path="/preview/mapa-infraestrutura"
               element={<MapaInfraestruturaPreviewPage />}
@@ -175,6 +176,14 @@ export const App = () => (
             element={
               <ProtectedRoute>
                 <InfraestruturaReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios/mapa-infraestrutura"
+            element={
+              <ProtectedRoute>
+                <MapaInfraestruturaReportPage />
               </ProtectedRoute>
             }
           />

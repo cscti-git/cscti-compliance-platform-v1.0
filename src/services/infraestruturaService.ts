@@ -554,3 +554,115 @@ export function getInfraItemFileUrl(record: InfraItem | InfraLinkItem, filename:
   if (!filename) return ''
   return pb.files.getURL(record as any, filename)
 }
+
+// ==========================================
+// 8. Persistência do Mapa da Infraestrutura (infra_mapas)
+// ==========================================
+
+export interface InfraMapaRecord {
+  id: string
+  organization: string
+  status: 'em_branco' | 'gerado' | 'revisado'
+  versao?: number
+  hash_sha256?: string
+  total_nos?: number
+  total_conexoes?: number
+  nos_reais_count?: number
+  autonomia_minutos?: number
+  velocidade_mbps?: number
+  equipamentos_snapshot?: any
+  conexoes_snapshot?: any
+  resumo_camadas?: any
+  diagrama_referencia_snapshot?: any
+  gerado_por_nome?: string
+  gerado_por_email?: string
+  observacoes?: string
+  created: string
+  updated: string
+}
+
+export async function getInfraMapaServentia(orgId: string): Promise<InfraMapaRecord | null> {
+  if (!orgId) return null
+  try {
+    const records = await pb.collection('infra_mapas').getList<InfraMapaRecord>(1, 1, {
+      filter: `organization = '${orgId}'`,
+      sort: '-created',
+    })
+    return records.items[0] || null
+  } catch (err) {
+    console.error('[infraestruturaService] Erro ao buscar mapa da serventia:', err)
+    return null
+  }
+}
+
+export interface SaveInfraMapaPayload {
+  status: 'em_branco' | 'gerado' | 'revisado'
+  hash_sha256?: string
+  total_nos?: number
+  total_conexoes?: number
+  nos_reais_count?: number
+  autonomia_minutos?: number
+  velocidade_mbps?: number
+  equipamentos_snapshot?: any[]
+  conexoes_snapshot?: any[]
+  resumo_camadas?: any
+  diagrama_referencia_snapshot?: any
+  gerado_por_nome?: string
+  gerado_por_email?: string
+  observacoes?: string
+}
+
+export async function saveInfraMapaServentia(
+  orgId: string,
+  payload: SaveInfraMapaPayload,
+): Promise<InfraMapaRecord> {
+  // Busca o mapa mais recente para saber a versão atual
+  const atual = await getInfraMapaServentia(orgId)
+  const proximaVersao = (atual?.versao || 0) + 1
+
+  const dataToSave = {
+    organization: orgId,
+    status: payload.status,
+    versao: proximaVersao,
+    hash_sha256: payload.hash_sha256 || '',
+    total_nos: payload.total_nos || 0,
+    total_conexoes: payload.total_conexoes || 0,
+    nos_reais_count: payload.nos_reais_count || 0,
+    autonomia_minutos: payload.autonomia_minutos || 0,
+    velocidade_mbps: payload.velocidade_mbps || 0,
+    equipamentos_snapshot: payload.equipamentos_snapshot || [],
+    conexoes_snapshot: payload.conexoes_snapshot || [],
+    resumo_camadas: payload.resumo_camadas || {},
+    diagrama_referencia_snapshot: payload.diagrama_referencia_snapshot || null,
+    gerado_por_nome: payload.gerado_por_nome || '',
+    gerado_por_email: payload.gerado_por_email || '',
+    observacoes: payload.observacoes || '',
+  }
+
+  let res: InfraMapaRecord
+  if (atual?.id) {
+    res = await pb.collection('infra_mapas').update<InfraMapaRecord>(atual.id, dataToSave)
+  } else {
+    res = await pb.collection('infra_mapas').create<InfraMapaRecord>(dataToSave)
+  }
+
+  // Trilha de auditoria append-only CSCTI
+  await logAudit({
+    action: payload.status === 'em_branco' ? 'INFRA_MAPA_RESET' : 'INFRA_MAPA_SAVE',
+    entity: 'Mapa da Infraestrutura',
+    detail:
+      payload.status === 'em_branco'
+        ? `Mapa da Infraestrutura redefinido para em branco por ${payload.gerado_por_nome || 'Usuário'}`
+        : `Mapa da Infraestrutura v${proximaVersao} salvo com ${payload.nos_reais_count || 0} nós reais identificados e hash SHA-256`,
+    organizationId: orgId,
+    metadata: {
+      versao: proximaVersao,
+      status: payload.status,
+      total_nos: payload.total_nos,
+      nos_reais: payload.nos_reais_count,
+      hash_sha256: payload.hash_sha256,
+    },
+  })
+
+  return res
+}

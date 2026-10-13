@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-13T12:22:45.881Z",
+  "generatedAt": "2026-10-13T12:34:59.634Z",
   "collections": [
     {
       "name": "users",
@@ -4872,6 +4872,136 @@
         "CREATE INDEX idx_infra_chk_org_status ON infra_checklist_itens (organization, status)",
         "CREATE INDEX idx_infra_chk_org_secao ON infra_checklist_itens (organization, secao)",
         "CREATE INDEX idx_infra_chk_org_ordem ON infra_checklist_itens (organization, ordem)"
+      ]
+    },
+    {
+      "name": "infra_mapas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "view": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin')",
+        "create": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "update": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')",
+        "delete": "@request.auth.id != '' && (organization = @request.auth.organization || @request.auth.system_role = 'admin') && (@request.auth.system_role = 'admin' || @request.auth.system_role = 'suporte')"
+      },
+      "fields": [
+        {
+          "name": "organization",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "organizations"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["em_branco", "gerado", "revisado"]
+        },
+        {
+          "name": "versao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hash_sha256",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_nos",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_conexoes",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nos_reais_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "autonomia_minutos",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "velocidade_mbps",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipamentos_snapshot",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "conexoes_snapshot",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resumo_camadas",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "diagrama_referencia_snapshot",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gerado_por_nome",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gerado_por_email",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_infra_mapas_org ON infra_mapas (organization)",
+        "CREATE INDEX idx_infra_mapas_org_status ON infra_mapas (organization, status)",
+        "CREATE INDEX idx_infra_mapas_org_created ON infra_mapas (organization, created DESC)"
       ]
     }
   ]

@@ -1,5 +1,14 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
-import { Zap, Building, Wifi, Cpu, ListChecks, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  Zap,
+  Building,
+  Wifi,
+  Cpu,
+  ListChecks,
+  Network,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface InfraTabItem {
@@ -21,6 +30,7 @@ export interface InfraTabStripProps {
   eolCount: number
   checklistConformes: number
   checklistTotal: number
+  mapaNosCount?: number
   className?: string
 }
 
@@ -34,6 +44,7 @@ export const InfraTabStrip: React.FC<InfraTabStripProps> = ({
   eolCount,
   checklistConformes,
   checklistTotal,
+  mapaNosCount,
   className,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -70,6 +81,14 @@ export const InfraTabStrip: React.FC<InfraTabStripProps> = ({
       icon: Cpu,
       count: eolCount > 0 ? `${eolCount} EOL` : 'OK',
       badgeVariant: eolCount > 0 ? 'rose' : 'emerald',
+    },
+    {
+      id: 'mapa',
+      label: 'Mapa da Infraestrutura',
+      subLabel: '(Topologia Técnica & Nós Vivos)',
+      icon: Network,
+      count: mapaNosCount !== undefined && mapaNosCount > 0 ? `${mapaNosCount} nós` : 'Oficial',
+      badgeVariant: mapaNosCount !== undefined && mapaNosCount > 0 ? 'emerald' : 'blue',
     },
     {
       id: 'checklist',

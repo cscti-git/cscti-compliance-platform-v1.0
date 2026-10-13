@@ -167,11 +167,7 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
   }
 
   const handleExportarPdf = () => {
-    toast({
-      title: 'Exportação em PDF A4 (Simulação)',
-      description:
-        'Recurso disponível na versão integrada ao produto real. O layout será formatado para impressão paisagem com selo de conformidade.',
-    })
+    navigate('/relatorios/mapa-infraestrutura')
   }
 
   const handleEditarMapa = () => {
@@ -210,41 +206,41 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-16">
-      {/* 1. BANNER CLARO NO TOPO (Requisito 1 Mantido) */}
-      <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-amber-100/60 to-orange-50 p-4 sm:p-5 shadow-sm">
+      {/* 1. BANNER DE RECURSO OFICIAL INTEGRADO */}
+      <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 via-slate-50 to-indigo-50 p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-              <Sparkles className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-[#0B2545] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-black uppercase tracking-wider text-amber-950 bg-amber-200/80 px-2.5 py-0.5 rounded-full border border-amber-300">
-                  SIMULAÇÃO VISUAL — Rota Isolada de Preview
-                </span>
-                <span className="text-[11px] font-semibold text-amber-800">
-                  Topologia Técnica Proposta • Análise Prévia
+                <Badge className="bg-emerald-700 text-white text-[10px] font-bold">
+                  RECURSO OFICIAL INTEGRADO
+                </Badge>
+                <span className="text-[11px] font-semibold text-slate-700">
+                  Aprovado • Módulo Infraestrutura Física e Lógica
                 </span>
               </div>
-              <h2 className="text-sm sm:text-base font-bold text-amber-950 mt-1">
-                SIMULAÇÃO VISUAL — Protótipo para análise. Não são dados reais da serventia.
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 mt-1">
+                O Mapa da Infraestrutura agora é um recurso permanente do produto
               </h2>
-              <p className="text-xs text-amber-800/90 mt-0.5">
-                O mapa inicia 100% em branco (sem topologias fictícias hard-coded). Ao clicar em
-                "Gerar mapa a partir dos dados da serventia", a ferramenta renderiza estritamente os
-                ativos e infraestrutura cadastrados no banco da serventia logada.
+              <p className="text-xs text-slate-600 mt-0.5">
+                A simulação foi promovida à aba oficial dentro de{' '}
+                <strong>Infraestrutura Física e Lógica</strong> com persistência no banco, auditoria
+                append-only e relatório A4.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
             <Button
-              variant="outline"
               size="sm"
-              onClick={() => navigate('/infraestrutura')}
-              className="text-xs bg-white text-amber-900 border-amber-300 hover:bg-amber-100 shadow-2xs"
+              onClick={() => navigate('/infraestrutura?tab=mapa')}
+              className="text-xs bg-[#0B2545] hover:bg-[#124E78] text-white shadow-xs gap-1.5"
             >
-              Voltar à Infraestrutura Oficial
+              <ArrowRight className="w-3.5 h-3.5" />
+              <span>Acessar Aba Oficial do Mapa</span>
             </Button>
           </div>
         </div>
@@ -402,17 +398,15 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
         icon={Network}
         title="Mapa da Infraestrutura Técnica"
         subtitle="Diagrama topológico interativo das camadas de energia, sala de servidores, interligação por fibra óptica e setores operacionais da serventia."
-        badgeText={modoMapa === 'real' ? 'Topologia Real • CSCTI' : 'Protótipo Visual • CSCTI'}
+        badgeText="Topologia Oficial • CSCTI"
         serventiaNome={serventiaNome}
         serventiaAtiva={true}
         breadcrumbs={[
           { label: 'Início', href: '/' },
           { label: 'Ambiente', href: '/infraestrutura' },
           {
-            label:
-              modoMapa === 'real'
-                ? 'Topologia Real da Serventia'
-                : 'Simulação: Mapa da Infraestrutura',
+            label: 'Mapa da Infraestrutura Oficial',
+            href: '/infraestrutura?tab=mapa',
           },
         ]}
         actions={

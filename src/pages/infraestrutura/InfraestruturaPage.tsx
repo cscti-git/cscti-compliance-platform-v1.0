@@ -7,12 +7,14 @@ import { InfraSecaoTab } from '@/components/infraestrutura/InfraSecaoTab'
 import { InfraConectividadeTab } from '@/components/infraestrutura/InfraConectividadeTab'
 import { InfraCamadaLogicaTab } from '@/components/infraestrutura/InfraCamadaLogicaTab'
 import { InfraChecklistGeralTab } from '@/components/infraestrutura/InfraChecklistGeralTab'
+import { InfraMapaTab } from '@/components/infraestrutura/mapa/InfraMapaTab'
 import { PlanoAcaoFormModal } from '@/components/planos/PlanoAcaoFormModal'
 import {
   listInfraItens,
   listInfraLinks,
   listInfraChecklist,
   consolidarInfraRaioX,
+  getInfraMapaServentia,
   confrontarConectividade,
   analisarAtivosEol,
 } from '@/services/infraestruturaService'
@@ -51,9 +53,14 @@ export const InfraestruturaPage: React.FC = () => {
   const { toast } = useToast()
   const navigate = useNavigate()
 
+  // Leitura opcional de query param ?tab=mapa
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<string>('energia')
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('tab') || 'energia'
+  })
   const [org, setOrg] = useState<OrganizationItem | null>(null)
+  const [mapaNosCount, setMapaNosCount] = useState<number>(0)
 
   // Dados das coleções
   const [itens, setItens] = useState<InfraItem[]>([])
@@ -74,14 +81,16 @@ export const InfraestruturaPage: React.FC = () => {
     if (!orgId) return
     setLoading(true)
     try {
-      const [orgData, itensData, linksData, chkData, assetsData, peopleData] = await Promise.all([
-        getCurrentUserOrganization().catch(() => null),
-        listInfraItens(orgId),
-        listInfraLinks(orgId),
-        listInfraChecklist(orgId),
-        listInventoryAssets(orgId).catch(() => []),
-        listPeople(orgId).catch(() => []),
-      ])
+      const [orgData, itensData, linksData, chkData, assetsData, peopleData, mapaData] =
+        await Promise.all([
+          getCurrentUserOrganization().catch(() => null),
+          listInfraItens(orgId),
+          listInfraLinks(orgId),
+          listInfraChecklist(orgId),
+          listInventoryAssets(orgId).catch(() => []),
+          listPeople(orgId).catch(() => []),
+          getInfraMapaServentia(orgId).catch(() => null),
+        ])
 
       setOrg(orgData)
       setItens(itensData)
@@ -89,6 +98,7 @@ export const InfraestruturaPage: React.FC = () => {
       setChecklist(chkData)
       setAssets(assetsData)
       setPeople(peopleData)
+      setMapaNosCount(mapaData?.nos_reais_count || 0)
     } catch (err) {
       console.error('[InfraestruturaPage] Erro ao carregar dados:', err)
       toast({
@@ -227,6 +237,7 @@ export const InfraestruturaPage: React.FC = () => {
         eolCount={raioX.ativosEolTotal}
         checklistConformes={raioX.itensConformes}
         checklistTotal={raioX.totalItens}
+        mapaNosCount={mapaNosCount}
       />
 
       {/* Conteúdo Dinâmico da Aba Selecionada */}
@@ -284,6 +295,14 @@ export const InfraestruturaPage: React.FC = () => {
               canEdit={canEdit}
               onReload={loadData}
               onGerarPlanoAcao={handleGerarPlanoFromText}
+            />
+          )}
+
+          {activeTab === 'mapa' && (
+            <InfraMapaTab
+              orgId={orgId}
+              serventiaNome={org?.name || 'Serventia'}
+              canEdit={canEdit}
             />
           )}
 
