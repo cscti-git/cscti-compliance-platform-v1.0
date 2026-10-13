@@ -21,8 +21,13 @@ import {
   Radio,
   Eye,
   AlertTriangle,
+  PlusCircle,
+  ExternalLink,
+  RotateCcw,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { useNavigate } from 'react-router-dom'
 
 export interface MapaTopologiaDiagramProps {
   onSelectEquipamento: (equipamento: EquipamentoSimulado) => void
@@ -32,6 +37,8 @@ export interface MapaTopologiaDiagramProps {
   equipamentosCustomizados?: EquipamentoSimulado[]
   conexoesCustomizadas?: TopologiaConexao[]
   isModoReal?: boolean
+  mapaVazioSemGeracao?: boolean
+  onGerarMapa?: () => void
 }
 
 export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
@@ -42,11 +49,14 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
   equipamentosCustomizados,
   conexoesCustomizadas,
   isModoReal = false,
+  mapaVazioSemGeracao = false,
+  onGerarMapa,
 }) => {
+  const navigate = useNavigate()
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
 
-  const listaEquipamentos = equipamentosCustomizados || EQUIPAMENTOS_SIMULADOS
-  const listaConexoes = conexoesCustomizadas || CONEXOES_SIMULADAS
+  const listaEquipamentos = equipamentosCustomizados ?? EQUIPAMENTOS_SIMULADOS
+  const listaConexoes = conexoesCustomizadas ?? CONEXOES_SIMULADAS
 
   // Encontra conexões relacionadas ao nó com hover
   const conexoesAtivas = React.useMemo(() => {
@@ -81,6 +91,99 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
     return mapa
   }, [listaEquipamentos])
 
+  // Componente de bloco tracejado honesto quando a camada não possui equipamentos cadastrados
+  const BlocoCamadaVazia: React.FC<{
+    camadaNome: string
+    moduloNome: string
+    rotaModulo: string
+    iconeDica?: string
+  }> = ({ camadaNome, moduloNome, rotaModulo }) => (
+    <div className="rounded-xl border-2 border-dashed border-slate-300/80 bg-slate-50/50 p-6 flex flex-col items-center justify-center text-center space-y-2 min-h-[140px] hover:border-slate-400 transition-colors">
+      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200">
+        <AlertTriangle className="w-4 h-4 text-slate-400" />
+      </div>
+      <div className="text-xs font-semibold text-slate-700">
+        Sem equipamentos cadastrados nesta camada
+      </div>
+      <p className="text-[11px] text-slate-500 max-w-sm">
+        Nenhum ativo ou elemento de <em>{camadaNome}</em> foi registrado no banco desta serventia.
+      </p>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => navigate(rotaModulo)}
+        className="text-[11px] h-7 border-slate-300 text-slate-700 hover:text-blue-700 hover:border-blue-300 gap-1 mt-1 bg-white"
+      >
+        <span>Cadastrar no módulo {moduloNome}</span>
+        <ExternalLink className="w-3 h-3 text-slate-400" />
+      </Button>
+    </div>
+  )
+
+  // Estado inicial: Mapa em branco aguardando acionamento do gerador real
+  if (mapaVazioSemGeracao || listaEquipamentos.length === 0) {
+    return (
+      <div className="w-full bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8 sm:p-12 text-center space-y-5 shadow-xs">
+        <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-700 mx-auto flex items-center justify-center border border-blue-200 shadow-xs">
+          <Network className="w-8 h-8 text-blue-600 animate-pulse" />
+        </div>
+        <div className="space-y-1.5 max-w-xl mx-auto">
+          <Badge
+            variant="outline"
+            className="bg-slate-100 text-slate-700 border-slate-300 text-[11px] font-bold uppercase tracking-wider"
+          >
+            Diagrama em Branco • Sem Dados Fictícios
+          </Badge>
+          <h3 className="text-lg font-bold text-slate-900">
+            Nenhum diagrama fictício gerado previamente
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Conforme a diretriz de conformidade, a ferramenta não desenha topologias artificiais.
+            Clique abaixo para que o motor consulte o inventário, os registros de infraestrutura
+            física e as evidências fotográficas da serventia logada e monte o diagrama real.
+          </p>
+        </div>
+
+        {onGerarMapa && (
+          <div className="pt-2">
+            <Button
+              size="default"
+              onClick={onGerarMapa}
+              className="bg-gradient-to-r from-blue-700 via-indigo-700 to-[#0B2545] hover:opacity-95 text-white text-xs sm:text-sm font-semibold shadow-md gap-2 px-6"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>Gerar mapa a partir dos dados da serventia</span>
+            </Button>
+          </div>
+        )}
+
+        <div className="pt-4 border-t border-slate-200/80 max-w-lg mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+          <div
+            onClick={() => navigate('/inventario')}
+            className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/60 hover:bg-slate-100 cursor-pointer transition-colors"
+          >
+            <div className="text-[11px] font-bold text-slate-800">1. Inventário GLPI</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">Servidores, switches, PCs</div>
+          </div>
+          <div
+            onClick={() => navigate('/infraestrutura')}
+            className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/60 hover:bg-slate-100 cursor-pointer transition-colors"
+          >
+            <div className="text-[11px] font-bold text-slate-800">2. Infraestrutura</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">Nobreaks, gerador, links</div>
+          </div>
+          <div
+            onClick={() => navigate('/evidencias')}
+            className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/60 hover:bg-slate-100 cursor-pointer transition-colors"
+          >
+            <div className="text-[11px] font-bold text-slate-800">3. Evidências</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">Fotos e comprovações</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full bg-slate-100/70 rounded-2xl border border-slate-200/90 p-4 sm:p-6 space-y-6 overflow-x-auto shadow-inner">
       {/* Guia visual do fluxo */}
@@ -88,28 +191,18 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-[#0B2545]" />
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-            Fluxo da Topologia: Entrada de Energia → Sala de Servidores (Core) → Interligação Óptica
-            → Setores Finais
+            Topologia Real: Energia → CPD / Core → Interligação Óptica → Setores da Serventia
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-          {isModoReal ? (
-            <Badge
-              variant="outline"
-              className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[11px]"
-            >
-              Topologia montada com registros reais da serventia
-            </Badge>
-          ) : (
-            <Badge
-              variant="outline"
-              className="bg-amber-50 text-amber-800 border-amber-300 text-[11px]"
-            >
-              Simulação Conceitual
-            </Badge>
-          )}
-          <span className="inline-block w-2 h-2 rounded-full bg-blue-600 animate-ping" />
-          <span>Interativo • Clique em qualquer equipamento</span>
+          <Badge
+            variant="outline"
+            className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[11px]"
+          >
+            Topologia montada com registros reais da serventia
+          </Badge>
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
+          <span>Interativo • Clique em qualquer nó para detalhes</span>
         </div>
       </div>
 
@@ -133,46 +226,53 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
                   </Badge>
                 </h3>
                 <p className="text-[11px] text-amber-800/80">
-                  Fluxo linear: Rede Concessionária → Grupo Gerador → QGBT Geral → Nobreak Central
-                  Online
+                  Entrada da concessionária, laudo de aterramento, motogerador e nobreaks
+                  cadastrados
                 </p>
               </div>
             </div>
             <div className="text-[11px] font-mono text-amber-800 bg-amber-100/60 px-2 py-0.5 rounded border border-amber-200">
-              {equipamentosPorCamada['energia']?.length || 0} Equipamentos Elétricos
+              {equipamentosPorCamada['energia']?.length || 0} Equipamentos Cadastrados
             </div>
           </div>
 
           <div className="p-4 sm:p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 relative">
-              {equipamentosPorCamada['energia']?.map((eq, idx) => {
-                const isSelected = eq.id === equipamentoSelecionadoId
-                const isHighlighted = nósConectadosAoHover.has(eq.id)
-                const isDimmed =
-                  (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
-                  !nósConectadosAoHover.has(eq.id)
+            {!equipamentosPorCamada['energia'] || equipamentosPorCamada['energia'].length === 0 ? (
+              <BlocoCamadaVazia
+                camadaNome="Energia Elétrica (Nobreaks / Gerador / Aterramento)"
+                moduloNome="Infraestrutura Física → Energia"
+                rotaModulo="/infraestrutura"
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 relative">
+                {equipamentosPorCamada['energia'].map((eq, idx) => {
+                  const isSelected = eq.id === equipamentoSelecionadoId
+                  const isHighlighted = nósConectadosAoHover.has(eq.id)
+                  const isDimmed =
+                    (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
+                    !nósConectadosAoHover.has(eq.id)
 
-                return (
-                  <div key={eq.id} className="relative flex flex-col">
-                    <MapaNodeCard
-                      equipamento={eq}
-                      selecionado={isSelected}
-                      onClick={onSelectEquipamento}
-                      onHighlightHover={setHoveredNodeId}
-                      isDestacado={isHighlighted}
-                      isOfuscado={isDimmed}
-                    />
+                  return (
+                    <div key={eq.id} className="relative flex flex-col">
+                      <MapaNodeCard
+                        equipamento={eq}
+                        selecionado={isSelected}
+                        onClick={onSelectEquipamento}
+                        onHighlightHover={setHoveredNodeId}
+                        isDestacado={isHighlighted}
+                        isOfuscado={isDimmed}
+                      />
 
-                    {/* Seta indicativa de cascata elétrica entre os cartões da camada energia */}
-                    {idx < (equipamentosPorCamada['energia']?.length || 0) - 1 && (
-                      <div className="hidden xl:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-amber-500 text-white items-center justify-center shadow-xs border border-white">
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                      {idx < (equipamentosPorCamada['energia']?.length || 0) - 1 && (
+                        <div className="hidden xl:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-amber-500 text-white items-center justify-center shadow-xs border border-white">
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </section>
 
@@ -204,37 +304,46 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
                 </h3>
                 <p className="text-[11px] text-blue-800/80">
                   Racks, Servidores Físicos/Hosts, Storages, Switches de Núcleo, Conectividade
-                  Externa e Climatização
+                  Externa, Climatização e Acesso
                 </p>
               </div>
             </div>
             <div className="text-[11px] font-mono text-blue-800 bg-blue-100/60 px-2 py-0.5 rounded border border-blue-200">
-              {equipamentosPorCamada['sala_servidores']?.length || 0} Elementos de Núcleo
+              {equipamentosPorCamada['sala_servidores']?.length || 0} Elementos Registrados
             </div>
           </div>
 
           <div className="p-4 sm:p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {equipamentosPorCamada['sala_servidores']?.map((eq) => {
-                const isSelected = eq.id === equipamentoSelecionadoId
-                const isHighlighted = nósConectadosAoHover.has(eq.id)
-                const isDimmed =
-                  (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
-                  !nósConectadosAoHover.has(eq.id)
+            {!equipamentosPorCamada['sala_servidores'] ||
+            equipamentosPorCamada['sala_servidores'].length === 0 ? (
+              <BlocoCamadaVazia
+                camadaNome="Sala de Servidores (Servidores / Storages / Switches / Racks)"
+                moduloNome="Inventário de Ativos & Infraestrutura"
+                rotaModulo="/inventario"
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {equipamentosPorCamada['sala_servidores'].map((eq) => {
+                  const isSelected = eq.id === equipamentoSelecionadoId
+                  const isHighlighted = nósConectadosAoHover.has(eq.id)
+                  const isDimmed =
+                    (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
+                    !nósConectadosAoHover.has(eq.id)
 
-                return (
-                  <MapaNodeCard
-                    key={eq.id}
-                    equipamento={eq}
-                    selecionado={isSelected}
-                    onClick={onSelectEquipamento}
-                    onHighlightHover={setHoveredNodeId}
-                    isDestacado={isHighlighted}
-                    isOfuscado={isDimmed}
-                  />
-                )
-              })}
-            </div>
+                  return (
+                    <MapaNodeCard
+                      key={eq.id}
+                      equipamento={eq}
+                      selecionado={isSelected}
+                      onClick={onSelectEquipamento}
+                      onHighlightHover={setHoveredNodeId}
+                      isDestacado={isHighlighted}
+                      isOfuscado={isDimmed}
+                    />
+                  )
+                })}
+              </div>
+            )}
           </div>
         </section>
 
@@ -251,20 +360,19 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
                     Backbone de Distribuição Estruturada
                   </span>
                   <Badge className="bg-cyan-600 text-white text-[10px] font-bold px-2 py-0.5">
-                    Fibra Óptica (10 Gbps SFP+)
+                    Fibra Óptica / Rede Lógica
                   </Badge>
                 </div>
                 <p className="text-xs text-cyan-800 font-medium mt-0.5">
-                  Interligação óptica direta em estrela da Sala de Servidores (Switches de Núcleo)
-                  para os Racks Setoriais. Imune a descargas atmosféricas e interferências
-                  eletromagnéticas.
+                  Interligação óptica da Sala de Servidores aos Racks e Setores Operacionais da
+                  serventia.
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 text-xs font-semibold text-cyan-900 bg-white px-3 py-1.5 rounded-xl border border-cyan-300 shadow-2xs">
               <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-ping inline-block" />
-              <span>3 Troncos Ópticos Ativos (Atendimento / Frente / Fundo)</span>
+              <span>Distribuição aos Setores da Serventia</span>
             </div>
           </div>
         </div>
@@ -283,34 +391,43 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
                   variant="outline"
                   className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px]"
                 >
-                  Fibra → Rack Setorial
+                  {equipamentosPorCamada['setor_atendimento']?.length || 0} nós
                 </Badge>
               </div>
               <p className="text-[11px] text-emerald-800/80 mt-0.5">
-                Balcão, Totem de Senhas, Guichês e Impressão Térmica
+                Balcão, Guichês, Totem e Impressão Documental
               </p>
             </div>
 
             <div className="p-4 space-y-3 flex-1">
-              {equipamentosPorCamada['setor_atendimento']?.map((eq) => {
-                const isSelected = eq.id === equipamentoSelecionadoId
-                const isHighlighted = nósConectadosAoHover.has(eq.id)
-                const isDimmed =
-                  (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
-                  !nósConectadosAoHover.has(eq.id)
+              {!equipamentosPorCamada['setor_atendimento'] ||
+              equipamentosPorCamada['setor_atendimento'].length === 0 ? (
+                <BlocoCamadaVazia
+                  camadaNome="Atendimento ao Público"
+                  moduloNome="Inventário de Ativos"
+                  rotaModulo="/inventario"
+                />
+              ) : (
+                equipamentosPorCamada['setor_atendimento'].map((eq) => {
+                  const isSelected = eq.id === equipamentoSelecionadoId
+                  const isHighlighted = nósConectadosAoHover.has(eq.id)
+                  const isDimmed =
+                    (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
+                    !nósConectadosAoHover.has(eq.id)
 
-                return (
-                  <MapaNodeCard
-                    key={eq.id}
-                    equipamento={eq}
-                    selecionado={isSelected}
-                    onClick={onSelectEquipamento}
-                    onHighlightHover={setHoveredNodeId}
-                    isDestacado={isHighlighted}
-                    isOfuscado={isDimmed}
-                  />
-                )
-              })}
+                  return (
+                    <MapaNodeCard
+                      key={eq.id}
+                      equipamento={eq}
+                      selecionado={isSelected}
+                      onClick={onSelectEquipamento}
+                      onHighlightHover={setHoveredNodeId}
+                      isDestacado={isHighlighted}
+                      isOfuscado={isDimmed}
+                    />
+                  )
+                })
+              )}
             </div>
           </section>
 
@@ -326,7 +443,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
                   variant="outline"
                   className="bg-indigo-100 text-indigo-800 border-indigo-300 text-[10px]"
                 >
-                  Fibra → Rack Setorial
+                  {equipamentosPorCamada['setor_frente']?.length || 0} nós
                 </Badge>
               </div>
               <p className="text-[11px] text-indigo-800/80 mt-0.5">
@@ -335,25 +452,34 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
             </div>
 
             <div className="p-4 space-y-3 flex-1">
-              {equipamentosPorCamada['setor_frente']?.map((eq) => {
-                const isSelected = eq.id === equipamentoSelecionadoId
-                const isHighlighted = nósConectadosAoHover.has(eq.id)
-                const isDimmed =
-                  (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
-                  !nósConectadosAoHover.has(eq.id)
+              {!equipamentosPorCamada['setor_frente'] ||
+              equipamentosPorCamada['setor_frente'].length === 0 ? (
+                <BlocoCamadaVazia
+                  camadaNome="Setor Interno Frente"
+                  moduloNome="Inventário de Ativos"
+                  rotaModulo="/inventario"
+                />
+              ) : (
+                equipamentosPorCamada['setor_frente'].map((eq) => {
+                  const isSelected = eq.id === equipamentoSelecionadoId
+                  const isHighlighted = nósConectadosAoHover.has(eq.id)
+                  const isDimmed =
+                    (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
+                    !nósConectadosAoHover.has(eq.id)
 
-                return (
-                  <MapaNodeCard
-                    key={eq.id}
-                    equipamento={eq}
-                    selecionado={isSelected}
-                    onClick={onSelectEquipamento}
-                    onHighlightHover={setHoveredNodeId}
-                    isDestacado={isHighlighted}
-                    isOfuscado={isDimmed}
-                  />
-                )
-              })}
+                  return (
+                    <MapaNodeCard
+                      key={eq.id}
+                      equipamento={eq}
+                      selecionado={isSelected}
+                      onClick={onSelectEquipamento}
+                      onHighlightHover={setHoveredNodeId}
+                      isDestacado={isHighlighted}
+                      isOfuscado={isDimmed}
+                    />
+                  )
+                })
+              )}
             </div>
           </section>
 
@@ -369,34 +495,43 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
                   variant="outline"
                   className="bg-purple-100 text-purple-800 border-purple-300 text-[10px]"
                 >
-                  Fibra → Rack Setorial
+                  {equipamentosPorCamada['setor_fundo']?.length || 0} nós
                 </Badge>
               </div>
               <p className="text-[11px] text-purple-800/80 mt-0.5">
-                Acervo, Digitalização Maciça, Financeiro e Livros
+                Acervo, Digitalização, Financeiro e Livros
               </p>
             </div>
 
             <div className="p-4 space-y-3 flex-1">
-              {equipamentosPorCamada['setor_fundo']?.map((eq) => {
-                const isSelected = eq.id === equipamentoSelecionadoId
-                const isHighlighted = nósConectadosAoHover.has(eq.id)
-                const isDimmed =
-                  (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
-                  !nósConectadosAoHover.has(eq.id)
+              {!equipamentosPorCamada['setor_fundo'] ||
+              equipamentosPorCamada['setor_fundo'].length === 0 ? (
+                <BlocoCamadaVazia
+                  camadaNome="Setor Interno Fundo"
+                  moduloNome="Inventário de Ativos"
+                  rotaModulo="/inventario"
+                />
+              ) : (
+                equipamentosPorCamada['setor_fundo'].map((eq) => {
+                  const isSelected = eq.id === equipamentoSelecionadoId
+                  const isHighlighted = nósConectadosAoHover.has(eq.id)
+                  const isDimmed =
+                    (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
+                    !nósConectadosAoHover.has(eq.id)
 
-                return (
-                  <MapaNodeCard
-                    key={eq.id}
-                    equipamento={eq}
-                    selecionado={isSelected}
-                    onClick={onSelectEquipamento}
-                    onHighlightHover={setHoveredNodeId}
-                    isDestacado={isHighlighted}
-                    isOfuscado={isDimmed}
-                  />
-                )
-              })}
+                  return (
+                    <MapaNodeCard
+                      key={eq.id}
+                      equipamento={eq}
+                      selecionado={isSelected}
+                      onClick={onSelectEquipamento}
+                      onHighlightHover={setHoveredNodeId}
+                      isDestacado={isHighlighted}
+                      isOfuscado={isDimmed}
+                    />
+                  )
+                })
+              )}
             </div>
           </section>
         </div>
@@ -415,42 +550,50 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
                     variant="outline"
                     className="bg-slate-200 text-slate-800 border-slate-300 text-[10px] py-0"
                   >
-                    VLAN 50 • Acesso Restrito
+                    VLAN • Acesso Restrito
                   </Badge>
                 </h3>
                 <p className="text-[11px] text-slate-600">
-                  Estações de trabalho do Tabelião/Registrador Titular, Substitutos e Impressão de
-                  Alta Segurança
+                  Estações de trabalho do Oficial Titular, Substitutos e Impressão de Segurança
                 </p>
               </div>
             </div>
             <div className="text-[11px] font-mono text-slate-700 bg-slate-200/60 px-2 py-0.5 rounded border border-slate-300">
-              Ambiente de Decisão e Gestão
+              {equipamentosPorCamada['setor_diretoria']?.length || 0} Estações Registradas
             </div>
           </div>
 
           <div className="p-4 sm:p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
-              {equipamentosPorCamada['setor_diretoria']?.map((eq) => {
-                const isSelected = eq.id === equipamentoSelecionadoId
-                const isHighlighted = nósConectadosAoHover.has(eq.id)
-                const isDimmed =
-                  (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
-                  !nósConectadosAoHover.has(eq.id)
+            {!equipamentosPorCamada['setor_diretoria'] ||
+            equipamentosPorCamada['setor_diretoria'].length === 0 ? (
+              <BlocoCamadaVazia
+                camadaNome="Gabinete / Diretoria"
+                moduloNome="Inventário de Ativos"
+                rotaModulo="/inventario"
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+                {equipamentosPorCamada['setor_diretoria'].map((eq) => {
+                  const isSelected = eq.id === equipamentoSelecionadoId
+                  const isHighlighted = nósConectadosAoHover.has(eq.id)
+                  const isDimmed =
+                    (hoveredNodeId !== null || equipamentoSelecionadoId !== null) &&
+                    !nósConectadosAoHover.has(eq.id)
 
-                return (
-                  <MapaNodeCard
-                    key={eq.id}
-                    equipamento={eq}
-                    selecionado={isSelected}
-                    onClick={onSelectEquipamento}
-                    onHighlightHover={setHoveredNodeId}
-                    isDestacado={isHighlighted}
-                    isOfuscado={isDimmed}
-                  />
-                )
-              })}
-            </div>
+                  return (
+                    <MapaNodeCard
+                      key={eq.id}
+                      equipamento={eq}
+                      selecionado={isSelected}
+                      onClick={onSelectEquipamento}
+                      onHighlightHover={setHoveredNodeId}
+                      isDestacado={isHighlighted}
+                      isOfuscado={isDimmed}
+                    />
+                  )
+                })}
+              </div>
+            )}
           </div>
         </section>
       </div>

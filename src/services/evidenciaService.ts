@@ -263,6 +263,26 @@ export function getEvidenciaFileUrl(
   filename: string,
   thumb?: string,
 ): string {
-  if (!filename) return ''
+  if (!filename) {
+    // Se não tiver arquivo direto, verificar se é uma evidência ilustrativa semeada
+    if (record?.titulo?.startsWith('Ilustração —') || record?.tags?.includes('ilustracao')) {
+      const tit = (record.titulo || '').toLowerCase()
+      if (tit.includes('rack')) return '/illustrations/ilustracao-rack.svg'
+      if (tit.includes('nobreak')) return '/illustrations/ilustracao-nobreak.svg'
+      if (tit.includes('gerador')) return '/illustrations/ilustracao-gerador.svg'
+      if (tit.includes('ar-condicionado') || tit.includes('climatiz'))
+        return '/illustrations/ilustracao-ar-condicionado.svg'
+      if (tit.includes('extintor')) return '/illustrations/ilustracao-extintor.svg'
+      if (tit.includes('servidor')) return '/illustrations/ilustracao-servidores.svg'
+      if (tit.includes('switch') || tit.includes('rede'))
+        return '/illustrations/ilustracao-switches.svg'
+      if (tit.includes('sala de ti') || tit.includes('sala_ti'))
+        return '/illustrations/ilustracao-sala-ti.svg'
+    }
+    return ''
+  }
+  if (filename.startsWith('ilustracao-') && filename.endsWith('.svg')) {
+    return `/illustrations/${filename}`
+  }
   return pb.files.getURL(record as any, filename, thumb ? { thumb } : undefined)
 }

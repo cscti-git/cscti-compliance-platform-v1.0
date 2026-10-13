@@ -188,7 +188,12 @@ export const CAMADAS_TOPOLOGIA: CamadaConfig[] = [
   },
 ]
 
-export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
+// Em conformidade com a determinação do usuário:
+// "não colocar dados fictícios deixar tudo em branco e só usar o que temos cadastrado de teste e a ferramenta gerar o diagrama real do que temos"
+export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = []
+export const CONEXOES_SIMULADAS: TopologiaConexao[] = []
+
+export const EQUIPAMENTOS_SIMULADOS_LEGADO: EquipamentoSimulado[] = [
   // ---------------- ENERGIA ----------------
   {
     id: 'en-rede-publica',
@@ -842,7 +847,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
   },
 ]
 
-export const CONEXOES_SIMULADAS: TopologiaConexao[] = [
+export const CONEXOES_SIMULADAS_LEGADO: TopologiaConexao[] = [
   // Camada Energia em cascata
   {
     id: 'cx-en-01',

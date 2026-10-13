@@ -61,7 +61,7 @@ import { listEvidencias } from '@/services/evidenciaService'
 import { calculateTextSha256 } from '@/services/designacaoService'
 import initialReferenceImg from '@/assets/image-54b72.png'
 
-type ModoMapa = 'simulado' | 'real'
+type ModoMapa = 'em_branco' | 'real'
 type VisualizacaoLayout = 'apenas_mapa' | 'lado_a_lado'
 
 export const MapaInfraestruturaPreviewPage: React.FC = () => {
@@ -69,8 +69,8 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
   const { toast } = useToast()
   const navigate = useNavigate()
 
-  // Modo de exibição: Simulado ou Gerado Real
-  const [modoMapa, setModoMapa] = useState<ModoMapa>('simulado')
+  // Modo de exibição: Inicia 100% em branco (conforme solicitado pelo usuário) ou Real
+  const [modoMapa, setModoMapa] = useState<ModoMapa>('em_branco')
   const [layoutVisualizacao, setLayoutVisualizacao] = useState<VisualizacaoLayout>('apenas_mapa')
 
   // Estado do equipamento selecionado no modal lateral
@@ -161,8 +161,8 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
     })
   }
 
-  const handleVoltarSimulado = () => {
-    setModoMapa('simulado')
+  const handleVoltarEmBranco = () => {
+    setModoMapa('em_branco')
     setEquipamentoSelecionado(null)
   }
 
@@ -184,25 +184,29 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
 
   // Lista de equipamentos e conexões exibidos de acordo com o modo
   const equipamentosExibidos: EquipamentoSimulado[] =
-    modoMapa === 'real' && dadosReaisResult ? dadosReaisResult.equipamentos : EQUIPAMENTOS_SIMULADOS
+    modoMapa === 'real' && dadosReaisResult ? dadosReaisResult.equipamentos : []
 
   const conexoesExibidas: TopologiaConexao[] =
-    modoMapa === 'real' && dadosReaisResult ? dadosReaisResult.conexoes : CONEXOES_SIMULADAS
+    modoMapa === 'real' && dadosReaisResult ? dadosReaisResult.conexoes : []
 
   // KPIs dinâmicos dependendo do modo
   const kpiTotalNos = equipamentosExibidos.length
   const kpiBackbone =
     modoMapa === 'real' && dadosReaisResult && dadosReaisResult.velocidadeTotalMbps > 0
       ? `${dadosReaisResult.velocidadeTotalMbps} Mbps`
-      : '10 Gbps'
+      : modoMapa === 'real'
+        ? 'Sem links cadastrados'
+        : '0 Mbps'
   const kpiAutonomia =
     modoMapa === 'real' && dadosReaisResult && dadosReaisResult.autonomiaTotalMinutos > 0
       ? `${dadosReaisResult.autonomiaTotalMinutos} min`
-      : '90 min'
+      : modoMapa === 'real'
+        ? 'Sem nobreak'
+        : '0 min'
   const kpiStatus =
     modoMapa === 'real' && dadosReaisResult
-      ? `${dadosReaisResult.nosReaisCount} / ${kpiTotalNos} reais`
-      : '100% Simulado'
+      ? `${dadosReaisResult.nosReaisCount} nós cadastrados`
+      : 'Aguardando Geração'
 
   return (
     <div className="space-y-6 pb-16">
@@ -223,11 +227,12 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
                 </span>
               </div>
               <h2 className="text-sm sm:text-base font-bold text-amber-950 mt-1">
-                Protótipo para análise prévia de Leandro antes da integração ao produto oficial.
+                SIMULAÇÃO VISUAL — Protótipo para análise. Não são dados reais da serventia.
               </h2>
               <p className="text-xs text-amber-800/90 mt-0.5">
-                Não são dados reais da serventia quando em modo simulado. No modo "Gerar a partir
-                dos dados da serventia", o sistema lê a base do cliente logado sem alterar dados.
+                O mapa inicia 100% em branco (sem topologias fictícias hard-coded). Ao clicar em
+                "Gerar mapa a partir dos dados da serventia", a ferramenta renderiza estritamente os
+                ativos e infraestrutura cadastrados no banco da serventia logada.
               </p>
             </div>
           </div>
@@ -263,28 +268,26 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
 
           {/* Botões de Ação dos dois fluxos solicitados */}
           <div className="flex items-center gap-2.5 flex-wrap">
-            {/* Botão Fluxo 1: GERAR AUTOMÁTICO a partir dos dados reais */}
-            {modoMapa === 'simulado' ? (
-              <Button
-                size="sm"
-                onClick={handleGerarMapaReal}
-                disabled={carregandoDadosReais}
-                className="text-xs bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-xs gap-1.5"
-              >
-                <RefreshCw
-                  className={`w-3.5 h-3.5 ${carregandoDadosReais ? 'animate-spin' : ''}`}
-                />
-                <span>Gerar mapa a partir dos dados da serventia</span>
-              </Button>
-            ) : (
+            {/* Botão Fluxo: GERAR AUTOMÁTICO a partir dos dados reais da serventia */}
+            <Button
+              size="sm"
+              onClick={handleGerarMapaReal}
+              disabled={carregandoDadosReais}
+              className="text-xs bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-xs gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${carregandoDadosReais ? 'animate-spin' : ''}`} />
+              <span>Gerar mapa a partir dos dados da serventia</span>
+            </Button>
+
+            {modoMapa === 'real' && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleVoltarSimulado}
+                onClick={handleVoltarEmBranco}
                 className="text-xs border-slate-300 text-slate-700 hover:bg-slate-100 gap-1.5"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                <span>Voltar à Simulação Conceitual</span>
+                <span>Limpar e Deixar em Branco</span>
               </Button>
             )}
 
@@ -358,21 +361,6 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
                 </span>
               </div>
             </div>
-
-            {/* Aviso sobre nós faltantes que necessitam cadastro */}
-            {dadosReaisResult && dadosReaisResult.nosPendentesCadastroCount > 0 && (
-              <div className="flex items-start gap-2 pt-1 border-t border-emerald-200/80 text-[11px] text-amber-900 bg-amber-50/70 p-2 rounded-lg">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
-                <div>
-                  <strong>
-                    Atenção ({dadosReaisResult.nosPendentesCadastroCount} itens pendentes):
-                  </strong>{' '}
-                  Alguns nós essenciais (como gerador, ar-condicionado ou racks) ainda não foram
-                  cadastrados nesta serventia e aparecem destacados com o botão{' '}
-                  <em>"Cadastrar manualmente"</em> para direcionar ao respectivo módulo.
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -414,7 +402,7 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
         icon={Network}
         title="Mapa da Infraestrutura Técnica"
         subtitle="Diagrama topológico interativo das camadas de energia, sala de servidores, interligação por fibra óptica e setores operacionais da serventia."
-        badgeText={modoMapa === 'real' ? 'Dados Reais • CSCTI' : 'Protótipo Visual • CSCTI'}
+        badgeText={modoMapa === 'real' ? 'Topologia Real • CSCTI' : 'Protótipo Visual • CSCTI'}
         serventiaNome={serventiaNome}
         serventiaAtiva={true}
         breadcrumbs={[
@@ -422,7 +410,9 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
           { label: 'Ambiente', href: '/infraestrutura' },
           {
             label:
-              modoMapa === 'real' ? 'Mapa Real da Serventia' : 'Simulação: Mapa da Infraestrutura',
+              modoMapa === 'real'
+                ? 'Topologia Real da Serventia'
+                : 'Simulação: Mapa da Infraestrutura',
           },
         ]}
         actions={
@@ -492,11 +482,11 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
         <KpiCard
           label="Status Operacional"
           value={kpiStatus}
-          secondaryValue={modoMapa === 'real' ? 'serventia real' : 'Conforme'}
+          secondaryValue={modoMapa === 'real' ? 'serventia real' : 'Em Branco'}
           supportText={
             modoMapa === 'real'
-              ? `${dadosReaisResult?.nosPendentesCadastroCount || 0} cadastros pendentes`
-              : 'Todos os nós em regime contínuo'
+              ? `${dadosReaisResult?.nosReaisCount || 0} nós reais em regime ativo`
+              : 'Aguardando geração do mapa a partir do banco'
           }
           icon={CheckCircle2}
           iconColor="text-emerald-700"
@@ -536,13 +526,14 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
             <div className="space-y-4">
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700">
-                  Mapa Topológico Vivo ({modoMapa === 'real' ? 'Dados Reais' : 'Simulação'})
+                  Mapa Topológico Vivo (
+                  {modoMapa === 'real' ? 'Dados Reais da Serventia' : 'Em Branco'})
                 </span>
                 <Badge
                   variant="outline"
                   className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[10px]"
                 >
-                  Atualizável
+                  {modoMapa === 'real' ? 'Topologia Real' : 'Aguardando'}
                 </Badge>
               </div>
 
@@ -553,6 +544,8 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
                 equipamentosCustomizados={equipamentosExibidos}
                 conexoesCustomizadas={conexoesExibidas}
                 isModoReal={modoMapa === 'real'}
+                mapaVazioSemGeracao={modoMapa === 'em_branco'}
+                onGerarMapa={handleGerarMapaReal}
               />
             </div>
           </div>
@@ -612,6 +605,8 @@ export const MapaInfraestruturaPreviewPage: React.FC = () => {
             equipamentosCustomizados={equipamentosExibidos}
             conexoesCustomizadas={conexoesExibidas}
             isModoReal={modoMapa === 'real'}
+            mapaVazioSemGeracao={modoMapa === 'em_branco'}
+            onGerarMapa={handleGerarMapaReal}
           />
 
           {/* CAMADA DE PROTEÇÃO SOBREPOSTA */}
