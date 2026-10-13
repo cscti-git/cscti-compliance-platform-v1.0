@@ -32,8 +32,10 @@ export type CamadaId =
   | 'setor_frente'
   | 'setor_fundo'
   | 'setor_diretoria'
+  | 'interligacao'
+  | 'protecao_sobreposta'
 
-export type TipoConexao = 'eletrica' | 'fibra' | 'rede'
+export type TipoConexao = 'eletrica' | 'fibra' | 'rede' | 'telefonia'
 
 export interface TopologiaConexao {
   id: string
@@ -43,6 +45,19 @@ export interface TopologiaConexao {
   rotulo?: string
   descricao?: string
   animada?: boolean
+}
+
+export interface ImagemAnexoEquipamento {
+  id: string
+  nomeArquivo: string
+  tamanhoFormatado: string
+  tamanhoBytes?: number
+  mimeType?: string
+  dataUpload: string
+  sha256: string
+  dataUrl: string // Base64 data:image/... ou URL relativa/absoluta
+  isSvgProvisorio?: boolean
+  titulo?: string
 }
 
 export interface EquipamentoSimulado {
@@ -71,8 +86,19 @@ export interface EquipamentoSimulado {
     | 'printer'
     | 'rack'
     | 'shield'
+    | 'extintor'
+    | 'link'
+    | 'outro'
+  // Posição no canvas para modo livre/diagrama editável
+  posicaoCanvas?: {
+    x: number
+    y: number
+  }
+  // Imagem anexada pelo usuário ou vinculada da Central de Evidências
+  imagemAnexada?: ImagemAnexoEquipamento
   // Indicação de procedência de dados
   isRealData?: boolean
+  isCriadoManualmente?: boolean
   precisaCadastro?: boolean
   moduloCadastroSugerido?: 'inventario' | 'infraestrutura' | 'conectividade' | 'evidencias'
   assetOrigemId?: string
@@ -143,48 +169,70 @@ export const CAMADAS_TOPOLOGIA: CamadaConfig[] = [
     ordem: 2,
   },
   {
+    id: 'interligacao',
+    titulo: '3. Interligação e Backbone',
+    subtitulo: 'Distribuição em fibra óptica e cabeamento estruturado para os setores',
+    badge: 'Backbone',
+    corBorda: 'border-cyan-200/80',
+    corFundo: 'bg-cyan-50/40',
+    corCabecalho: 'text-cyan-900',
+    corBadge: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+    ordem: 3,
+  },
+  {
     id: 'setor_atendimento',
-    titulo: '3. Setor Atendimento ao Público',
+    titulo: '4. Setor Atendimento ao Público',
     subtitulo: 'Balcão de senhas, guichês dos escreventes e impressão térmica/documental',
     badge: 'Front-Office',
     corBorda: 'border-emerald-200/80',
     corFundo: 'bg-emerald-50/40',
     corCabecalho: 'text-emerald-900',
     corBadge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    ordem: 3,
+    ordem: 4,
   },
   {
     id: 'setor_frente',
-    titulo: '4. Setor Interno Frente',
+    titulo: '5. Setor Interno Frente',
     subtitulo: 'Processamento de escrituras, certidões e conferência registral',
     badge: 'Back-Office 1',
     corBorda: 'border-indigo-200/80',
     corFundo: 'bg-indigo-50/40',
     corCabecalho: 'text-indigo-900',
     corBadge: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-    ordem: 4,
+    ordem: 5,
   },
   {
     id: 'setor_fundo',
-    titulo: '5. Setor Interno Fundo',
+    titulo: '6. Setor Interno Fundo',
     subtitulo: 'Arquivo, digitalização, microfilmagem e setor financeiro/administrativo',
     badge: 'Back-Office 2',
     corBorda: 'border-purple-200/80',
     corFundo: 'bg-purple-50/40',
     corCabecalho: 'text-purple-900',
     corBadge: 'bg-purple-100 text-purple-800 border-purple-300',
-    ordem: 5,
+    ordem: 6,
   },
   {
     id: 'setor_diretoria',
-    titulo: '6. Setor Diretoria e Gabinete',
+    titulo: '7. Setor Diretoria e Gabinete',
     subtitulo: 'Estações dos oficiais titulares, substitutos e assessoria jurídica',
     badge: 'Gabinete & Gestão',
     corBorda: 'border-slate-300',
     corFundo: 'bg-slate-50/70',
     corCabecalho: 'text-slate-900',
     corBadge: 'bg-slate-200 text-slate-800 border-slate-300',
-    ordem: 6,
+    ordem: 7,
+  },
+  {
+    id: 'protecao_sobreposta',
+    titulo: '8. Proteção Sobreposta e Defesa Perimetral',
+    subtitulo: 'Firewall NGFW, EDR endpoint, telemetria 24x7 e rotinas de salvaguarda',
+    badge: 'Segurança & NOC',
+    corBorda: 'border-rose-200/80',
+    corFundo: 'bg-rose-50/40',
+    corCabecalho: 'text-rose-900',
+    corBadge: 'bg-rose-100 text-rose-800 border-rose-300',
+    ordem: 8,
   },
 ]
 
@@ -1021,3 +1069,162 @@ export const CAMADA_PROTECAO_SOBREPOSTA = {
     },
   ],
 }
+
+export interface TipoEquipamentoOpcao {
+  tipo: string
+  label: string
+  iconKey: EquipamentoSimulado['iconKey']
+  camadaPadrao: CamadaId
+}
+
+export const TIPOS_EQUIPAMENTO_CATALOGO: TipoEquipamentoOpcao[] = [
+  { tipo: 'nobreak', label: 'Nobreak / UPS', iconKey: 'nobreak', camadaPadrao: 'energia' },
+  { tipo: 'gerador', label: 'Grupo Gerador', iconKey: 'generator', camadaPadrao: 'energia' },
+  {
+    tipo: 'quadro',
+    label: 'Quadro Geral / QGBT / DPS',
+    iconKey: 'quadro',
+    camadaPadrao: 'energia',
+  },
+  {
+    tipo: 'switch',
+    label: 'Switch de Rede / Core',
+    iconKey: 'switch',
+    camadaPadrao: 'sala_servidores',
+  },
+  {
+    tipo: 'servidor',
+    label: 'Servidor Físico / Host',
+    iconKey: 'server',
+    camadaPadrao: 'sala_servidores',
+  },
+  {
+    tipo: 'storage',
+    label: 'Storage SAN / NAS / Backup',
+    iconKey: 'storage',
+    camadaPadrao: 'sala_servidores',
+  },
+  {
+    tipo: 'estacao',
+    label: 'Estação de Trabalho / PC',
+    iconKey: 'workstation',
+    camadaPadrao: 'setor_atendimento',
+  },
+  {
+    tipo: 'impressora',
+    label: 'Impressora / Multifuncional',
+    iconKey: 'printer',
+    camadaPadrao: 'setor_atendimento',
+  },
+  {
+    tipo: 'totem',
+    label: 'Totem de Senhas / Recepção',
+    iconKey: 'totem',
+    camadaPadrao: 'setor_atendimento',
+  },
+  {
+    tipo: 'ar-condicionado',
+    label: 'Ar-Condicionado / Climatização',
+    iconKey: 'hvac',
+    camadaPadrao: 'sala_servidores',
+  },
+  {
+    tipo: 'extintor',
+    label: 'Extintor / Proteção Incêndio',
+    iconKey: 'extintor',
+    camadaPadrao: 'sala_servidores',
+  },
+  {
+    tipo: 'rack',
+    label: 'Rack 19" Fechado / Parede',
+    iconKey: 'rack',
+    camadaPadrao: 'sala_servidores',
+  },
+  {
+    tipo: 'link',
+    label: 'Link de Conectividade / WAN',
+    iconKey: 'link',
+    camadaPadrao: 'sala_servidores',
+  },
+  {
+    tipo: 'outro',
+    label: 'Outro Equipamento / Dispositivo',
+    iconKey: 'outro',
+    camadaPadrao: 'sala_servidores',
+  },
+]
+
+export const TIPOS_CONEXAO_CATALOGO: {
+  tipo: TipoConexao
+  label: string
+  cor: string
+  descricao: string
+}[] = [
+  {
+    tipo: 'fibra',
+    label: 'Fibra Óptica',
+    cor: '#0891b2',
+    descricao: 'Backbone de alta velocidade SFP+ 10Gbps',
+  },
+  {
+    tipo: 'rede',
+    label: 'Rede UTP / Cat6 / LAN',
+    cor: '#2563eb',
+    descricao: 'Cabo par trançado Gigabit Ethernet',
+  },
+  {
+    tipo: 'eletrica',
+    label: 'Alimentação Elétrica',
+    cor: '#d97706',
+    descricao: 'Circuito protegido por Nobreak / QGBT',
+  },
+  {
+    tipo: 'telefonia',
+    label: 'Telefonia / Ramal VoIP',
+    cor: '#9333ea',
+    descricao: 'Linha SIP ou ramal de voz',
+  },
+]
+
+export const ILUSTRACOES_PROVISORIAS_SEMEADAS = [
+  {
+    titulo: 'Ilustração — Rack 42U CPD',
+    arquivo: 'ilustracao-rack.svg',
+    url: '/illustrations/ilustracao-rack.svg',
+  },
+  {
+    titulo: 'Ilustração — Nobreak Senoidal',
+    arquivo: 'ilustracao-nobreak.svg',
+    url: '/illustrations/ilustracao-nobreak.svg',
+  },
+  {
+    titulo: 'Ilustração — Grupo Motogerador',
+    arquivo: 'ilustracao-gerador.svg',
+    url: '/illustrations/ilustracao-gerador.svg',
+  },
+  {
+    titulo: 'Ilustração — Servidores Hosts',
+    arquivo: 'ilustracao-servidores.svg',
+    url: '/illustrations/ilustracao-servidores.svg',
+  },
+  {
+    titulo: 'Ilustração — Switches de Rede',
+    arquivo: 'ilustracao-switches.svg',
+    url: '/illustrations/ilustracao-switches.svg',
+  },
+  {
+    titulo: 'Ilustração — Climatização Sala CPD',
+    arquivo: 'ilustracao-ar-condicionado.svg',
+    url: '/illustrations/ilustracao-ar-condicionado.svg',
+  },
+  {
+    titulo: 'Ilustração — Extintor CO2 / Sala Técnica',
+    arquivo: 'ilustracao-extintor.svg',
+    url: '/illustrations/ilustracao-extintor.svg',
+  },
+  {
+    titulo: 'Ilustração — Sala de TI e Datacenter',
+    arquivo: 'ilustracao-sala-ti.svg',
+    url: '/illustrations/ilustracao-sala-ti.svg',
+  },
+]

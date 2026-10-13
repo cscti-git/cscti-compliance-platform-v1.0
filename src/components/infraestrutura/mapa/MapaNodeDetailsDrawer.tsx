@@ -228,6 +228,43 @@ export const MapaNodeDetailsDrawer: React.FC<MapaNodeDetailsDrawerProps> = ({
           </div>
         </div>
 
+        {/* Imagem do Nó (quando anexada pelo usuário ou vinculada) */}
+        {equipamento.imagemAnexada && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Imagem / Foto do Equipamento</span>
+              <Badge
+                variant="outline"
+                className="bg-blue-50 text-blue-800 border-blue-200 text-[10px]"
+              >
+                {equipamento.imagemAnexada.isSvgProvisorio ? 'SVG Provisório' : 'Anexo SHA-256'}
+              </Badge>
+            </h4>
+            <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 p-2 space-y-2">
+              <div className="w-full h-44 rounded-lg bg-white border border-slate-200 flex items-center justify-center overflow-hidden">
+                <img
+                  src={equipamento.imagemAnexada.dataUrl}
+                  alt={equipamento.nome}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div className="text-[11px] text-slate-600 space-y-0.5 px-1">
+                <div className="flex justify-between font-medium">
+                  <span className="truncate max-w-[220px]">
+                    {equipamento.imagemAnexada.nomeArquivo}
+                  </span>
+                  <span>{equipamento.imagemAnexada.tamanhoFormatado}</span>
+                </div>
+                {equipamento.imagemAnexada.sha256 && (
+                  <div className="font-mono text-[9px] text-slate-500 truncate">
+                    SHA-256: {equipamento.imagemAnexada.sha256}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Seção 2: Observações e Papel na Topologia */}
         <div className="space-y-2">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">

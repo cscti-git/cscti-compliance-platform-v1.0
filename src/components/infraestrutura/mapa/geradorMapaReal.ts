@@ -911,10 +911,12 @@ export function gerarTopologiaRealServentia(params: {
   const resumoPorCamada: Record<CamadaId, { total: number; reais: number }> = {
     energia: { total: 0, reais: 0 },
     sala_servidores: { total: 0, reais: 0 },
+    interligacao: { total: 0, reais: 0 },
     setor_atendimento: { total: 0, reais: 0 },
     setor_frente: { total: 0, reais: 0 },
     setor_fundo: { total: 0, reais: 0 },
     setor_diretoria: { total: 0, reais: 0 },
+    protecao_sobreposta: { total: 0, reais: 0 },
   }
 
   equipamentos.forEach((eq) => {

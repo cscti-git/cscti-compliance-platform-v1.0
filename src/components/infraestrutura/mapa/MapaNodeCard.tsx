@@ -66,6 +66,12 @@ export const getIconForEquipamento = (
       return <Layers className={className} />
     case 'shield':
       return <Shield className={className} />
+    case 'extintor':
+      return <Flame className={className} />
+    case 'link':
+      return <Radio className={className} />
+    case 'outro':
+      return <Building className={className} />
     default:
       return <Server className={className} />
   }
@@ -80,6 +86,8 @@ const getIconBadgeColor = (camadaId: string, precisaCadastro?: boolean) => {
       return 'bg-amber-100 text-amber-700 border-amber-200'
     case 'sala_servidores':
       return 'bg-blue-100 text-blue-700 border-blue-200'
+    case 'interligacao':
+      return 'bg-cyan-100 text-cyan-700 border-cyan-200'
     case 'setor_atendimento':
       return 'bg-emerald-100 text-emerald-700 border-emerald-200'
     case 'setor_frente':
@@ -88,6 +96,8 @@ const getIconBadgeColor = (camadaId: string, precisaCadastro?: boolean) => {
       return 'bg-purple-100 text-purple-700 border-purple-200'
     case 'setor_diretoria':
       return 'bg-slate-200 text-slate-800 border-slate-300'
+    case 'protecao_sobreposta':
+      return 'bg-rose-100 text-rose-700 border-rose-200'
     default:
       return 'bg-slate-100 text-slate-700 border-slate-200'
   }
@@ -130,14 +140,32 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
       }`}
     >
       <div className="flex items-start gap-3">
-        {/* Ícone estilizado */}
-        <div
-          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-2xs transition-transform group-hover:scale-105 ${getIconBadgeColor(
-            equipamento.camadaId,
-            isPendente,
-          )}`}
-        >
-          {getIconForEquipamento(equipamento.iconKey, 'w-5 h-5')}
+        {/* Ícone estilizado ou miniatura da imagem */}
+        <div className="relative shrink-0">
+          {equipamento.imagemAnexada?.dataUrl ? (
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-slate-300 bg-white shadow-2xs relative group-hover:scale-105 transition-transform">
+              <img
+                src={equipamento.imagemAnexada.dataUrl}
+                alt={equipamento.nome}
+                className="w-full h-full object-cover"
+              />
+              <span
+                title="Imagem anexada com SHA-256"
+                className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-blue-600 rounded-full border border-white flex items-center justify-center text-[7px] text-white font-bold"
+              >
+                ●
+              </span>
+            </div>
+          ) : (
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-2xs transition-transform group-hover:scale-105 ${getIconBadgeColor(
+                equipamento.camadaId,
+                isPendente,
+              )}`}
+            >
+              {getIconForEquipamento(equipamento.iconKey, 'w-5 h-5')}
+            </div>
+          )}
         </div>
 
         {/* Informações centrais */}
@@ -193,6 +221,14 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
             {equipamento.evidenciaFotoSimulada && (
               <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
                 {equipamento.isRealData ? 'Foto Comprovada' : 'Evidência Foto'}
+              </span>
+            )}
+            {equipamento.imagemAnexada && (
+              <span
+                className="text-[10px] font-medium text-cyan-800 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200/70"
+                title={`Imagem anexada: ${equipamento.imagemAnexada.nomeArquivo} (SHA-256: ${equipamento.imagemAnexada.sha256?.substring(0, 8)}...)`}
+              >
+                📷 {equipamento.imagemAnexada.isSvgProvisorio ? 'SVG Provisório' : 'Foto'}
               </span>
             )}
             {isPendente && (
