@@ -71,7 +71,13 @@ export interface EquipamentoSimulado {
     | 'printer'
     | 'rack'
     | 'shield'
-  // Metadados para enriquecer a simulação dos botões desabilitados
+  // Indicação de procedência de dados
+  isRealData?: boolean
+  precisaCadastro?: boolean
+  moduloCadastroSugerido?: 'inventario' | 'infraestrutura' | 'conectividade' | 'evidencias'
+  assetOrigemId?: string
+  infraOrigemId?: string
+  // Metadados para enriquecer a simulação dos botões desabilitados ou reais
   glpiVinculoSimulado?: {
     idAtivo: string
     nomeGlpi: string
@@ -207,6 +213,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Fornecimento principal da concessionária pública local com laudo de aterramento em conformidade.',
     },
+    isRealData: false,
   },
   {
     id: 'en-gerador',
@@ -232,6 +239,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Partida automática por Quadro de Transferência Automática (QTA) em caso de queda da rede pública.',
     },
+    isRealData: false,
   },
   {
     id: 'en-quadro-geral',
@@ -257,6 +265,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Recebe a rede da concessionária e do gerador; alimenta os Nobreaks centrais e quadros setoriais.',
     },
+    isRealData: false,
   },
   {
     id: 'en-nobreak-central',
@@ -292,6 +301,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Alimenta os Racks centrais, Storages, Core Switches e infraestrutura crítica da sala de servidores.',
     },
+    isRealData: false,
   },
 
   // ---------------- SALA DE SERVIDORES ----------------
@@ -318,6 +328,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Hospeda servidores físicos, storage SAN, patch panels de fibra e switches de núcleo.',
     },
+    isRealData: false,
   },
   {
     id: 'srv-host-01',
@@ -343,6 +354,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Executa as VMs do Banco de Dados Registral, Servidor de Arquivos e Sistema de Selos.',
     },
+    isRealData: false,
   },
   {
     id: 'srv-host-02',
@@ -368,6 +380,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Par do cluster Proxmox/VMware com failover automático e réplica contínua de memória e disco.',
     },
+    isRealData: false,
   },
   {
     id: 'srv-storage-san',
@@ -393,6 +406,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Armazena volumes de produção do acervo registral e repositório de snapshots locais imutáveis.',
     },
+    isRealData: false,
   },
   {
     id: 'srv-switch-core',
@@ -418,6 +432,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Ponto focal de terminação de toda a fibra óptica dos setores da serventia e roteamento de VLANs.',
     },
+    isRealData: false,
   },
   {
     id: 'srv-telecom-fibra',
@@ -443,6 +458,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Atende com folga as exigências mínimas da classe registral, com redundância de operadora física.',
     },
+    isRealData: false,
   },
   {
     id: 'srv-telefonia-voip',
@@ -463,6 +479,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Atende aos ramais de atendimento, escreventes, salas internas e diretoria com gravação de segurança.',
     },
+    isRealData: false,
   },
   {
     id: 'srv-ar-condicionado',
@@ -488,6 +505,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Mantém temperatura entre 19°C e 22°C com monitoramento de umidade e alarmes sonoros/e-mail.',
     },
+    isRealData: false,
   },
 
   // ---------------- SETOR ATENDIMENTO AO PÚBLICO ----------------
@@ -520,6 +538,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Alimentado diretamente por cabo de fibra óptica vindo do switch de núcleo da Sala de Servidores.',
     },
+    isRealData: false,
   },
   {
     id: 'atend-totem-senhas',
@@ -544,6 +563,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Software integrado de triagem prioritária (Lei 10.048/00) e fila eletrônica de atendimento.',
     },
+    isRealData: false,
   },
   {
     id: 'atend-workstations',
@@ -569,6 +589,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Acesso seguro restrito com autenticação em dois fatores e bloqueio por inatividade de 5 min.',
     },
+    isRealData: false,
   },
   {
     id: 'atend-impressoras',
@@ -594,6 +615,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Impressão direta de recibos de protocolo, etiquetas de selagem e traslados imediatos.',
     },
+    isRealData: false,
   },
 
   // ---------------- SETOR INTERNO FRENTE ----------------
@@ -626,6 +648,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Interligado por fibra óptica direta da Sala de Servidores, provendo tráfego sem interferência.',
     },
+    isRealData: false,
   },
   {
     id: 'frente-workstations',
@@ -651,6 +674,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Todos os computadores com disco criptografado BitLocker e antivírus corporativo gerenciado.',
     },
+    isRealData: false,
   },
   {
     id: 'frente-impressoras',
@@ -676,6 +700,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Controle de impressão com liberação por crachá/código individual para confidencialidade.',
     },
+    isRealData: false,
   },
 
   // ---------------- SETOR INTERNO FUNDO ----------------
@@ -707,6 +732,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       localizacaoFisica: 'Corredor de acesso ao Acervo / Arquivo Histórico',
       observacoes: 'Ligado por cabo de fibra óptica dedicado diretamente à Sala de Servidores.',
     },
+    isRealData: false,
   },
   {
     id: 'fundo-workstations',
@@ -732,6 +758,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Geração de pacotes PDF/A com assinatura digital com carimbo do tempo e hash ICP-Brasil.',
     },
+    isRealData: false,
   },
   {
     id: 'fundo-impressoras',
@@ -757,6 +784,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Emissão dos livros de notas e registro de imóveis, termos de encerramento e balancetes.',
     },
+    isRealData: false,
   },
 
   // ---------------- DIRETORIA ----------------
@@ -784,6 +812,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Acesso pleno ao CSCTI Compliance, com certificação digital de assinatura em lote e aprovações.',
     },
+    isRealData: false,
   },
   {
     id: 'dir-impressora-sigilosa',
@@ -809,6 +838,7 @@ export const EQUIPAMENTOS_SIMULADOS: EquipamentoSimulado[] = [
       observacoes:
         'Uso exclusivo para emissão de certidões sigilosas, atos notariais especiais e documentos de gestão.',
     },
+    isRealData: false,
   },
 ]
 
@@ -971,7 +1001,7 @@ export const CAMADA_PROTECAO_SOBREPOSTA = {
       badge: 'Endpoint Security',
     },
     {
-      nome: 'NOC / Monitoramento 24x7',
+      nome: 'Validação Externa (NOC) / Telemetria 24x7',
       status: 'ativo',
       descricao:
         'Telemetria contínua de nobreaks, links de internet, temperatura da sala de servidores e status dos hosts.',

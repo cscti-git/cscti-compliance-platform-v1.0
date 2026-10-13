@@ -17,9 +17,12 @@ import {
   Building,
   CheckCircle2,
   AlertTriangle,
+  PlusCircle,
+  ExternalLink,
   Flame,
 } from 'lucide-react'
 import { EquipamentoSimulado } from './topologiaData'
+import { Badge } from '@/components/ui/badge'
 
 export interface MapaNodeCardProps {
   equipamento: EquipamentoSimulado
@@ -68,7 +71,10 @@ export const getIconForEquipamento = (
   }
 }
 
-const getIconBadgeColor = (camadaId: string) => {
+const getIconBadgeColor = (camadaId: string, precisaCadastro?: boolean) => {
+  if (precisaCadastro) {
+    return 'bg-amber-100 text-amber-800 border-amber-300'
+  }
   switch (camadaId) {
     case 'energia':
       return 'bg-amber-100 text-amber-700 border-amber-200'
@@ -95,6 +101,8 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
   isDestacado = false,
   isOfuscado = false,
 }) => {
+  const isPendente = !!equipamento.precisaCadastro
+
   return (
     <div
       id={`node-${equipamento.id}`}
@@ -116,14 +124,17 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
             ? 'bg-white border-blue-400 shadow-sm ring-1 ring-blue-300'
             : isOfuscado
               ? 'bg-white/60 border-slate-200 opacity-60'
-              : 'bg-white border-slate-200/90 hover:border-slate-300 hover:shadow-xs hover:bg-slate-50/50'
+              : isPendente
+                ? 'bg-amber-50/40 border-dashed border-amber-300 hover:border-amber-400 hover:bg-amber-50/80 shadow-2xs'
+                : 'bg-white border-slate-200/90 hover:border-slate-300 hover:shadow-xs hover:bg-slate-50/50'
       }`}
     >
       <div className="flex items-start gap-3">
-        {/* Ícone estilizado em círculo pastel de acordo com a camada */}
+        {/* Ícone estilizado */}
         <div
           className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-2xs transition-transform group-hover:scale-105 ${getIconBadgeColor(
             equipamento.camadaId,
+            isPendente,
           )}`}
         >
           {getIconForEquipamento(equipamento.iconKey, 'w-5 h-5')}
@@ -135,13 +146,25 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
             <span className="text-[10px] font-bold font-mono tracking-wider text-slate-500 uppercase truncate">
               {equipamento.codigoAtivo}
             </span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Operacional
-            </span>
+
+            {isPendente ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.2 rounded border border-amber-300 shrink-0">
+                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                Cadastrar manualmente
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {equipamento.isRealData ? 'Dado Real' : 'Operacional'}
+              </span>
+            )}
           </div>
 
-          <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight mt-0.5 group-hover:text-blue-900 transition-colors line-clamp-2">
+          <h4
+            className={`text-xs sm:text-sm font-bold leading-tight mt-0.5 group-hover:text-blue-900 transition-colors line-clamp-2 ${
+              isPendente ? 'text-amber-950' : 'text-slate-900'
+            }`}
+          >
             {equipamento.nome}
           </h4>
 
@@ -149,7 +172,7 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
             {equipamento.fabricanteModelo}
           </p>
 
-          {/* Rodapé do card com badges funcionais de prévia */}
+          {/* Rodapé do card com badges funcionais */}
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             {equipamento.ipOuIdentificacao && (
               <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60 truncate max-w-[170px]">
@@ -164,12 +187,17 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
             )}
             {equipamento.glpiVinculoSimulado && (
               <span className="text-[10px] font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60">
-                GLPI Simulado
+                {equipamento.isRealData ? 'Ativo Real' : 'GLPI Simulado'}
               </span>
             )}
             {equipamento.evidenciaFotoSimulada && (
               <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
-                Evidência Foto
+                {equipamento.isRealData ? 'Foto Comprovada' : 'Evidência Foto'}
+              </span>
+            )}
+            {isPendente && (
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded border border-amber-300">
+                + Ação necessária
               </span>
             )}
           </div>
@@ -178,8 +206,14 @@ export const MapaNodeCard: React.FC<MapaNodeCardProps> = ({
 
       {/* Dica visual suave de clique para abrir painel */}
       <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <span className="text-[9px] font-medium text-blue-700 bg-blue-50 border border-blue-200 px-1 py-0.5 rounded">
-          Ver detalhes
+        <span
+          className={`text-[9px] font-medium px-1 py-0.5 rounded border ${
+            isPendente
+              ? 'text-amber-800 bg-amber-100 border-amber-300'
+              : 'text-blue-700 bg-blue-50 border border-blue-200'
+          }`}
+        >
+          {isPendente ? 'Ver como cadastrar' : 'Ver ficha técnica'}
         </span>
       </div>
     </div>

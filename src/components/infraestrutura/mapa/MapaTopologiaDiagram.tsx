@@ -20,6 +20,7 @@ import {
   Info,
   Radio,
   Eye,
+  AlertTriangle,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
@@ -28,6 +29,9 @@ export interface MapaTopologiaDiagramProps {
   equipamentoSelecionadoId: string | null
   filtroConexao?: 'todos' | 'eletrica' | 'fibra' | 'rede'
   orientacao?: 'horizontal' | 'vertical'
+  equipamentosCustomizados?: EquipamentoSimulado[]
+  conexoesCustomizadas?: TopologiaConexao[]
+  isModoReal?: boolean
 }
 
 export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
@@ -35,18 +39,24 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
   equipamentoSelecionadoId,
   filtroConexao = 'todos',
   orientacao = 'horizontal',
+  equipamentosCustomizados,
+  conexoesCustomizadas,
+  isModoReal = false,
 }) => {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
 
+  const listaEquipamentos = equipamentosCustomizados || EQUIPAMENTOS_SIMULADOS
+  const listaConexoes = conexoesCustomizadas || CONEXOES_SIMULADAS
+
   // Encontra conexões relacionadas ao nó com hover
   const conexoesAtivas = React.useMemo(() => {
-    return CONEXOES_SIMULADAS.filter((c) => {
+    return listaConexoes.filter((c) => {
       if (filtroConexao !== 'todos' && c.tipo !== filtroConexao) {
         return false
       }
       return true
     })
-  }, [filtroConexao])
+  }, [listaConexoes, filtroConexao])
 
   // Identifica nós conectados ao nó focado para destaque
   const nósConectadosAoHover = React.useMemo(() => {
@@ -55,21 +65,21 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
     const set = new Set<string>()
     if (target) set.add(target)
 
-    CONEXOES_SIMULADAS.forEach((c) => {
+    listaConexoes.forEach((c) => {
       if (c.origemId === target) set.add(c.destinoId)
       if (c.destinoId === target) set.add(c.origemId)
     })
     return set
-  }, [hoveredNodeId, equipamentoSelecionadoId])
+  }, [hoveredNodeId, equipamentoSelecionadoId, listaConexoes])
 
   // Agrupa os equipamentos por camada
   const equipamentosPorCamada = React.useMemo(() => {
     const mapa: Record<string, EquipamentoSimulado[]> = {}
     CAMADAS_TOPOLOGIA.forEach((camada) => {
-      mapa[camada.id] = EQUIPAMENTOS_SIMULADOS.filter((e) => e.camadaId === camada.id)
+      mapa[camada.id] = listaEquipamentos.filter((e) => e.camadaId === camada.id)
     })
     return mapa
-  }, [])
+  }, [listaEquipamentos])
 
   return (
     <div className="w-full bg-slate-100/70 rounded-2xl border border-slate-200/90 p-4 sm:p-6 space-y-6 overflow-x-auto shadow-inner">
@@ -83,6 +93,21 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+          {isModoReal ? (
+            <Badge
+              variant="outline"
+              className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[11px]"
+            >
+              Topologia montada com registros reais da serventia
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="bg-amber-50 text-amber-800 border-amber-300 text-[11px]"
+            >
+              Simulação Conceitual
+            </Badge>
+          )}
           <span className="inline-block w-2 h-2 rounded-full bg-blue-600 animate-ping" />
           <span>Interativo • Clique em qualquer equipamento</span>
         </div>
@@ -114,7 +139,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
               </div>
             </div>
             <div className="text-[11px] font-mono text-amber-800 bg-amber-100/60 px-2 py-0.5 rounded border border-amber-200">
-              4 Equipamentos Elétricos
+              {equipamentosPorCamada['energia']?.length || 0} Equipamentos Elétricos
             </div>
           </div>
 
@@ -178,13 +203,13 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
                   </Badge>
                 </h3>
                 <p className="text-[11px] text-blue-800/80">
-                  Racks 42U, Cluster de Virtualização, Storage SAN, Core Switches 10G, Links de
-                  Fibra WAN e Climatização 24/7
+                  Racks, Servidores Físicos/Hosts, Storages, Switches de Núcleo, Conectividade
+                  Externa e Climatização
                 </p>
               </div>
             </div>
             <div className="text-[11px] font-mono text-blue-800 bg-blue-100/60 px-2 py-0.5 rounded border border-blue-200">
-              8 Elementos de Núcleo
+              {equipamentosPorCamada['sala_servidores']?.length || 0} Elementos de Núcleo
             </div>
           </div>
 
@@ -213,7 +238,7 @@ export const MapaTopologiaDiagram: React.FC<MapaTopologiaDiagramProps> = ({
           </div>
         </section>
 
-        {/* Linha de Transição 2: INTERLIGAÇÃO POR FIBRA ÓPTICA DA SALA PARA OS SETORES (Requisito 2) */}
+        {/* Linha de Transição 2: INTERLIGAÇÃO POR FIBRA ÓPTICA DA SALA PARA OS SETORES */}
         <div className="rounded-2xl border-2 border-cyan-400 bg-gradient-to-r from-cyan-50 via-white to-cyan-50 p-4 shadow-sm relative">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-3">
