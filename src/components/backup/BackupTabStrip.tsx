@@ -141,15 +141,21 @@ export const BackupTabStrip: React.FC<BackupTabStripProps> = ({
     },
   ]
 
-  // Monitoramento do scroll para setas e fades laterais (apenas abaixo de lg / desktop onde pode rolar)
+  // Monitoramento do scroll para setas e fades laterais (apenas quando houver transbordamento horizontal / abaixo de xl)
   const checkScroll = useCallback(() => {
     const el = scrollContainerRef.current
-    if (!el || window.innerWidth >= 1024) {
+    if (!el) {
       setCanScrollLeft(false)
       setCanScrollRight(false)
       return
     }
     const { scrollLeft, scrollWidth, clientWidth } = el
+    // Se não há overflow horizontal (ex.: xl+ com todas as abas cabendo), oculta setas
+    if (scrollWidth <= clientWidth + 2) {
+      setCanScrollLeft(false)
+      setCanScrollRight(false)
+      return
+    }
     setCanScrollLeft(scrollLeft > 4)
     setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4)
   }, [])
@@ -227,52 +233,54 @@ export const BackupTabStrip: React.FC<BackupTabStripProps> = ({
       role="region"
       aria-label="Navegação de abas do Backup e Recuperação"
     >
-      {/* Sombra / Fade à esquerda quando houver rolagem apenas em telas menores */}
+      {/* Sombra / Fade à esquerda quando houver rolagem apenas em telas menores (< xl) */}
       {canScrollLeft && (
         <div
-          className="lg:hidden absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none transition-opacity duration-200"
+          className="xl:hidden absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none transition-opacity duration-200"
           aria-hidden="true"
         />
       )}
 
-      {/* Botão de rolagem anterior (apenas quando houver scroll em telas menores) */}
+      {/* Botão de rolagem anterior (apenas quando houver scroll em telas menores < xl) */}
       {canScrollLeft && (
         <button
           type="button"
           onClick={() => scrollBy(-200)}
-          className="lg:hidden absolute left-1 top-1/2 -translate-y-1/2 z-20 w-5 h-5 rounded-full bg-white/95 hover:bg-slate-100 text-slate-700 flex items-center justify-center shadow-md border border-slate-200 transition backdrop-blur-xs cursor-pointer"
+          className="xl:hidden absolute left-1 top-1/2 -translate-y-1/2 z-20 w-5 h-5 rounded-full bg-white/95 hover:bg-slate-100 text-slate-700 flex items-center justify-center shadow-md border border-slate-200 transition backdrop-blur-xs cursor-pointer"
           aria-label="Rolar abas para a esquerda"
         >
           <ChevronLeft className="w-3 h-3" />
         </button>
       )}
 
-      {/* Sombra / Fade à direita quando houver rolagem apenas em telas menores */}
+      {/* Sombra / Fade à direita quando houver rolagem apenas em telas menores (< xl) */}
       {canScrollRight && (
         <div
-          className="lg:hidden absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none transition-opacity duration-200"
+          className="xl:hidden absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none transition-opacity duration-200"
           aria-hidden="true"
         />
       )}
 
-      {/* Botão de rolagem posterior (apenas quando houver scroll em telas menores) */}
+      {/* Botão de rolagem posterior (apenas quando houver scroll em telas menores < xl) */}
       {canScrollRight && (
         <button
           type="button"
           onClick={() => scrollBy(200)}
-          className="lg:hidden absolute right-1 top-1/2 -translate-y-1/2 z-20 w-5 h-5 rounded-full bg-white/95 hover:bg-slate-100 text-slate-700 flex items-center justify-center shadow-md border border-slate-200 transition backdrop-blur-xs cursor-pointer"
+          className="xl:hidden absolute right-1 top-1/2 -translate-y-1/2 z-20 w-5 h-5 rounded-full bg-white/95 hover:bg-slate-100 text-slate-700 flex items-center justify-center shadow-md border border-slate-200 transition backdrop-blur-xs cursor-pointer"
           aria-label="Rolar abas para a direita"
         >
           <ChevronRight className="w-3 h-3" />
         </button>
       )}
 
-      {/* Trilho de abas: em desktop (lg+) envolve (flex-wrap) sem scroll nem chevrons, em telas menores faz scroll horizontal suave */}
+      {/* Trilho de abas: SEMPRE linha única (flex-nowrap whitespace-nowrap), sem quebra.
+          Em desktop (>= 1280px / xl) cabe perfeitamente em 1 linha alinhada.
+          Em telas menores (< xl) rola suavemente sem scrollbar visível. */}
       <div
         ref={scrollContainerRef}
         role="tablist"
         aria-orientation="horizontal"
-        className="flex items-center gap-0.5 sm:gap-1 lg:flex-wrap lg:justify-start overflow-x-auto lg:overflow-x-visible no-scrollbar scroll-smooth py-0.5 px-0.5"
+        className="flex items-center gap-0.5 sm:gap-1 flex-nowrap whitespace-nowrap overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5"
       >
         {tabs.map((tab, idx) => {
           const Icon = tab.icon
@@ -291,15 +299,16 @@ export const BackupTabStrip: React.FC<BackupTabStripProps> = ({
               data-tab-id={tab.id}
               onClick={() => onSelectTab(tab.id)}
               onKeyDown={(e) => handleKeyDown(e, idx)}
+              title={tab.subLabel ? `${tab.label} ${tab.subLabel}` : tab.label}
               className={cn(
-                'group relative shrink-0 flex flex-col justify-center rounded-lg sm:rounded-xl px-2 sm:px-2.5 xl:px-3 py-1.5 text-left transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A56DB] cursor-pointer min-h-[44px]',
+                'group relative shrink-0 flex flex-col justify-center rounded-lg px-1.5 sm:px-2 2xl:px-2.5 py-1 text-left transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A56DB] cursor-pointer min-h-[38px] 2xl:min-h-[42px]',
                 isActive
                   ? 'bg-[#1A56DB] text-white shadow-xs font-semibold'
                   : 'bg-transparent text-slate-700 hover:bg-slate-100/70 hover:text-slate-900',
               )}
             >
               {/* Linha superior: ÍCONE + NOME + CONTADORES */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 sm:gap-1.5">
                 <Icon
                   className={cn(
                     'w-3.5 h-3.5 shrink-0 transition-colors',
@@ -308,18 +317,18 @@ export const BackupTabStrip: React.FC<BackupTabStripProps> = ({
                 />
                 <span
                   className={cn(
-                    'text-[11px] sm:text-xs tracking-tight whitespace-nowrap',
+                    'text-[11px] 2xl:text-xs tracking-tight whitespace-nowrap',
                     isActive ? 'font-bold text-white' : 'font-semibold text-slate-800',
                   )}
                 >
                   {tab.label}
                 </span>
 
-                {/* Mini-badge contador discreto ao lado do nome */}
+                {/* Mini-badge contador compacto ao lado do nome */}
                 {tab.count !== undefined && (
                   <span
                     className={cn(
-                      'inline-flex items-center justify-center px-1.5 py-0.2 text-[10px] font-bold rounded-full leading-none font-mono tracking-tight shrink-0',
+                      'inline-flex items-center justify-center px-1 py-0.2 text-[10px] font-bold rounded-full leading-none font-mono tracking-tight shrink-0',
                       isActive
                         ? 'bg-white/20 text-white border border-white/25'
                         : 'bg-slate-100 text-slate-600 border border-slate-200/90 group-hover:bg-slate-200/80',
@@ -333,7 +342,7 @@ export const BackupTabStrip: React.FC<BackupTabStripProps> = ({
                 {tab.id === 'evidencias' && (tab.nocCount ?? 0) > 0 && (
                   <span
                     className={cn(
-                      'inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] font-bold rounded-full leading-none font-mono shrink-0 shadow-2xs',
+                      'inline-flex items-center gap-0.5 px-1 py-0.2 text-[10px] font-bold rounded-full leading-none font-mono shrink-0 shadow-2xs',
                       isActive
                         ? 'bg-purple-200 text-purple-900 border border-purple-300 font-extrabold'
                         : 'bg-purple-100 text-purple-800 border border-purple-200 group-hover:bg-purple-200',
@@ -346,9 +355,9 @@ export const BackupTabStrip: React.FC<BackupTabStripProps> = ({
                 )}
               </div>
 
-              {/* Linha inferior: SUB-RÓTULO em cinza abaixo (se houver) */}
+              {/* Sub-rótulo: exibido apenas em telas ultra-largas (2xl+) para manter alinhamento em 1 linha em 1280px-1536px */}
               {tab.subLabel && (
-                <div className="pl-5 text-[9px] sm:text-[10px] leading-tight">
+                <div className="hidden 2xl:block pl-4.5 text-[9px] leading-tight">
                   <span
                     className={cn(
                       'transition-colors whitespace-nowrap',
